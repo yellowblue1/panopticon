@@ -6,7 +6,7 @@ const agentIconVariants = cva("inline-flex items-center justify-center shrink-0"
   variants: {
     agent: {
       claude: "text-[#e8926a]",
-      codex: "text-accent-green",
+      codex: "text-white",
       unknown: "text-text-muted",
     },
   },
