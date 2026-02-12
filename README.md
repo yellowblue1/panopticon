@@ -23,7 +23,6 @@ Automatically detects Claude Code processes, tracks their activity in real time,
 ## Quick Start
 
 ```bash
-gcloud auth login                    # Authenticate with GCP (for Gemini API)
 git clone git@github.com:yellowblue1/panopticon.git
 cd panopticon
 bun install
@@ -62,6 +61,12 @@ The dashboard will be available at `https://<your-machine>.ts.net`.
 ## Configuration
 
 ### GCP (Gemini API)
+
+AI summaries and action detection require `gcloud` authentication:
+
+```bash
+gcloud auth login
+```
 
 By default, the GCP project and location are read from your `gcloud` configuration. You can override them with environment variables:
 
