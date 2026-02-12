@@ -215,7 +215,8 @@ const app = createApp(
 
 // Add static file serving and SPA fallback
 const indexHtml = readFileSync(join(import.meta.dirname, "dist", "index.html"));
-const appWithStatic = app.use("/*", serveStatic({ root: "./dist" })).get("/*", (c) => {
+const distDir = join(import.meta.dirname, "dist");
+const appWithStatic = app.use("/*", serveStatic({ root: distDir })).get("/*", (c) => {
   return c.body(indexHtml, 200, {
     "Content-Type": "text/html; charset=utf-8",
   });
