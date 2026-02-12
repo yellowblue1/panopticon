@@ -1,0 +1,46 @@
+import type { SessionResponse } from "@shared/types";
+import { useMemo } from "react";
+import { useReadStatus } from "@/hooks/use-read-status";
+import { SessionRow } from "./session-row";
+
+interface SessionTableProps {
+  sessions: SessionResponse[];
+}
+
+export function SessionTable({ sessions }: SessionTableProps) {
+  const paneIds = useMemo(() => sessions.map((s) => s.pane_id), [sessions]);
+  const { readStatuses, markAsRead } = useReadStatus(paneIds);
+
+  if (sessions.length === 0) {
+    return (
+      <div className="empty-state">
+        <p>No active Claude sessions found.</p>
+        <p className="hint">Sessions will appear here when Claude Code is running in tmux.</p>
+      </div>
+    );
+  }
+
+  return (
+    <table className="sessions-table">
+      <thead>
+        <tr>
+          <th className="col-project">Project</th>
+          <th className="col-branch">Branch</th>
+          <th className="col-status">Status</th>
+          <th className="col-summary">Summary</th>
+          <th className="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sessions.map((session) => (
+          <SessionRow
+            key={session.pane_id}
+            session={session}
+            isRead={readStatuses.get(session.pane_id) ?? false}
+            onMarkAsRead={markAsRead}
+          />
+        ))}
+      </tbody>
+    </table>
+  );
+}

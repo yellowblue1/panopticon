@@ -1,0 +1,416 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Background colors - GitHub Dark palette */
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-bg-tertiary: #21262d;
+
+  /* Text colors - improved contrast */
+  --color-text-primary: #f0f6fc;
+  --color-text-secondary: #c9d1d9;
+  --color-text-muted: #8b949e;
+
+  /* Border colors */
+  --color-border-default: #30363d;
+  --color-border-muted: #21262d;
+
+  /* Accent colors - vibrant */
+  --color-accent-blue: #58a6ff;
+  --color-accent-purple: #bc8cff;
+  --color-accent-green: #3fb950;
+  --color-accent-yellow: #d29922;
+  --color-accent-red: #f85149;
+
+  /* Status badge colors */
+  --color-badge-busy-bg: #238636;
+  --color-badge-busy-text: #fff;
+  --color-badge-waiting-bg: #9e6a03;
+  --color-badge-waiting-text: #fff;
+
+  /* Font family */
+  --font-family-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+/* ============================================
+   Safe Area Support (notched devices)
+   ============================================ */
+
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* ============================================
+   Component Classes
+   ============================================ */
+
+/* Status indicator */
+.status-indicator {
+  @apply w-3 h-3 rounded-full transition-colors;
+}
+
+.status-indicator.connected {
+  @apply bg-accent-green;
+  box-shadow: 0 0 10px rgba(63, 185, 80, 0.6);
+}
+
+.status-indicator.disconnected {
+  @apply bg-accent-red;
+}
+
+.status-indicator.polling {
+  @apply bg-accent-yellow;
+}
+
+/* Empty state */
+.empty-state {
+  @apply text-center py-[60px] px-5 text-text-muted text-[1.0625rem];
+}
+
+.empty-state p {
+  @apply mb-2.5;
+}
+
+.empty-state .hint {
+  @apply text-[0.9375rem] text-text-muted opacity-80;
+}
+
+/* Sessions table */
+.sessions-table {
+  @apply w-full border-collapse text-base;
+}
+
+.sessions-table th {
+  @apply text-left py-3.5 px-[18px] bg-bg-secondary text-text-secondary font-medium text-[0.8125rem] uppercase tracking-[0.05em] border-b border-border-default;
+}
+
+.sessions-table td {
+  @apply py-3.5 px-[18px] border-b border-border-muted align-middle;
+}
+
+.sessions-table tbody tr {
+  @apply transition-colors;
+}
+
+.sessions-table tbody tr:hover {
+  @apply bg-bg-secondary;
+}
+
+.sessions-table tbody tr.read {
+  @apply opacity-70;
+}
+
+/* Column widths — flexible with minimum constraints */
+.col-project {
+  width: 20%;
+  min-width: 140px;
+}
+.col-branch {
+  width: 15%;
+  min-width: 100px;
+}
+.col-status {
+  width: 10%;
+  min-width: 80px;
+}
+.col-summary {
+  width: auto;
+  min-width: 200px;
+}
+.col-actions {
+  width: 10%;
+  min-width: 100px;
+}
+
+/* Project info */
+.project-name {
+  @apply font-medium text-accent-blue;
+}
+
+.git-branch {
+  @apply text-sm text-accent-purple font-mono;
+}
+
+.no-branch {
+  @apply text-text-muted italic text-sm opacity-70;
+}
+
+/* Status badge */
+.status-badge {
+  @apply inline-block text-xl leading-none cursor-default;
+}
+
+/* Summary */
+.summary {
+  @apply text-text-secondary;
+}
+
+.summary-placeholder {
+  @apply text-text-muted italic text-sm opacity-70;
+}
+
+/* AI Summary indicator */
+.ai-indicator {
+  @apply shrink-0 text-accent-yellow cursor-help;
+  font-size: 0.875rem;
+}
+
+/* Action buttons */
+.action-group {
+  @apply flex items-center gap-1.5;
+}
+
+.action-btn {
+  @apply inline-flex items-center justify-center bg-transparent border-none text-text-secondary rounded-md cursor-pointer transition-all;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 6px;
+}
+
+.action-btn:hover {
+  @apply bg-bg-tertiary text-text-primary;
+}
+
+.action-btn:active {
+  @apply scale-[0.98];
+}
+
+.action-btn.copied {
+  @apply text-accent-green;
+}
+
+.action-btn svg {
+  @apply w-5 h-5 shrink-0;
+}
+
+/* Toast */
+.toast {
+  @apply fixed bg-bg-tertiary text-text-primary py-3.5 px-6 rounded-lg text-[0.9375rem] transition-all z-[1000];
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  /* Desktop: bottom-right corner */
+  bottom: max(24px, env(safe-area-inset-bottom));
+  right: max(24px, env(safe-area-inset-right));
+}
+
+@media (max-width: 639px) {
+  .toast {
+    /* Mobile: centered horizontally */
+    right: 16px;
+    left: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+}
+
+.toast.hidden {
+  @apply opacity-0 translate-y-2.5 pointer-events-none;
+}
+
+.toast.success {
+  @apply bg-badge-busy-bg;
+}
+
+.toast.error {
+  @apply bg-accent-red;
+}
+
+/* Warning banner */
+.warning-banner {
+  @apply flex items-center gap-3 bg-bg-secondary border border-accent-yellow rounded-lg p-4 mb-4;
+}
+
+.warning-banner .warning-icon {
+  @apply w-5 h-5 shrink-0 text-accent-yellow;
+}
+
+.warning-banner span {
+  @apply flex-1 text-text-secondary text-sm;
+}
+
+.warning-banner code {
+  @apply bg-bg-tertiary px-1.5 py-0.5 rounded text-accent-yellow font-mono text-xs;
+}
+
+.warning-dismiss {
+  @apply bg-transparent border-none text-text-muted cursor-pointer transition-colors rounded inline-flex items-center justify-center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+}
+
+.warning-dismiss:hover {
+  @apply text-text-primary bg-bg-tertiary;
+}
+
+.warning-dismiss svg {
+  @apply w-5 h-5;
+}
+
+/* Hidden utility — !important needed to override inline/component styles */
+.hidden {
+  /* biome-ignore lint/complexity/noImportantStyles: required to override component display values */
+  display: none !important;
+}
+
+/* ============================================
+   Pane Content Viewer
+   ============================================ */
+
+.pane-viewer {
+  @apply bg-bg-primary border border-border-default rounded-lg overflow-hidden m-0;
+  max-height: calc(100vh - 280px);
+  max-height: calc(100dvh - 280px);
+  min-height: 200px;
+}
+
+.pane-viewer .xterm {
+  padding: 12px;
+}
+
+/* Send keys input bar */
+.send-keys-bar {
+  @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.quick-action-btn {
+  @apply text-xs px-3 py-1 bg-bg-secondary border border-border-default rounded-md text-text-secondary cursor-pointer transition-colors;
+  min-height: 32px;
+}
+
+.quick-action-btn:hover {
+  @apply bg-bg-tertiary text-text-primary;
+}
+
+.quick-action-btn:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+/* ============================================
+   Responsive Breakpoints
+   ============================================ */
+
+/* Medium screens (640px–1023px): table without branch */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .col-branch {
+    display: none;
+  }
+
+  .col-project {
+    width: 25%;
+  }
+  .col-status {
+    width: 15%;
+  }
+  .col-summary {
+    width: auto;
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    @apply py-2.5 px-3.5;
+  }
+}
+
+/* Small screens (<640px): card layout */
+@media (max-width: 639px) {
+  .sessions-table {
+    display: block;
+  }
+
+  .sessions-table thead {
+    display: none;
+  }
+
+  .sessions-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Card: transform <tr> into a CSS Grid card */
+  .sessions-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas:
+      "project  status actions"
+      "summary  summary summary"
+      "branch   branch  branch";
+    gap: 4px 8px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-default);
+  }
+
+  .sessions-table tbody tr:hover {
+    background: var(--color-bg-tertiary);
+  }
+
+  /* Remove td border-bottom in card mode */
+  .sessions-table td {
+    border-bottom: none;
+    padding: 0;
+  }
+
+  .col-project {
+    grid-area: project;
+    width: auto;
+    min-width: 0;
+  }
+
+  .col-status {
+    grid-area: status;
+    width: auto;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .col-actions {
+    grid-area: actions;
+    width: auto;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .col-summary {
+    grid-area: summary;
+    min-width: 0;
+    width: auto;
+  }
+
+  .col-branch {
+    grid-area: branch;
+    width: auto;
+    min-width: 0;
+    font-size: 0.8125rem;
+    opacity: 0.7;
+  }
+
+  .summary {
+    @apply text-sm;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .project-name {
+    @apply text-[0.9375rem];
+  }
+
+  .copy-action {
+    display: none;
+  }
+
+  .pane-viewer {
+    max-height: calc(100vh - 260px);
+    max-height: calc(100dvh - 260px);
+    min-height: 150px;
+    @apply rounded-none border-x-0;
+  }
+}
