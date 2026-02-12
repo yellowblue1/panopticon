@@ -4,8 +4,8 @@ import { serveStatic } from "hono/bun";
 import { detectPaneActions } from "../src/intelligence/application/detect-actions";
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
 import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
-import { getAccessToken } from "../src/intelligence/infrastructure/gcp-auth";
 import { getGcpLocation, getGcpProject } from "../src/intelligence/infrastructure/gcp-config";
+import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
@@ -40,18 +40,18 @@ const HOST = process.env.HOST ?? DEFAULT_HOST;
 
 // ═══ Wire dependencies ═══
 
+const gcpProject = getGcpProject();
+const gcpLocation = getGcpLocation();
+
+// Create SDK-based generateContent function (only if project is configured)
+const generateContent = gcpProject ? createGenerateContentFn(gcpProject, gcpLocation) : null;
+
 const summaryDeps: SummaryDeps = {
-  fetch: globalThis.fetch,
-  getAccessToken,
-  getGcpProject,
-  getGcpLocation,
+  generateContent: generateContent ?? (async () => null),
 };
 
 const actionDeps: ActionDeps = {
-  fetch: globalThis.fetch,
-  getAccessToken,
-  getGcpProject,
-  getGcpLocation,
+  generateContent: generateContent ?? (async () => null),
 };
 
 const sessionManagerDeps: SessionManagerDeps = {
@@ -178,8 +178,8 @@ const app = createApp(
       const sanitized = sanitizePaneContent(rawContent);
       return detectPaneActions(sanitized, actionDeps);
     },
-    getAccessToken,
     getGcpProject,
+    isAiAvailable: generateContent !== null,
     onSseConnect: (client) => {
       clients.add(client);
     },

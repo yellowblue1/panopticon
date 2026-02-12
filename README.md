@@ -62,10 +62,10 @@ The dashboard will be available at `https://<your-machine>.ts.net`.
 
 ### GCP (Gemini API)
 
-AI summaries and action detection require `gcloud` authentication:
+AI summaries and action detection use the `@google/genai` SDK with Application Default Credentials (ADC):
 
 ```bash
-gcloud auth login
+gcloud auth login --update-adc
 ```
 
 By default, the GCP project and location are read from your `gcloud` configuration. You can override them with environment variables:
@@ -101,7 +101,7 @@ bun run depcruise    # Dependency architecture check
 | Runtime | [Bun](https://bun.sh/) |
 | Backend | [Hono](https://hono.dev/) |
 | Frontend | [React](https://react.dev/) 19, [TanStack Router & Query](https://tanstack.com/), [xterm.js](https://xtermjs.org/) |
-| AI | [Gemini 2.5 Flash](https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash) via Vertex AI |
+| AI | [Gemini 2.5 Flash](https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash) via [`@google/genai`](https://github.com/googleapis/js-genai) SDK |
 | Styling | [Tailwind CSS](https://tailwindcss.com/) |
 | Quality | [Biome](https://biomejs.dev/), TypeScript strict, [dependency-cruiser](https://github.com/sverweij/dependency-cruiser), [knip](https://knip.dev/) |
 

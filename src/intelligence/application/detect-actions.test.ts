@@ -1,22 +1,18 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import {
-  mockFetchNetworkError,
-  mockGeminiEmpty,
-  mockGeminiError,
-  mockGeminiSuccess,
+  mockGenerateContent,
+  mockGenerateContentEmpty,
+  mockGenerateContentError,
 } from "../../__tests__";
 import type { PaneAction } from "../../shared/types";
-import type { ActionDeps, FetchFn } from "../domain/ports";
+import type { ActionDeps, GenerateContentFn } from "../domain/ports";
 import { clearActionCache, getInflightSize } from "../infrastructure/action-cache";
 import { detectPaneActions } from "./detect-actions";
 
 describe("detect-actions", () => {
   describe("detectPaneActions", () => {
-    const mockDeps = (fetchImpl: FetchFn): ActionDeps => ({
-      fetch: fetchImpl,
-      getAccessToken: () => "mock-token" as string | null,
-      getGcpProject: () => "mock-project" as string | null,
-      getGcpLocation: () => "us-central1",
+    const mockDeps = (generateContent: GenerateContentFn): ActionDeps => ({
+      generateContent,
     });
 
     beforeEach(() => {
@@ -27,7 +23,7 @@ describe("detect-actions", () => {
       const action: PaneAction = { type: "yesno" };
       const result = await detectPaneActions(
         "Do you want to proceed? (y/n)",
-        mockDeps(mockGeminiSuccess(JSON.stringify(action))),
+        mockDeps(mockGenerateContent(JSON.stringify(action))),
       );
       expect(result).toEqual(action);
     });
@@ -42,7 +38,7 @@ describe("detect-actions", () => {
       };
       const result = await detectPaneActions(
         "Select an option:\n1. Create file\n2. Delete file",
-        mockDeps(mockGeminiSuccess(JSON.stringify(action))),
+        mockDeps(mockGenerateContent(JSON.stringify(action))),
       );
       expect(result).toEqual(action);
     });
@@ -51,7 +47,7 @@ describe("detect-actions", () => {
       const action: PaneAction = { type: "freeform", placeholder: "Enter file path..." };
       const result = await detectPaneActions(
         "Enter the file path:",
-        mockDeps(mockGeminiSuccess(JSON.stringify(action))),
+        mockDeps(mockGenerateContent(JSON.stringify(action))),
       );
       expect(result).toEqual(action);
     });
@@ -59,46 +55,25 @@ describe("detect-actions", () => {
     it("returns none for empty content", async () => {
       const result = await detectPaneActions(
         "   ",
-        mockDeps(mockGeminiSuccess('{"type":"yesno"}')),
+        mockDeps(mockGenerateContent('{"type":"yesno"}')),
       );
       expect(result).toEqual({ type: "none" });
     });
 
-    it("returns none when project is not configured", async () => {
-      const result = await detectPaneActions("content", {
-        ...mockDeps(mockGeminiSuccess('{"type":"yesno"}')),
-        getGcpProject: () => null,
-      });
+    it("returns none on empty response", async () => {
+      const result = await detectPaneActions("content", mockDeps(mockGenerateContentEmpty()));
       expect(result).toEqual({ type: "none" });
     });
 
-    it("returns none when access token is unavailable", async () => {
-      const result = await detectPaneActions("content", {
-        ...mockDeps(mockGeminiSuccess('{"type":"yesno"}')),
-        getAccessToken: () => null,
-      });
-      expect(result).toEqual({ type: "none" });
-    });
-
-    it("returns none on API error response", async () => {
-      const result = await detectPaneActions("content", mockDeps(mockGeminiError(500)));
-      expect(result).toEqual({ type: "none" });
-    });
-
-    it("returns none on empty candidates", async () => {
-      const result = await detectPaneActions("content", mockDeps(mockGeminiEmpty()));
-      expect(result).toEqual({ type: "none" });
-    });
-
-    it("returns none on network error", async () => {
-      const result = await detectPaneActions("content", mockDeps(mockFetchNetworkError()));
+    it("returns none on API error", async () => {
+      const result = await detectPaneActions("content", mockDeps(mockGenerateContentError()));
       expect(result).toEqual({ type: "none" });
     });
 
     it("returns none on invalid JSON from Gemini", async () => {
       const result = await detectPaneActions(
         "content",
-        mockDeps(mockGeminiSuccess("not valid json")),
+        mockDeps(mockGenerateContent("not valid json")),
       );
       expect(result).toEqual({ type: "none" });
     });
@@ -106,7 +81,7 @@ describe("detect-actions", () => {
     it("returns none on invalid action type", async () => {
       const result = await detectPaneActions(
         "content",
-        mockDeps(mockGeminiSuccess('{"type":"unknown_type"}')),
+        mockDeps(mockGenerateContent('{"type":"unknown_type"}')),
       );
       expect(result).toEqual({ type: "none" });
     });
@@ -114,13 +89,13 @@ describe("detect-actions", () => {
     describe("caching", () => {
       it("returns cached action on second call with same content", async () => {
         let callCount = 0;
-        const countingFetch: FetchFn = async (url, options) => {
+        const countingFn: GenerateContentFn = async () => {
           callCount++;
-          return mockGeminiSuccess('{"type":"yesno"}')(url, options);
+          return '{"type":"yesno"}';
         };
 
-        const result1 = await detectPaneActions("same content", mockDeps(countingFetch));
-        const result2 = await detectPaneActions("same content", mockDeps(countingFetch));
+        const result1 = await detectPaneActions("same content", mockDeps(countingFn));
+        const result2 = await detectPaneActions("same content", mockDeps(countingFn));
 
         expect(result1).toEqual({ type: "yesno" });
         expect(result2).toEqual({ type: "yesno" });
@@ -129,26 +104,26 @@ describe("detect-actions", () => {
 
       it("makes new API call for different content", async () => {
         let callCount = 0;
-        const countingFetch: FetchFn = async (url, options) => {
+        const countingFn: GenerateContentFn = async () => {
           callCount++;
-          return mockGeminiSuccess('{"type":"none"}')(url, options);
+          return '{"type":"none"}';
         };
 
-        await detectPaneActions("content A", mockDeps(countingFetch));
-        await detectPaneActions("content B", mockDeps(countingFetch));
+        await detectPaneActions("content A", mockDeps(countingFn));
+        await detectPaneActions("content B", mockDeps(countingFn));
 
         expect(callCount).toBe(2);
       });
 
       it("does not cache when API returns error", async () => {
         let callCount = 0;
-        const countingErrorFetch: FetchFn = async (url, options) => {
+        const countingErrorFn: GenerateContentFn = async () => {
           callCount++;
-          return mockGeminiError(500)(url, options);
+          throw new Error("API error");
         };
 
-        await detectPaneActions("content", mockDeps(countingErrorFetch));
-        await detectPaneActions("content", mockDeps(countingErrorFetch));
+        await detectPaneActions("content", mockDeps(countingErrorFn));
+        await detectPaneActions("content", mockDeps(countingErrorFn));
 
         expect(callCount).toBe(2);
       });
@@ -157,27 +132,21 @@ describe("detect-actions", () => {
     describe("in-flight deduplication", () => {
       it("concurrent calls with same content only make one API call", async () => {
         let callCount = 0;
-        let resolveResponse!: (value: Response) => void;
-        const delayedFetch: FetchFn = async () => {
+        let resolveResponse!: (value: string | null) => void;
+        const delayedFn: GenerateContentFn = async () => {
           callCount++;
-          return new Promise<Response>((resolve) => {
+          return new Promise<string | null>((resolve) => {
             resolveResponse = resolve;
           });
         };
 
-        const deps = mockDeps(delayedFetch);
+        const deps = mockDeps(delayedFn);
 
         const p1 = detectPaneActions("same content", deps);
         const p2 = detectPaneActions("same content", deps);
         const p3 = detectPaneActions("same content", deps);
 
-        resolveResponse({
-          ok: true,
-          status: 200,
-          json: async () => ({
-            candidates: [{ content: { parts: [{ text: '{"type":"yesno"}' }] } }],
-          }),
-        } as Response);
+        resolveResponse('{"type":"yesno"}');
 
         const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
 
@@ -188,12 +157,12 @@ describe("detect-actions", () => {
       });
 
       it("in-flight entry is cleaned up after request completes", async () => {
-        await detectPaneActions("content", mockDeps(mockGeminiSuccess('{"type":"yesno"}')));
+        await detectPaneActions("content", mockDeps(mockGenerateContent('{"type":"yesno"}')));
         expect(getInflightSize()).toBe(0);
       });
 
       it("in-flight entry is cleaned up after request fails", async () => {
-        await detectPaneActions("content", mockDeps(mockGeminiError(500)));
+        await detectPaneActions("content", mockDeps(mockGenerateContentError()));
         expect(getInflightSize()).toBe(0);
       });
     });

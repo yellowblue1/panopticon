@@ -16,8 +16,8 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     sendRawKey: () => true,
     capturePaneContent: () => null,
     detectPaneActions: async () => ({ type: "none" }),
-    getAccessToken: () => "mock-token",
     getGcpProject: () => "mock-project",
+    isAiAvailable: true,
     onSseConnect: () => {},
     onSseDisconnect: () => {},
     serializeSessionsData: () => "{}",
@@ -368,10 +368,10 @@ describe("Hono API endpoints", () => {
   });
 
   describe("GET /api/auth/status", () => {
-    it("returns all true when both authenticated and configured", async () => {
+    it("returns all true when project configured and AI available", async () => {
       const deps = createMockDeps({
-        getAccessToken: () => "valid-token",
         getGcpProject: () => "my-project",
+        isAiAvailable: true,
       });
       const app = createApp(deps);
 
@@ -384,24 +384,24 @@ describe("Hono API endpoints", () => {
       expect(data.ai_summary_available).toBe(true);
     });
 
-    it("returns false when not authenticated", async () => {
+    it("returns false when AI is not available", async () => {
       const deps = createMockDeps({
-        getAccessToken: () => null,
         getGcpProject: () => "my-project",
+        isAiAvailable: false,
       });
       const app = createApp(deps);
 
       const res = await app.request("/api/auth/status");
       const data = await res.json();
 
-      expect(data.gcloud_authenticated).toBe(false);
+      expect(data.gcloud_authenticated).toBe(true);
       expect(data.ai_summary_available).toBe(false);
     });
 
     it("returns false when project not configured", async () => {
       const deps = createMockDeps({
-        getAccessToken: () => "valid-token",
         getGcpProject: () => null,
+        isAiAvailable: false,
       });
       const app = createApp(deps);
 

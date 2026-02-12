@@ -1,5 +1,5 @@
 import type { PaneAction } from "../../shared/types";
-import type { ActionDeps, GeminiResponse } from "../domain/ports";
+import type { ActionDeps } from "../domain/ports";
 import { isValidPaneAction } from "../domain/ports";
 import { buildActionPrompt, getContentTail } from "../domain/prompts";
 import {
@@ -9,8 +9,6 @@ import {
   setCachedAction,
   setInflightRequest,
 } from "../infrastructure/action-cache";
-
-const MODEL_ID = "gemini-2.5-flash";
 
 const DEFAULT_ACTION: PaneAction = { type: "none" };
 
@@ -43,19 +41,6 @@ export async function detectPaneActions(content: string, deps: ActionDeps): Prom
     return existing;
   }
 
-  const projectId = deps.getGcpProject();
-  if (!projectId) {
-    return DEFAULT_ACTION;
-  }
-
-  const accessToken = deps.getAccessToken();
-  if (!accessToken) {
-    return DEFAULT_ACTION;
-  }
-
-  const location = deps.getGcpLocation();
-  const apiUrl = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${MODEL_ID}:generateContent`;
-
   const prompt = buildActionPrompt(contentTail);
 
   const requestPromise = (async (): Promise<PaneAction> => {
@@ -66,38 +51,9 @@ export async function detectPaneActions(content: string, deps: ActionDeps): Prom
       );
       console.log(`${new Date().toISOString()} [Gemini Actions] Content tail:\n${contentTail}`);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const response = await deps.fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: {
-            role: "user",
-            parts: { text: prompt },
-          },
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
-        }),
-        signal: controller.signal,
+      const text = await deps.generateContent(prompt, {
+        responseMimeType: "application/json",
       });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.log(
-          `${new Date().toISOString()} [Gemini Actions] Request failed: HTTP ${response.status} (${Date.now() - startTime}ms)`,
-        );
-        return DEFAULT_ACTION;
-      }
-
-      const data = (await response.json()) as GeminiResponse;
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!text) {
         console.log(
