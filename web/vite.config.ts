@@ -10,7 +10,11 @@ export default defineConfig({
       routesDirectory: resolve(__dirname, "src/client/routes"),
       generatedRouteTree: resolve(__dirname, "src/client/routeTree.gen.ts"),
     }),
-    react(),
+    react({
+      babel: {
+        plugins: ["babel-plugin-react-compiler"],
+      },
+    }),
     tailwindcss(),
   ],
   root: "src",
