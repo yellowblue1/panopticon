@@ -10,12 +10,12 @@ import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
 import {
+  buildTmuxTarget,
   getClaudeProcesses,
   matchProcessesToPanes,
 } from "../src/terminal/infrastructure/process-matching";
 import { sanitizePaneContent } from "../src/terminal/infrastructure/sanitize";
 import {
-  buildTmuxTarget,
   capturePaneContent,
   capturePaneContentEscaped,
   capturePaneContentSanitized,
