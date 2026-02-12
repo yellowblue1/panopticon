@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["@types/bun"],
+    "lib": ["ESNext", "DOM"]
+  },
+  "include": ["src/**/*.ts", "test-setup.ts"],
+  "exclude": ["node_modules", "web/**"]
+}

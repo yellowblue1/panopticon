@@ -1,0 +1,4 @@
+[test]
+# Exclude web directory - it has its own test configuration
+root = "./src"
+preload = ["./test-setup.ts"]
