@@ -49,7 +49,7 @@ Then:
 bunx @yellowblue1/panopticon
 ```
 
-## Remote Access via Tailscale
+## Remote Access via [Tailscale](https://tailscale.com/)
 
 Expose the dashboard to your Tailscale network so you can monitor sessions from your phone:
 
