@@ -1,11 +1,26 @@
 {
-  "name": "panopticon",
-  "version": "1.0.0",
+  "name": "@yellowblue1/panopticon",
+  "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "panopticon": "bin/cli.ts"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "web/server.ts",
+    "web/server-app.ts",
+    "web/dist/",
+    "web/public/"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "workspaces": [
     "web"
   ],
   "scripts": {
+    "prepublishOnly": "cd web && bun run build",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
@@ -15,6 +30,9 @@
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
     "knip": "knip",
     "type-coverage": "type-coverage --at-least 99"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",
