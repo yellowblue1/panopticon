@@ -1,0 +1,48 @@
+repos:
+  # Block commits to protected branches
+  - repo: local
+    hooks:
+      - id: block-protected-branch-commit
+        name: Block commits to protected branches
+        entry: bash -c 'BRANCH=$(git branch --show-current); if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then echo "Direct commits to ${BRANCH} are prohibited. Create a feature/* branch and submit a PR."; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  # Common hooks for all files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.md$'
+      - id: check-yaml
+      - id: check-json
+        exclude: 'tsconfig.*\.json$'
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Project quality gates
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: Biome check
+        entry: bun run lint:fix
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json]
+        pass_filenames: false
+
+      - id: typescript-check
+        name: TypeScript check
+        entry: bun run typecheck
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false
+
+      - id: dependency-cruiser
+        name: Dependency architecture check
+        entry: bun run depcruise
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false
