@@ -52,19 +52,12 @@ bunx @yellowblue1/panopticon
 
 ### GCP (Gemini API)
 
-Each setting is resolved in this order — first match wins:
+By default, the GCP project and location are read from your `gcloud` configuration. You can override them with environment variables:
 
-| Setting | Env var | Settings file key | Fallback |
-|---------|---------|-------------------|----------|
-| Project | `GEMINI_GCP_PROJECT` | `gcp_project` | `gcloud config get-value project` |
-| Location | `GEMINI_GCP_LOCATION` | `gcp_location` | `asia-northeast1` |
-
-Settings file path: `~/.claude/panopticon.local.md`
-
-```
-gcp_project: my-project-id
-gcp_location: us-central1
-```
+| Setting | Env var | Default |
+|---------|---------|---------|
+| Project | `GEMINI_GCP_PROJECT` | `gcloud config get-value project` |
+| Location | `GEMINI_GCP_LOCATION` | `asia-northeast1` |
 
 ### Server
 
