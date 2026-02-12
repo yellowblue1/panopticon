@@ -12,6 +12,7 @@ Automatically detects Claude Code processes, tracks their activity in real time,
 - **Action detection** — identifies what type of input Claude expects (yes/no, choices, free-text, or none)
 - **Live dashboard** — Server-Sent Events push updates to the React UI in real time
 - **Terminal viewer** — xterm.js renders full ANSI output; send keystrokes directly from the browser
+- **Mobile access** — access the dashboard from your phone over Tailscale VPN
 
 ## Prerequisites
 
@@ -47,6 +48,16 @@ Then:
 ```bash
 bunx @yellowblue1/panopticon
 ```
+
+## Remote Access via Tailscale
+
+Expose the dashboard to your Tailscale network so you can monitor sessions from your phone:
+
+```bash
+tailscale serve --bg 3847
+```
+
+The dashboard will be available at `https://<your-machine>.ts.net`.
 
 ## Configuration
 
