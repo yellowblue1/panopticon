@@ -28,10 +28,7 @@ function ClaudeIcon() {
 function CodexIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="w-full h-full">
-      <path
-        fillRule="evenodd"
-        d="M2 2.5A1.5 1.5 0 013.5 1h9A1.5 1.5 0 0114 2.5v11a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 13.5v-11zm2.75 3.75a.75.75 0 000 1.06L6.44 9 4.75 10.69a.75.75 0 101.06 1.06l2.22-2.22a.75.75 0 000-1.06L5.81 6.25a.75.75 0 00-1.06 0zM8.5 11.25a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3z"
-      />
+      <path d="M8 6.2L8 2.5 10.4 3.9ZM9.6 7.1L12.8 5.3 12.8 8ZM9.6 8.9L12.8 10.8 10.4 12.1ZM8 9.8L8 13.5 5.6 12.1ZM6.4 8.9L3.2 10.8 3.2 8ZM6.4 7.1L3.2 5.3 5.6 3.9Z" />
     </svg>
   );
 }
