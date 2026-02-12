@@ -93,12 +93,12 @@ bun run depcruise    # Dependency architecture check
 
 | Layer | Technology |
 |-------|-----------|
-| Runtime | Bun |
-| Backend | Hono |
-| Frontend | React 19, TanStack Router & Query, xterm.js |
-| AI | Gemini 2.5 Flash via Vertex AI |
-| Styling | Tailwind CSS |
-| Quality | Biome, TypeScript strict, dependency-cruiser, knip |
+| Runtime | [Bun](https://bun.sh/) |
+| Backend | [Hono](https://hono.dev/) |
+| Frontend | [React](https://react.dev/) 19, [TanStack Router & Query](https://tanstack.com/), [xterm.js](https://xtermjs.org/) |
+| AI | [Gemini 2.5 Flash](https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash) via Vertex AI |
+| Styling | [Tailwind CSS](https://tailwindcss.com/) |
+| Quality | [Biome](https://biomejs.dev/), TypeScript strict, [dependency-cruiser](https://github.com/sverweij/dependency-cruiser), [knip](https://knip.dev/) |
 
 ## Project Structure
 
