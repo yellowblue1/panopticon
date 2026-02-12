@@ -19,7 +19,7 @@ Automatically detects Claude Code processes, tracks their activity in real time,
 - [Bun](https://bun.sh/) v1.x
 - tmux
 - A GCP project with the Vertex AI API enabled (for Gemini)
-- `gcloud auth login --update-adc`
+- `gcloud auth login`
 
 ## Quick Start
 
