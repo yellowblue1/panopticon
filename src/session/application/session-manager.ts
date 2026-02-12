@@ -2,7 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { SessionResponse } from "../../shared/types";
+import type { AgentType, SessionResponse } from "../../shared/types";
 import type { SessionState } from "../../terminal/domain/types";
 import type { SessionManagerDeps, SessionManagerOptions } from "../domain/ports";
 
@@ -217,7 +217,7 @@ export class SessionManager {
     this.sessions.set(paneId, {
       pane_id: paneId,
       process_pid: processPid,
-      agent_type: binaryName,
+      agent_type: binaryName as AgentType,
       cwd,
       project_name: this.deps.getProjectName(cwd),
       git_branch: this.deps.getGitBranch(cwd),

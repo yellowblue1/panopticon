@@ -401,6 +401,10 @@ body {
 
   .project-name {
     @apply text-[0.9375rem];
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .copy-action {
