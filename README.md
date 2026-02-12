@@ -22,21 +22,31 @@ Automatically detects Claude Code processes, tracks their activity in real time,
 
 ## Quick Start
 
-Set up GitHub Packages access (one-time):
+```bash
+git clone git@github.com:yellowblue1/panopticon.git
+cd panopticon
+bun install
+bun run web/server.ts
+```
+
+Open http://localhost:3847 in your browser.
+
+### Alternative: run via bunx
+
+If you prefer not to clone the repo, you can run directly via GitHub Packages.
+
+One-time setup — add to `~/.npmrc`:
 
 ```bash
-# Add to ~/.npmrc (replace ghp_... with a GitHub PAT that has read:packages scope)
-echo "//npm.pkg.github.com/:_authToken=ghp_YOUR_TOKEN" >> ~/.npmrc
+echo "//npm.pkg.github.com/:_authToken=ghp_YOUR_TOKEN" >> ~/.npmrc  # GitHub PAT with read:packages
 echo "@yellowblue1:registry=https://npm.pkg.github.com" >> ~/.npmrc
 ```
 
-Run:
+Then:
 
 ```bash
 bunx @yellowblue1/panopticon
 ```
-
-Open http://localhost:3847 in your browser.
 
 ## Configuration
 
