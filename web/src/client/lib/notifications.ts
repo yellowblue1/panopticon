@@ -20,7 +20,7 @@ export function showBrowserNotification(session: SessionResponse): void {
 
   new Notification(title, {
     body,
-    tag: `crux-${session.pane_id}`,
+    tag: `panopticon-${session.pane_id}`,
     icon: "/favicon.ico",
   });
 }

@@ -1,7 +1,7 @@
 import type { AuthStatusResponse } from "@shared/types";
 import { useState } from "react";
 
-const AUTH_DISMISSED_KEY = "crux-auth-warning-dismissed";
+const AUTH_DISMISSED_KEY = "panopticon-auth-warning-dismissed";
 
 function getWarningMessage(authStatus: AuthStatusResponse): string | null {
   if (authStatus.ai_summary_available) return null;

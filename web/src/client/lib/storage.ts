@@ -1,4 +1,4 @@
-const DB_NAME = "crux-monitor";
+const DB_NAME = "panopticon";
 const STORE_NAME = "read-events";
 
 let db: IDBDatabase | null = null;
