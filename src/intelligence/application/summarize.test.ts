@@ -32,7 +32,7 @@ describe("summarize", () => {
 
     it("mentions terminal output context", () => {
       const prompt = buildConversationPrompt("test");
-      expect(prompt).toContain("terminal output from a Claude Code session");
+      expect(prompt).toContain("terminal output from a coding agent session");
     });
 
     it("includes attention detection instructions with bell emoji", () => {

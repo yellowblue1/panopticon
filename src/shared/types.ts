@@ -11,6 +11,7 @@ export interface SessionResponse {
   summary: string | null;
   tmux_target: string;
   last_activity: string;
+  agent_type: string;
 }
 
 export interface SessionsApiResponse {

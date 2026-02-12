@@ -1,15 +1,15 @@
 # Panopticon
 
-A monitoring dashboard for Claude Code sessions running in tmux.
+A monitoring dashboard for Claude Code and Codex sessions running in tmux.
 
-Automatically detects Claude Code processes, tracks their activity in real time, and generates AI-powered summaries when sessions go idle — all accessible through a web-based dashboard.
+Automatically detects Claude Code and Codex processes, tracks their activity in real time, and generates AI-powered summaries when sessions go idle — all accessible through a web-based dashboard.
 
 ## Features
 
-- **Auto-discovery** — finds Claude Code processes across tmux panes via process table scanning
+- **Auto-discovery** — finds Claude Code and Codex processes across tmux panes via process table scanning
 - **Real-time activity detection** — FIFO-based pipe-pane monitoring with polling fallback
 - **AI summaries** — generates concise session summaries using Gemini 2.5 Flash when a session is idle
-- **Action detection** — identifies what type of input Claude expects (yes/no, choices, free-text, or none)
+- **Action detection** — identifies what type of input the agent expects (yes/no, choices, free-text, or none)
 - **Live dashboard** — Server-Sent Events push updates to the React UI in real time
 - **Terminal viewer** — xterm.js renders full ANSI output; send keystrokes directly from the browser
 - **Mobile access** — access the dashboard from your phone over Tailscale VPN

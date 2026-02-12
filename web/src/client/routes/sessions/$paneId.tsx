@@ -18,7 +18,7 @@ function SessionDetailPage() {
 
   return (
     <>
-      <title>{session?.project_name ?? paneId} - Claude Monitoring</title>
+      <title>{session?.project_name ?? paneId} - Panopticon</title>
 
       <div className="mb-4">
         <Link to="/" className="text-accent-blue hover:underline text-sm">

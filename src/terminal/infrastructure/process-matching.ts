@@ -1,26 +1,35 @@
-import type { ClaudeProcess, ProcessInfo, TmuxPane } from "../domain/types";
+import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
+
+const MONITORED_BINARIES = new Set(["claude", "codex"]);
 
 /**
- * Check if a command string is a Claude CLI binary.
- * Matches only the actual `claude` binary name (case-sensitive),
- * not processes that happen to have "claude" in their arguments or paths.
+ * Extract the binary name from a command string.
+ * Takes the last path component of the first whitespace-delimited word.
  */
-/** @internal Exported for testing only */
-export function isClaudeBinary(command: string): boolean {
+function extractBinaryName(command: string): string {
   const firstWord = command.split(/\s+/)[0] || "";
-  const binaryName = firstWord.split("/").pop() || "";
-  return binaryName === "claude";
+  return firstWord.split("/").pop() || "";
 }
 
 /**
- * Find all Claude Code CLI processes from a process table.
- * Only matches the `claude` binary itself, filtering out Claude Desktop app,
- * editors with .claude/ paths, and other false positives.
+ * Check if a command string is a monitored coding-agent binary.
+ * Matches the actual binary name (case-sensitive) for any entry in MONITORED_BINARIES,
+ * not processes that happen to have the name in their arguments or paths.
  */
-export function getClaudeProcesses(processTable: ProcessInfo[]): ClaudeProcess[] {
+/** @internal Exported for testing only */
+export function isMonitoredBinary(command: string): boolean {
+  return MONITORED_BINARIES.has(extractBinaryName(command));
+}
+
+/**
+ * Find all monitored coding-agent CLI processes from a process table.
+ * Only matches the actual binary itself, filtering out desktop apps,
+ * editors with config paths, and other false positives.
+ */
+export function getMonitoredProcesses(processTable: ProcessInfo[]): MonitoredProcess[] {
   return processTable
-    .filter((p) => isClaudeBinary(p.command))
-    .map((p) => ({ pid: p.pid, ppid: p.ppid }));
+    .filter((p) => isMonitoredBinary(p.command))
+    .map((p) => ({ pid: p.pid, ppid: p.ppid, binaryName: extractBinaryName(p.command) }));
 }
 
 /**
@@ -31,17 +40,17 @@ export function buildTmuxTarget(pane: TmuxPane): string {
 }
 
 /**
- * Match Claude processes to tmux panes by walking the process tree.
- * For each Claude process, walks up the PPID chain to find an ancestor
+ * Match monitored processes to tmux panes by walking the process tree.
+ * For each monitored process, walks up the PPID chain to find an ancestor
  * that is a tmux pane's initial process (pane_pid).
- * This handles cases where claude is launched through intermediate processes
- * (e.g., shell → wrapper script → claude).
+ * This handles cases where the agent is launched through intermediate processes
+ * (e.g., shell → wrapper script → claude/codex).
  */
 export function matchProcessesToPanes(
-  processes: ClaudeProcess[],
+  processes: MonitoredProcess[],
   panes: TmuxPane[],
   processTable: ProcessInfo[] = [],
-): Map<string, { process: ClaudeProcess; pane: TmuxPane }> {
+): Map<string, { process: MonitoredProcess; pane: TmuxPane }> {
   const paneByPid = new Map<number, TmuxPane>();
   for (const pane of panes) {
     paneByPid.set(pane.pane_pid, pane);
@@ -53,10 +62,10 @@ export function matchProcessesToPanes(
     processById.set(p.pid, p);
   }
 
-  const result = new Map<string, { process: ClaudeProcess; pane: TmuxPane }>();
+  const result = new Map<string, { process: MonitoredProcess; pane: TmuxPane }>();
 
   for (const proc of processes) {
-    // Walk up the process tree from claude's parent
+    // Walk up the process tree from the agent's parent
     let currentPid = proc.ppid;
     const visited = new Set<number>();
 

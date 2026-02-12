@@ -11,7 +11,7 @@ import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
 import {
   buildTmuxTarget,
-  getClaudeProcesses,
+  getMonitoredProcesses,
   matchProcessesToPanes,
 } from "../src/terminal/infrastructure/process-matching";
 import { sanitizePaneContent } from "../src/terminal/infrastructure/sanitize";
@@ -58,7 +58,7 @@ const sessionManagerDeps: SessionManagerDeps = {
   isTmuxAvailable,
   getAllTmuxPanes,
   getProcessTable,
-  getClaudeProcesses,
+  getMonitoredProcesses,
   getProcessCwd,
   getProcessStartTime,
   getProjectName,
