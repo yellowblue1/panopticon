@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
 
-export type ConnectionStatus = "connected" | "polling" | "disconnected";
+type ConnectionStatus = "connected" | "polling" | "disconnected";
 
 interface ConnectionContextValue {
   status: ConnectionStatus;

@@ -52,7 +52,7 @@ export interface SseClient {
 /**
  * Options for app creation
  */
-export interface AppOptions {
+interface AppOptions {
   restrictCors?: boolean;
 }
 
