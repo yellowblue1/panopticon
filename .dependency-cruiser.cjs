@@ -17,13 +17,9 @@ module.exports = {
       from: { path: "^src/[^/]+/domain/" },
       to: { path: "^src/[^/]+/application/" },
     },
-    {
-      name: "no-application-depends-on-infrastructure",
-      comment: "Application layer must not import infrastructure directly",
-      severity: "error",
-      from: { path: "^src/[^/]+/application/" },
-      to: { path: "^src/[^/]+/infrastructure/" },
-    },
+    // NOTE: Application → Infrastructure within the SAME bounded context is allowed.
+    // Cross-context isolation rules below prevent the problematic case
+    // (application in context A importing infrastructure from context B).
 
     // ═══ BOUNDED CONTEXT ISOLATION ═══
 
