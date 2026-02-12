@@ -27,8 +27,21 @@ function ClaudeIcon() {
 
 function CodexIcon() {
   return (
-    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="w-full h-full">
-      <path d="M8 6.2L8 2.5 10.4 3.9ZM9.6 7.1L12.8 5.3 12.8 8ZM9.6 8.9L12.8 10.8 10.4 12.1ZM8 9.8L8 13.5 5.6 12.1ZM6.4 8.9L3.2 10.8 3.2 8ZM6.4 7.1L3.2 5.3 5.6 3.9Z" />
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+      className="w-full h-full"
+    >
+      <path d="M8 2.5 C11 3, 10.5 5, 9 6.3" />
+      <path d="M12.8 5.3 C13.5 7, 11.5 8.5, 10 8" />
+      <path d="M12.8 10.8 C12 12, 10 10.5, 9 9.7" />
+      <path d="M8 13.5 C5 13, 5.5 11, 7 9.7" />
+      <path d="M3.2 10.8 C2.5 9, 4.5 7.5, 6 8" />
+      <path d="M3.2 5.3 C4 4, 6 5.5, 7 6.3" />
     </svg>
   );
 }
