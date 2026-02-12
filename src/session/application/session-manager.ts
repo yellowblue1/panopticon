@@ -18,7 +18,7 @@ interface PipePaneState {
 }
 
 /**
- * Manages Claude Code session state via tmux polling + pipe-pane activity detection.
+ * Manages coding agent session state via tmux polling + pipe-pane activity detection.
  *
  * Session discovery: polls ps + tmux list-panes periodically.
  * Status detection: pipe-pane (FIFO) is the primary signal for both directions:
@@ -156,7 +156,7 @@ export class SessionManager {
 
     const panes = this.deps.getAllTmuxPanes();
     const processTable = this.deps.getProcessTable();
-    const processes = this.deps.getClaudeProcesses(processTable);
+    const processes = this.deps.getMonitoredProcesses(processTable);
     const matches = this.deps.matchProcessesToPanes(processes, panes, processTable);
 
     const foundPanes = new Set<string>();

@@ -24,7 +24,7 @@ export interface TmuxPane {
   pane_index: number;
 }
 
-export interface ClaudeProcess {
+export interface MonitoredProcess {
   pid: number;
   ppid: number;
 }

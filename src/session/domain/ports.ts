@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process";
-import type { ClaudeProcess, ProcessInfo, TmuxPane } from "../../terminal/domain/types";
+import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../../terminal/domain/types";
 
 /**
  * Dependencies for the SessionManager.
@@ -9,17 +9,17 @@ export interface SessionManagerDeps {
   isTmuxAvailable: () => boolean;
   getAllTmuxPanes: () => TmuxPane[];
   getProcessTable: () => ProcessInfo[];
-  getClaudeProcesses: (processTable: ProcessInfo[]) => ClaudeProcess[];
+  getMonitoredProcesses: (processTable: ProcessInfo[]) => MonitoredProcess[];
   getProcessCwd: (pid: number) => string | null;
   getProcessStartTime: (pid: number) => string | null;
   getProjectName: (cwd: string) => string;
   getGitBranch: (cwd: string) => string | null;
   buildTmuxTarget: (pane: TmuxPane) => string;
   matchProcessesToPanes: (
-    processes: ClaudeProcess[],
+    processes: MonitoredProcess[],
     panes: TmuxPane[],
     processTable: ProcessInfo[],
-  ) => Map<string, { process: ClaudeProcess; pane: TmuxPane }>;
+  ) => Map<string, { process: MonitoredProcess; pane: TmuxPane }>;
   generateSummary: (content: string) => Promise<string | null>;
   capturePaneContent: (paneId: string) => string | null;
   capturePaneContentForSummary: (paneId: string) => string | null;

@@ -13,18 +13,18 @@ export function getConversationTail(conversation: string): string {
 }
 
 /**
- * Build the prompt for Gemini to summarize a Claude Code session.
+ * Build the prompt for Gemini to summarize a coding agent session.
  * The content may be terminal pane output or a JSONL conversation extract.
  * Includes attention detection to prefix summaries with emoji when user action is needed.
  */
 export function buildConversationPrompt(conversationTail: string): string {
   return `IMPORTANT: Analyze the content to determine what language the user is using. Your response MUST be in the same language as the user's messages.
 
-The following is the terminal output from a Claude Code session. Claude appears to be idle.
+The following is the terminal output from a coding agent session (Claude Code or Codex). The agent appears to be idle.
 
-Your task: determine whether Claude needs the user's attention, then write a short summary (15 words or less).
+Your task: determine whether the agent needs the user's attention, then write a short summary (15 words or less).
 
-ATTENTION DETECTION — prefix with 🔔 when Claude is waiting for user action:
+ATTENTION DETECTION — prefix with 🔔 when the agent is waiting for user action:
 - Permission request (file delete, git push, command execution, tool use approval) → prefix with 🔔
 - Question asking user to choose between options → prefix with 🔔
 - Question asking for information or clarification → prefix with 🔔
@@ -55,7 +55,7 @@ export function getContentTail(content: string): string {
  * Build the prompt for Gemini to detect what interaction the terminal expects.
  */
 export function buildActionPrompt(contentTail: string): string {
-  return `Analyze the following terminal output from a Claude Code session.
+  return `Analyze the following terminal output from a coding agent session (Claude Code or Codex).
 Determine what type of user interaction is expected based on the last visible prompt or question.
 
 Rules (apply in this priority order):
@@ -67,7 +67,7 @@ Rules (apply in this priority order):
 autoEnter field for choices:
 - Each option has an "autoEnter" boolean. Set to true for options that are complete selections (e.g., "1. Mango" — selecting it is the final action). Set to false for options that require further user input after selection (e.g., "Type something" or any option that opens a text input).
 
-Claude Code UI patterns to recognize:
+Coding agent UI patterns to recognize:
 1. AskUserQuestion with numbered choices — bordered region with header, question text, numbered options (1. Option, 2. Option...), sometimes with a cursor, footer "Enter to select / to navigate / Esc to cancel". Options below the separator line (like "Chat about this") should be EXCLUDED.
 2. Permission/confirmation prompt — "Do you want to proceed?" with Yes/No options and footer "Esc to cancel / Tab to amend"
 

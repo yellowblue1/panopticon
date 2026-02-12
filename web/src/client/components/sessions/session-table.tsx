@@ -14,8 +14,10 @@ export function SessionTable({ sessions }: SessionTableProps) {
   if (sessions.length === 0) {
     return (
       <div className="empty-state">
-        <p>No active Claude sessions found.</p>
-        <p className="hint">Sessions will appear here when Claude Code is running in tmux.</p>
+        <p>No active sessions found.</p>
+        <p className="hint">
+          Sessions will appear here when Claude Code or Codex is running in tmux.
+        </p>
       </div>
     );
   }

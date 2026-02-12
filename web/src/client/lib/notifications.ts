@@ -16,7 +16,7 @@ export function showBrowserNotification(session: SessionResponse): void {
   if (Notification.permission !== "granted") return;
 
   const title = `[Waiting] ${session.project_name}`;
-  const body = session.summary || "Claude is waiting for input";
+  const body = session.summary || "Agent is waiting for input";
 
   new Notification(title, {
     body,

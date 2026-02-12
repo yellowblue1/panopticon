@@ -22,7 +22,7 @@ function RootLayout() {
               <div className="flex items-center gap-6">
                 <h1 className="text-[1.75rem] font-semibold text-text-primary max-md:text-2xl">
                   <Link to="/" className="no-underline text-inherit">
-                    Claude Monitoring
+                    Panopticon
                   </Link>
                 </h1>
                 <nav className="flex items-center gap-4 text-sm text-text-muted">

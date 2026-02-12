@@ -1,56 +1,77 @@
 import { describe, expect, it } from "bun:test";
-import type { ClaudeProcess, ProcessInfo, TmuxPane } from "../domain/types";
+import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
 import {
   buildTmuxTarget,
-  getClaudeProcesses,
-  isClaudeBinary,
+  getMonitoredProcesses,
+  isMonitoredBinary,
   matchProcessesToPanes,
 } from "./process-matching";
 
-describe("isClaudeBinary", () => {
+describe("isMonitoredBinary", () => {
   it("matches bare claude command", () => {
-    expect(isClaudeBinary("claude")).toBe(true);
+    expect(isMonitoredBinary("claude")).toBe(true);
   });
 
   it("matches claude with arguments", () => {
-    expect(isClaudeBinary("claude --resume")).toBe(true);
-    expect(isClaudeBinary("claude --agent-id worker@team --plan-mode")).toBe(true);
+    expect(isMonitoredBinary("claude --resume")).toBe(true);
+    expect(isMonitoredBinary("claude --agent-id worker@team --plan-mode")).toBe(true);
   });
 
   it("matches claude with full path", () => {
-    expect(isClaudeBinary("/usr/local/bin/claude")).toBe(true);
-    expect(isClaudeBinary("/opt/homebrew/bin/claude --resume")).toBe(true);
+    expect(isMonitoredBinary("/usr/local/bin/claude")).toBe(true);
+    expect(isMonitoredBinary("/opt/homebrew/bin/claude --resume")).toBe(true);
   });
 
   it("rejects Claude Desktop app (capital C)", () => {
-    expect(isClaudeBinary("/Applications/Claude.app/Contents/MacOS/Claude")).toBe(false);
+    expect(isMonitoredBinary("/Applications/Claude.app/Contents/MacOS/Claude")).toBe(false);
   });
 
   it("rejects processes with claude in path arguments", () => {
-    expect(isClaudeBinary("nvim /Users/test/.claude/CLAUDE.md")).toBe(false);
-    expect(isClaudeBinary("nvim --embed /Users/test/.claude/CLAUDE.md")).toBe(false);
+    expect(isMonitoredBinary("nvim /Users/test/.claude/CLAUDE.md")).toBe(false);
+    expect(isMonitoredBinary("nvim --embed /Users/test/.claude/CLAUDE.md")).toBe(false);
   });
 
   it("rejects Claude Helper processes", () => {
     expect(
-      isClaudeBinary(
+      isMonitoredBinary(
         "/Applications/Claude.app/Contents/Frameworks/Claude Helper (GPU).app/Contents/MacOS/Claude Helper (GPU) --type=gpu-process",
       ),
     ).toBe(false);
   });
 
   it("rejects bun/node processes running claude-related scripts", () => {
-    expect(isClaudeBinary("bun run /path/.claude/plugins/server.ts")).toBe(false);
-    expect(isClaudeBinary("node /path/claude-code/index.js")).toBe(false);
+    expect(isMonitoredBinary("bun run /path/.claude/plugins/server.ts")).toBe(false);
+    expect(isMonitoredBinary("node /path/claude-code/index.js")).toBe(false);
   });
 
   it("rejects grep claude", () => {
-    expect(isClaudeBinary("grep claude")).toBe(false);
+    expect(isMonitoredBinary("grep claude")).toBe(false);
+  });
+
+  it("matches bare codex command", () => {
+    expect(isMonitoredBinary("codex")).toBe(true);
+  });
+
+  it("matches codex with arguments", () => {
+    expect(isMonitoredBinary("codex --full-auto")).toBe(true);
+  });
+
+  it("matches codex with full path", () => {
+    expect(isMonitoredBinary("/opt/homebrew/bin/codex")).toBe(true);
+    expect(
+      isMonitoredBinary(
+        "/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex/codex",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects node running codex launcher script", () => {
+    expect(isMonitoredBinary("node /opt/homebrew/bin/codex")).toBe(false);
   });
 });
 
-describe("getClaudeProcesses", () => {
-  it("filters only claude CLI binary from process table", () => {
+describe("getMonitoredProcesses", () => {
+  it("filters only monitored CLI binaries from process table", () => {
     const processTable: ProcessInfo[] = [
       { pid: 100, ppid: 1234, command: "claude" },
       { pid: 200, ppid: 5678, command: "claude --resume" },
@@ -58,7 +79,7 @@ describe("getClaudeProcesses", () => {
       { pid: 400, ppid: 3456, command: "node server.js" },
     ];
 
-    const processes = getClaudeProcesses(processTable);
+    const processes = getMonitoredProcesses(processTable);
     expect(processes).toHaveLength(2);
     expect(processes[0]).toEqual({ pid: 100, ppid: 1234 });
     expect(processes[1]).toEqual({ pid: 200, ppid: 5678 });
@@ -71,7 +92,7 @@ describe("getClaudeProcesses", () => {
       { pid: 300, ppid: 200, command: "nvim --embed /Users/test/.claude/CLAUDE.md" },
     ];
 
-    const processes = getClaudeProcesses(processTable);
+    const processes = getMonitoredProcesses(processTable);
     expect(processes).toHaveLength(1);
     expect(processes[0].pid).toBe(100);
   });
@@ -88,13 +109,27 @@ describe("getClaudeProcesses", () => {
       },
     ];
 
-    const processes = getClaudeProcesses(processTable);
+    const processes = getMonitoredProcesses(processTable);
     expect(processes).toHaveLength(1);
     expect(processes[0].pid).toBe(100);
   });
 
   it("returns empty array for empty table", () => {
-    expect(getClaudeProcesses([])).toEqual([]);
+    expect(getMonitoredProcesses([])).toEqual([]);
+  });
+
+  it("detects mixed claude and codex processes", () => {
+    const processTable: ProcessInfo[] = [
+      { pid: 100, ppid: 1234, command: "claude" },
+      { pid: 200, ppid: 5678, command: "codex --full-auto" },
+      { pid: 300, ppid: 9012, command: "vim" },
+      { pid: 400, ppid: 3456, command: "node /opt/homebrew/bin/codex" },
+    ];
+
+    const processes = getMonitoredProcesses(processTable);
+    expect(processes).toHaveLength(2);
+    expect(processes[0]).toEqual({ pid: 100, ppid: 1234 });
+    expect(processes[1]).toEqual({ pid: 200, ppid: 5678 });
   });
 });
 
@@ -112,8 +147,8 @@ describe("buildTmuxTarget", () => {
 });
 
 describe("matchProcessesToPanes", () => {
-  it("matches claude process whose direct parent is pane_pid", () => {
-    const processes: ClaudeProcess[] = [{ pid: 100, ppid: 1234 }];
+  it("matches monitored process whose direct parent is pane_pid", () => {
+    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234 }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
@@ -135,9 +170,9 @@ describe("matchProcessesToPanes", () => {
     expect(result.get("%0")?.pane.pane_id).toBe("%0");
   });
 
-  it("matches claude through intermediate processes (ancestor walk)", () => {
+  it("matches process through intermediate processes (ancestor walk)", () => {
     // shell (pane_pid=1000) → bun (pid=1500) → claude (pid=2000)
-    const processes: ClaudeProcess[] = [{ pid: 2000, ppid: 1500 }];
+    const processes: MonitoredProcess[] = [{ pid: 2000, ppid: 1500 }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
@@ -159,8 +194,8 @@ describe("matchProcessesToPanes", () => {
     expect(result.get("%0")?.process.pid).toBe(2000);
   });
 
-  it("matches multiple claude sessions to different panes", () => {
-    const processes: ClaudeProcess[] = [
+  it("matches multiple sessions to different panes", () => {
+    const processes: MonitoredProcess[] = [
       { pid: 100, ppid: 1234 },
       { pid: 200, ppid: 5678 },
     ];
@@ -194,7 +229,7 @@ describe("matchProcessesToPanes", () => {
   });
 
   it("returns empty map when no matches", () => {
-    const processes: ClaudeProcess[] = [{ pid: 100, ppid: 9999 }];
+    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 9999 }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
@@ -219,7 +254,7 @@ describe("matchProcessesToPanes", () => {
   });
 
   it("works with empty process table (falls back to no match)", () => {
-    const processes: ClaudeProcess[] = [{ pid: 100, ppid: 1234 }];
+    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234 }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
