@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
 import type {
   PaneAction,
   PaneActionsResponse,
@@ -63,6 +64,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
   const { restrictCors = true } = options;
 
   const app = new Hono()
+    .use("/*", secureHeaders())
     .use(
       "/*",
       cors(

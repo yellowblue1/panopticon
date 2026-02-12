@@ -34,7 +34,9 @@ import {
 import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
+const DEFAULT_HOST = "127.0.0.1";
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : DEFAULT_PORT;
+const HOST = process.env.HOST ?? DEFAULT_HOST;
 
 // ═══ Wire dependencies ═══
 
@@ -235,6 +237,7 @@ async function main() {
   try {
     server = Bun.serve({
       port: PORT,
+      hostname: HOST,
       fetch: appWithStatic.fetch,
       idleTimeout: 255,
     });
@@ -243,6 +246,7 @@ async function main() {
       console.error(`Port ${PORT} is in use by another application`);
       server = Bun.serve({
         port: 0,
+        hostname: HOST,
         fetch: appWithStatic.fetch,
         idleTimeout: 255,
       });
@@ -251,7 +255,7 @@ async function main() {
     }
   }
 
-  console.log(`Panopticon Web UI running at http://localhost:${server.port}`);
+  console.log(`Panopticon Web UI running at http://${server.hostname}:${server.port}`);
 
   // Start session polling
   sessionManager.start();

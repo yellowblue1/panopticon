@@ -18,7 +18,7 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false,
   },
   resolve: {
     alias: {
@@ -28,7 +28,7 @@ export default defineConfig({
   },
   server: {
     host: true,
-    allowedHosts: true,
+    allowedHosts: ["localhost", "127.0.0.1", ".ts.net"],
     port: 3847,
     proxy: {
       "/api/": {
