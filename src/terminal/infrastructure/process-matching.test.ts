@@ -81,8 +81,8 @@ describe("getMonitoredProcesses", () => {
 
     const processes = getMonitoredProcesses(processTable);
     expect(processes).toHaveLength(2);
-    expect(processes[0]).toEqual({ pid: 100, ppid: 1234 });
-    expect(processes[1]).toEqual({ pid: 200, ppid: 5678 });
+    expect(processes[0]).toEqual({ pid: 100, ppid: 1234, binaryName: "claude" });
+    expect(processes[1]).toEqual({ pid: 200, ppid: 5678, binaryName: "claude" });
   });
 
   it("filters out nvim editing .claude files", () => {
@@ -128,8 +128,8 @@ describe("getMonitoredProcesses", () => {
 
     const processes = getMonitoredProcesses(processTable);
     expect(processes).toHaveLength(2);
-    expect(processes[0]).toEqual({ pid: 100, ppid: 1234 });
-    expect(processes[1]).toEqual({ pid: 200, ppid: 5678 });
+    expect(processes[0]).toEqual({ pid: 100, ppid: 1234, binaryName: "claude" });
+    expect(processes[1]).toEqual({ pid: 200, ppid: 5678, binaryName: "codex" });
   });
 });
 
@@ -148,7 +148,7 @@ describe("buildTmuxTarget", () => {
 
 describe("matchProcessesToPanes", () => {
   it("matches monitored process whose direct parent is pane_pid", () => {
-    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234 }];
+    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234, binaryName: "claude" }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
@@ -172,7 +172,7 @@ describe("matchProcessesToPanes", () => {
 
   it("matches process through intermediate processes (ancestor walk)", () => {
     // shell (pane_pid=1000) → bun (pid=1500) → claude (pid=2000)
-    const processes: MonitoredProcess[] = [{ pid: 2000, ppid: 1500 }];
+    const processes: MonitoredProcess[] = [{ pid: 2000, ppid: 1500, binaryName: "claude" }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
@@ -196,8 +196,8 @@ describe("matchProcessesToPanes", () => {
 
   it("matches multiple sessions to different panes", () => {
     const processes: MonitoredProcess[] = [
-      { pid: 100, ppid: 1234 },
-      { pid: 200, ppid: 5678 },
+      { pid: 100, ppid: 1234, binaryName: "claude" },
+      { pid: 200, ppid: 5678, binaryName: "claude" },
     ];
     const panes: TmuxPane[] = [
       {
@@ -229,7 +229,7 @@ describe("matchProcessesToPanes", () => {
   });
 
   it("returns empty map when no matches", () => {
-    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 9999 }];
+    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 9999, binaryName: "claude" }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",
@@ -254,7 +254,7 @@ describe("matchProcessesToPanes", () => {
   });
 
   it("works with empty process table (falls back to no match)", () => {
-    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234 }];
+    const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234, binaryName: "claude" }];
     const panes: TmuxPane[] = [
       {
         pane_id: "%0",

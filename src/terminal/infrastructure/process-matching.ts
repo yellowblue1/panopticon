@@ -3,15 +3,22 @@ import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
 const MONITORED_BINARIES = new Set(["claude", "codex"]);
 
 /**
+ * Extract the binary name from a command string.
+ * Takes the last path component of the first whitespace-delimited word.
+ */
+function extractBinaryName(command: string): string {
+  const firstWord = command.split(/\s+/)[0] || "";
+  return firstWord.split("/").pop() || "";
+}
+
+/**
  * Check if a command string is a monitored coding-agent binary.
  * Matches the actual binary name (case-sensitive) for any entry in MONITORED_BINARIES,
  * not processes that happen to have the name in their arguments or paths.
  */
 /** @internal Exported for testing only */
 export function isMonitoredBinary(command: string): boolean {
-  const firstWord = command.split(/\s+/)[0] || "";
-  const binaryName = firstWord.split("/").pop() || "";
-  return MONITORED_BINARIES.has(binaryName);
+  return MONITORED_BINARIES.has(extractBinaryName(command));
 }
 
 /**
@@ -22,7 +29,7 @@ export function isMonitoredBinary(command: string): boolean {
 export function getMonitoredProcesses(processTable: ProcessInfo[]): MonitoredProcess[] {
   return processTable
     .filter((p) => isMonitoredBinary(p.command))
-    .map((p) => ({ pid: p.pid, ppid: p.ppid }));
+    .map((p) => ({ pid: p.pid, ppid: p.ppid, binaryName: extractBinaryName(p.command) }));
 }
 
 /**

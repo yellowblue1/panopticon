@@ -120,6 +120,7 @@ export class SessionManager {
       summary: s.status === "busy" ? null : s.summary,
       tmux_target: s.tmux_target,
       last_activity: s.last_activity,
+      agent_type: s.agent_type,
     }));
   }
 
@@ -138,6 +139,7 @@ export class SessionManager {
       summary: state.status === "busy" ? null : state.summary,
       tmux_target: state.tmux_target,
       last_activity: state.last_activity,
+      agent_type: state.agent_type,
     };
   }
 
@@ -167,12 +169,12 @@ export class SessionManager {
       try {
         const existing = this.sessions.get(paneId);
         if (!existing) {
-          const didCreate = this.createSession(paneId, process.pid, pane);
+          const didCreate = this.createSession(paneId, process.pid, pane, process.binaryName);
           if (didCreate) changed = true;
         } else if (existing.process_pid !== process.pid) {
-          // Claude process changed in this pane — recreate session with fresh metadata
+          // Monitored process changed in this pane — recreate session with fresh metadata
           this.removeSession(paneId);
-          const didCreate = this.createSession(paneId, process.pid, pane);
+          const didCreate = this.createSession(paneId, process.pid, pane, process.binaryName);
           if (didCreate) changed = true;
         }
       } catch {
@@ -207,6 +209,7 @@ export class SessionManager {
       pane_pid: number;
       pane_id: string;
     },
+    binaryName: string,
   ): boolean {
     const cwd = this.deps.getProcessCwd(processPid);
     if (!cwd) return false;
@@ -214,6 +217,7 @@ export class SessionManager {
     this.sessions.set(paneId, {
       pane_id: paneId,
       process_pid: processPid,
+      agent_type: binaryName,
       cwd,
       project_name: this.deps.getProjectName(cwd),
       git_branch: this.deps.getGitBranch(cwd),

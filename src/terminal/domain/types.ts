@@ -3,6 +3,7 @@
 export interface SessionState {
   pane_id: string;
   process_pid: number;
+  agent_type: string;
   cwd: string;
   project_name: string;
   git_branch: string | null;
@@ -27,6 +28,7 @@ export interface TmuxPane {
 export interface MonitoredProcess {
   pid: number;
   ppid: number;
+  binaryName: string;
 }
 
 export interface ProcessInfo {

@@ -28,6 +28,12 @@ export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
     <tr className={cn(statusClass, isRead && "read")}>
       <td className="col-project">
         <span className="project-name">{session.project_name}</span>
+        <span
+          className="ml-2 text-xs font-medium text-text-muted opacity-70"
+          title={session.agent_type}
+        >
+          {session.agent_type === "codex" ? "Codex" : "Claude"}
+        </span>
       </td>
       <td className="col-branch">
         {session.git_branch ? (

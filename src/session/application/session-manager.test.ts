@@ -43,7 +43,7 @@ function createMockDeps(overrides: Partial<SessionManagerDeps> = {}): {
       pane_index: 0,
     },
   ];
-  const defaultProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000 }];
+  const defaultProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000, binaryName: "claude" }];
   const defaultProcessTable: ProcessInfo[] = [
     { pid: 1000, ppid: 1, command: "-bash" },
     { pid: 2000, ppid: 1000, command: "claude" },
@@ -121,6 +121,19 @@ describe("SessionManager", () => {
       expect(sessions[0].git_branch).toBe("main");
       expect(sessions[0].status).toBe("busy");
       expect(sessions[0].tmux_target).toBe("main:0.0");
+      expect(sessions[0].agent_type).toBe("claude");
+    });
+
+    it("exposes agent_type from binaryName in session response", () => {
+      const { deps } = createMockDeps({
+        getMonitoredProcesses: () => [{ pid: 2000, ppid: 1000, binaryName: "codex" }],
+      });
+      manager = new SessionManager(deps);
+      manager.start();
+
+      const sessions = manager.getSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].agent_type).toBe("codex");
     });
   });
 
@@ -217,7 +230,8 @@ describe("SessionManager", () => {
     it("removes sessions when process disappears", async () => {
       let hasProcess = true;
       const { deps } = createMockDeps({
-        getMonitoredProcesses: () => (hasProcess ? [{ pid: 2000, ppid: 1000 }] : []),
+        getMonitoredProcesses: () =>
+          hasProcess ? [{ pid: 2000, ppid: 1000, binaryName: "claude" }] : [],
       });
 
       manager = new SessionManager(deps, { pollIntervalMs: 50 });
@@ -237,7 +251,7 @@ describe("SessionManager", () => {
     it("recreates session when monitored process PID changes in same pane", async () => {
       let currentPid = 2000;
       const { deps } = createMockDeps({
-        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000 }],
+        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000, binaryName: "claude" }],
         getGitBranch: () => (currentPid === 2000 ? "feature-a" : "feature-b"),
         getProcessCwd: () =>
           currentPid === 2000 ? "/home/user/project-a" : "/home/user/project-b",
@@ -265,7 +279,7 @@ describe("SessionManager", () => {
       let currentPid = 2000;
       const onChangeSpy = mock(() => {});
       const { deps } = createMockDeps({
-        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000 }],
+        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000, binaryName: "claude" }],
       });
 
       manager = new SessionManager(deps, { pollIntervalMs: 50 });
@@ -284,7 +298,7 @@ describe("SessionManager", () => {
     it("recreates session with fresh metadata when PID changes during WAITING", async () => {
       let currentPid = 2000;
       const { deps } = createMockDeps({
-        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000 }],
+        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000, binaryName: "claude" }],
         getGitBranch: () => (currentPid === 2000 ? "old-branch" : "new-branch"),
       });
 
@@ -373,7 +387,8 @@ describe("SessionManager", () => {
       let hasProcess = true;
 
       const { deps } = createMockDeps({
-        getMonitoredProcesses: () => (hasProcess ? [{ pid: 2000, ppid: 1000 }] : []),
+        getMonitoredProcesses: () =>
+          hasProcess ? [{ pid: 2000, ppid: 1000, binaryName: "claude" }] : [],
       });
 
       manager = new SessionManager(deps, { pollIntervalMs: 50 });
@@ -964,7 +979,8 @@ describe("SessionManager", () => {
       const stopPipePaneSpy = mock(() => true);
 
       const { deps, fifoReaders } = createMockDeps({
-        getMonitoredProcesses: () => (hasProcess ? [{ pid: 2000, ppid: 1000 }] : []),
+        getMonitoredProcesses: () =>
+          hasProcess ? [{ pid: 2000, ppid: 1000, binaryName: "claude" }] : [],
         stopPipePane: stopPipePaneSpy,
       });
 
@@ -1035,7 +1051,7 @@ describe("SessionManager", () => {
       const createFifoSpy = mock(() => true);
 
       const { deps, fifoReaders } = createMockDeps({
-        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000 }],
+        getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000, binaryName: "claude" }],
         createFifo: createFifoSpy,
       });
 
@@ -1427,7 +1443,7 @@ describe("SessionManager", () => {
           pane_index: 0,
         },
       ];
-      let currentProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000 }];
+      let currentProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000, binaryName: "claude" }];
       let currentProcessTable: ProcessInfo[] = [
         { pid: 1000, ppid: 1, command: "-bash" },
         { pid: 2000, ppid: 1000, command: "claude" },
@@ -1470,7 +1486,7 @@ describe("SessionManager", () => {
           pane_index: 1,
         },
       ];
-      currentProcesses = [{ pid: 3000, ppid: 1001 }];
+      currentProcesses = [{ pid: 3000, ppid: 1001, binaryName: "claude" }];
       currentProcessTable = [
         { pid: 1001, ppid: 1, command: "-bash" },
         { pid: 3000, ppid: 1001, command: "claude" },
