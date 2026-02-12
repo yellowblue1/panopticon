@@ -3,6 +3,8 @@
 
 export type SessionStatus = "busy" | "waiting";
 
+export type AgentType = "claude" | "codex";
+
 export interface SessionResponse {
   pane_id: string;
   project_name: string;
@@ -11,7 +13,7 @@ export interface SessionResponse {
   summary: string | null;
   tmux_target: string;
   last_activity: string;
-  agent_type: string;
+  agent_type: AgentType;
 }
 
 export interface SessionsApiResponse {

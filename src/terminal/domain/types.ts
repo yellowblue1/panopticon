@@ -1,9 +1,11 @@
 // Internal types for tmux polling
 
+import type { AgentType } from "../../shared/types";
+
 export interface SessionState {
   pane_id: string;
   process_pid: number;
-  agent_type: string;
+  agent_type: AgentType;
   cwd: string;
   project_name: string;
   git_branch: string | null;

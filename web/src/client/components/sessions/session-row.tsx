@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Clipboard, ClipboardCheck, SquareTerminal } from "lucide-react";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/cn";
+import { AgentTypeIcon } from "../ui/agent-type-icon";
 import { StatusBadge } from "../ui/badge";
 
 interface SessionRowProps {
@@ -27,13 +28,10 @@ export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
   return (
     <tr className={cn(statusClass, isRead && "read")}>
       <td className="col-project">
-        <span className="project-name">{session.project_name}</span>
-        <span
-          className="ml-2 text-xs font-medium text-text-muted opacity-70"
-          title={session.agent_type}
-        >
-          {session.agent_type === "codex" ? "Codex" : "Claude"}
-        </span>
+        <div className="flex items-center gap-2">
+          <AgentTypeIcon agentType={session.agent_type} />
+          <span className="project-name">{session.project_name}</span>
+        </div>
       </td>
       <td className="col-branch">
         {session.git_branch ? (
