@@ -32,6 +32,7 @@
     "type-coverage": "type-coverage --at-least 99"
   },
   "dependencies": {
+    "@google/genai": "^1.41.0",
     "hono": "^4.7.0"
   },
   "devDependencies": {

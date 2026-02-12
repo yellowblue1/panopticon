@@ -2,10 +2,9 @@
  * Test utilities barrel export
  */
 
-// Fetch mocking utilities
+// Gemini SDK mocking utilities
 export {
-  mockFetchNetworkError,
-  mockGeminiEmpty,
-  mockGeminiError,
-  mockGeminiSuccess,
+  mockGenerateContent,
+  mockGenerateContentEmpty,
+  mockGenerateContentError,
 } from "./helpers/fetch-mock";

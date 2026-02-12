@@ -1,4 +1,4 @@
-import type { GeminiResponse, SummaryDeps } from "../domain/ports";
+import type { SummaryDeps } from "../domain/ports";
 import {
   buildConversationPrompt,
   getConversationTail,
@@ -11,8 +11,6 @@ import {
   setCachedSummary,
   setInflightRequest,
 } from "../infrastructure/summary-cache";
-
-const MODEL_ID = "gemini-2.5-flash";
 
 /**
  * Generate a summary from Claude Code conversation using the Gemini API.
@@ -46,19 +44,6 @@ export async function generatePaneSummary(
     return existing;
   }
 
-  const projectId = deps.getGcpProject();
-  if (!projectId) {
-    return null;
-  }
-
-  const accessToken = deps.getAccessToken();
-  if (!accessToken) {
-    return null;
-  }
-
-  const location = deps.getGcpLocation();
-  const apiUrl = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${MODEL_ID}:generateContent`;
-
   const prompt = buildConversationPrompt(conversationTail);
 
   const requestPromise = (async (): Promise<string | null> => {
@@ -68,35 +53,7 @@ export async function generatePaneSummary(
         `${new Date().toISOString()} [Gemini] Requesting summary (input: ${conversationTail.length} chars)`,
       );
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const response = await deps.fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: {
-            role: "user",
-            parts: { text: prompt },
-          },
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.log(
-          `${new Date().toISOString()} [Gemini] Request failed: HTTP ${response.status} (${Date.now() - startTime}ms)`,
-        );
-        return null;
-      }
-
-      const data = (await response.json()) as GeminiResponse;
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const text = await deps.generateContent(prompt);
 
       if (!text) {
         console.log(

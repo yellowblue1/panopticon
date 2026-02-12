@@ -30,8 +30,8 @@ export interface AppDeps {
   detectPaneActions?: (content: string) => Promise<PaneAction>;
 
   // Auth status
-  getAccessToken?: () => string | null;
   getGcpProject?: () => string | null;
+  isAiAvailable?: boolean;
 
   // SSE callbacks (session list)
   onSseConnect?: (client: SseClient) => void;
@@ -189,12 +189,11 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
     // GET /api/auth/status
     .get("/api/auth/status", (c) => {
-      const gcloudAuthenticated = deps.getAccessToken?.() !== null;
       const gcpProjectConfigured = deps.getGcpProject?.() !== null;
-      const aiSummaryAvailable = gcloudAuthenticated && gcpProjectConfigured;
+      const aiSummaryAvailable = deps.isAiAvailable ?? false;
 
       return c.json({
-        gcloud_authenticated: gcloudAuthenticated,
+        gcloud_authenticated: gcpProjectConfigured,
         gcp_project_configured: gcpProjectConfigured,
         ai_summary_available: aiSummaryAvailable,
       });

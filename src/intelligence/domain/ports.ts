@@ -1,36 +1,26 @@
 import type { PaneAction } from "../../shared/types";
 
-export type FetchFn = (url: string | URL | Request, options?: RequestInit) => Promise<Response>;
-
-/** Response shape from Gemini generateContent API */
-export interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
-}
+/**
+ * Function type representing a Gemini generateContent call.
+ * The infrastructure layer wraps the SDK client into this shape.
+ */
+export type GenerateContentFn = (
+  prompt: string,
+  options?: { responseMimeType?: string },
+) => Promise<string | null>;
 
 /**
  * Dependencies for summary generation
  */
 export interface SummaryDeps {
-  fetch: FetchFn;
-  getAccessToken: () => string | null;
-  getGcpProject: () => string | null;
-  getGcpLocation: () => string;
+  generateContent: GenerateContentFn;
 }
 
 /**
  * Dependencies for action detection
  */
 export interface ActionDeps {
-  fetch: FetchFn;
-  getAccessToken: () => string | null;
-  getGcpProject: () => string | null;
-  getGcpLocation: () => string;
+  generateContent: GenerateContentFn;
 }
 
 const VALID_ACTION_TYPES = new Set(["choices", "yesno", "freeform", "none"]);
