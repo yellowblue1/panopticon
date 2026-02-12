@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { serveStatic } from "hono/bun";
 import { detectPaneActions } from "../src/intelligence/application/detect-actions";
@@ -213,14 +213,21 @@ const app = createApp(
   { restrictCors: true },
 );
 
-// Add static file serving and SPA fallback
-const indexHtml = readFileSync(join(import.meta.dirname, "dist", "index.html"));
+// Add static file serving and SPA fallback (only when dist/ exists)
 const distDir = join(import.meta.dirname, "dist");
-const appWithStatic = app.use("/*", serveStatic({ root: distDir })).get("/*", (c) => {
-  return c.body(indexHtml, 200, {
-    "Content-Type": "text/html; charset=utf-8",
+const distIndexPath = join(distDir, "index.html");
+
+let appWithStatic: typeof app;
+if (existsSync(distIndexPath)) {
+  const indexHtml = readFileSync(distIndexPath);
+  appWithStatic = app.use("/*", serveStatic({ root: distDir })).get("/*", (c) => {
+    return c.body(indexHtml, 200, {
+      "Content-Type": "text/html; charset=utf-8",
+    });
   });
-});
+} else {
+  appWithStatic = app;
+}
 
 // Export type for future RPC client
 export type { AppType };
