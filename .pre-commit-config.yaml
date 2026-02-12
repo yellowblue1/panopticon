@@ -23,6 +23,12 @@ repos:
       - id: mixed-line-ending
         args: ['--fix=lf']
 
+  # GitHub Actions workflow linting
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint
+
   # Project quality gates
   - repo: local
     hooks:
@@ -43,6 +49,27 @@ repos:
       - id: dependency-cruiser
         name: Dependency architecture check
         entry: bun run depcruise
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false
+
+      - id: bun-audit
+        name: Security audit
+        entry: bun audit --audit-level=high
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: knip
+        name: Knip check
+        entry: bun run knip
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: type-coverage
+        name: Type coverage check
+        entry: bun run type-coverage
         language: system
         types_or: [ts, tsx]
         pass_filenames: false
