@@ -1,13 +1,16 @@
-import type { PaneAction, PaneActionsResponse } from "@shared/types";
+import type { PaneAction } from "@shared/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { actionKeys } from "@/lib/query-keys";
+import { sessionsApi } from "@/lib/rpc-client";
 
 const DEFAULT_ACTION: PaneAction = { type: "none" };
 
 async function fetchActions(paneId: string): Promise<PaneAction> {
-  const res = await fetch(`/api/sessions/${encodeURIComponent(paneId)}/actions`);
+  const res = await sessionsApi[":pane_id"].actions.$get({
+    param: { pane_id: encodeURIComponent(paneId) },
+  });
   if (!res.ok) return DEFAULT_ACTION;
-  const data: PaneActionsResponse = await res.json();
+  const data = await res.json();
   return data.action;
 }
 

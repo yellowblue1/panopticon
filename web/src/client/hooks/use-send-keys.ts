@@ -1,6 +1,6 @@
-import type { SendKeysResponse } from "@shared/types";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { sessionsApi } from "@/lib/rpc-client";
 
 interface SendKeysInput {
   paneId: string;
@@ -12,13 +12,12 @@ interface SendKeysInput {
 export function useSendKeys() {
   return useMutation({
     mutationFn: async ({ paneId, text, raw }: SendKeysInput) => {
-      const res = await fetch(`/api/sessions/${encodeURIComponent(paneId)}/send-keys`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, ...(raw ? { raw: true } : {}) }),
+      const res = await sessionsApi[":pane_id"]["send-keys"].$post({
+        param: { pane_id: encodeURIComponent(paneId) },
+        json: { text, ...(raw ? { raw: true } : {}) },
       });
 
-      const data = (await res.json()) as SendKeysResponse;
+      const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to send keys");
       }
