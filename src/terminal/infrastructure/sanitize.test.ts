@@ -70,7 +70,7 @@ describe("sanitizePaneContent", () => {
   it("handles realistic Claude Code suggestion scenario", () => {
     const input = [
       `${ESC}[1m❯${ESC}[22m ${ESC}[32mbun test${ESC}[0m`,
-      `${ESC}[2m --cwd tools/crux-monitor${ESC}[22m`,
+      `${ESC}[2m --cwd panopticon${ESC}[22m`,
       "PASS src/tmux/utils.test.ts",
     ].join("\n");
     const result = sanitizePaneContent(input);
