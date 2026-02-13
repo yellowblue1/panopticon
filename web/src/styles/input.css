@@ -263,6 +263,7 @@ body {
   @apply bg-bg-primary border border-border-default rounded-lg overflow-hidden m-0;
   flex: 1;
   min-height: 200px;
+  overscroll-behavior: contain;
 }
 
 .pane-viewer .xterm {
