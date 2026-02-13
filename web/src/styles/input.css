@@ -427,4 +427,8 @@ body {
     min-height: 150px;
     @apply rounded-none border-x-0;
   }
+
+  .switch-action-btn {
+    display: none;
+  }
 }

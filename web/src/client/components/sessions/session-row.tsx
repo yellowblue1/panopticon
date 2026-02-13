@@ -72,7 +72,7 @@ export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
           </Link>
           <button
             type="button"
-            className="action-btn"
+            className="action-btn switch-action-btn"
             title={`Switch to ${session.pane_id}`}
             onClick={handleSwitch}
             disabled={switchClient.isPending}
