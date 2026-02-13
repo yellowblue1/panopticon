@@ -73,7 +73,7 @@ By default, the GCP project and location are read from your `gcloud` configurati
 | Setting | Env var | Default |
 |---------|---------|---------|
 | Project | `GEMINI_GCP_PROJECT` | `gcloud config get-value project` |
-| Location | `GEMINI_GCP_LOCATION` | `asia-northeast1` |
+| Location | `GEMINI_GCP_LOCATION` | `global` |
 
 ### Server
 
