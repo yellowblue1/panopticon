@@ -73,6 +73,19 @@ function visibleWidth(line: string): number {
   return count;
 }
 
+/**
+ * Calculate the maximum visible character width across all lines in content.
+ * Used by the desktop fit-width toggle to determine the required terminal column count.
+ */
+export function maxContentWidth(content: string): number {
+  let max = 0;
+  for (const line of content.split("\n")) {
+    const w = visibleWidth(line);
+    if (w > max) max = w;
+  }
+  return max;
+}
+
 // U+2500 ─ (light horizontal), U+2501 ━ (heavy horizontal), U+2550 ═ (double horizontal)
 const BORDER_CHAR_SET = new Set([0x2500, 0x2501, 0x2550]);
 

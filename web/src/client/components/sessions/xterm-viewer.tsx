@@ -1,11 +1,11 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowLeftRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/cn";
-import { filterHorizontalBorders } from "@/lib/terminal-filters";
+import { filterHorizontalBorders, maxContentWidth } from "@/lib/terminal-filters";
 import "@xterm/xterm/css/xterm.css";
 
 interface XtermViewerProps {
@@ -42,9 +42,29 @@ const XTERM_THEME = {
 /** Pixel tolerance for "at bottom" detection in the xterm viewport. */
 const SCROLL_BOTTOM_THRESHOLD_PX = 10;
 
+/** Upper bound for terminal columns to prevent absurd widths from malformed content. */
+const MAX_COLS = 500;
+
 function safeFit(fitAddon: FitAddon): void {
   try {
     fitAddon.fit();
+  } catch {
+    // Renderer dimensions not yet available; will retry on next resize event
+  }
+}
+
+/**
+ * Fit the terminal to its container, widening cols on desktop
+ * to accommodate content wider than the container.
+ */
+function fitWithOverride(terminal: Terminal, fitAddon: FitAddon, maxWidth: number): void {
+  try {
+    const dims = fitAddon.proposeDimensions();
+    if (!dims || Number.isNaN(dims.cols) || Number.isNaN(dims.rows)) return;
+
+    const effectiveCols = Math.min(MAX_COLS, Math.max(dims.cols, maxWidth));
+    if (terminal.rows === dims.rows && terminal.cols === effectiveCols) return;
+    terminal.resize(effectiveCols, dims.rows);
   } catch {
     // Renderer dimensions not yet available; will retry on next resize event
   }
@@ -57,6 +77,11 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   const isMobile = useMediaQuery("(max-width: 639px)");
   const [showButton, setShowButton] = useState(false);
   const isAtBottomRef = useRef(true);
+  const [fitWidth, setFitWidth] = useState(false);
+  const [contentOverflows, setContentOverflows] = useState(false);
+  const maxWidthRef = useRef(0);
+  const fitWidthRef = useRef(false);
+  fitWidthRef.current = fitWidth;
 
   // Initialize terminal and scroll listener on mount
   useEffect(() => {
@@ -96,7 +121,11 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => {
-        safeFit(fitAddon);
+        if (fitWidthRef.current && maxWidthRef.current > 0) {
+          fitWithOverride(terminal, fitAddon, maxWidthRef.current);
+        } else {
+          safeFit(fitAddon);
+        }
       });
     });
     resizeObserver.observe(container);
@@ -123,6 +152,17 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     };
   }, []);
 
+  // Re-fit when fitWidth is toggled off — reset to container-fitted dimensions.
+  // Toggling ON is handled by the content effect which recalculates width.
+  useEffect(() => {
+    const fitAddon = fitAddonRef.current;
+    if (!fitAddon || fitWidth) return;
+
+    maxWidthRef.current = 0;
+    const frameId = requestAnimationFrame(() => safeFit(fitAddon));
+    return () => cancelAnimationFrame(frameId);
+  }, [fitWidth]);
+
   // Write content when it changes — deferred to ensure renderer is initialized.
   // Uses escape sequences instead of terminal.reset() to avoid flicker:
   // reset() is synchronous (instant blank) while write() is async, causing
@@ -136,14 +176,26 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     // Don't disrupt the user's reading position — defer until they return to bottom
     if (!isAtBottomRef.current && content != null) return;
 
+    const fitAddon = fitAddonRef.current;
+
     const frameId = requestAnimationFrame(() => {
       try {
         if (content != null) {
-          const processed = isMobile ? filterHorizontalBorders(content, terminal.cols) : content;
-          // Reset attributes, move to home, clear screen + scrollback, then write —
-          // all in one write() call so xterm.js renders them in a single paint.
-          terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
+          if (isMobile) {
+            const processed = filterHorizontalBorders(content, terminal.cols);
+            terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
+          } else {
+            const contentWidth = maxContentWidth(content);
+            setContentOverflows(contentWidth > terminal.cols);
+            if (fitWidthRef.current && fitAddon) {
+              maxWidthRef.current = contentWidth;
+              fitWithOverride(terminal, fitAddon, maxWidthRef.current);
+            }
+            terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
+          }
         } else {
+          maxWidthRef.current = 0;
+          setContentOverflows(false);
           terminal.reset();
         }
         isAtBottomRef.current = true;
@@ -161,8 +213,42 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   };
 
   return (
-    <div className={cn("relative flex flex-col", className)}>
+    <div
+      className={cn(
+        "relative flex flex-col",
+        !isMobile && fitWidth && "pane-viewer--fit-width",
+        className,
+      )}
+    >
       <div ref={containerRef} className="flex-1 min-h-0" />
+
+      {/* Fit-width toggle — desktop only, hidden when content fits */}
+      {!isMobile && (fitWidth || contentOverflows) && (
+        <button
+          type="button"
+          aria-label={
+            fitWidth ? "Fit terminal to container width" : "Fit terminal to content width"
+          }
+          className={cn(
+            "absolute right-3 top-3 z-10",
+            "flex items-center justify-center",
+            "w-9 h-9",
+            "rounded-full",
+            "shadow-lg shadow-black/30",
+            "transition-all duration-200 ease-out",
+            "cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
+            fitWidth
+              ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/50 hover:bg-accent-blue/30"
+              : "bg-bg-tertiary/90 backdrop-blur-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-border-default",
+          )}
+          onClick={() => setFitWidth((prev) => !prev)}
+        >
+          <ArrowLeftRight size={16} />
+        </button>
+      )}
+
+      {/* Scroll to bottom */}
       <button
         type="button"
         aria-label="Scroll to bottom"

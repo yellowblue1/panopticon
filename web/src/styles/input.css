@@ -270,6 +270,20 @@ body {
   padding: 12px;
 }
 
+/* Desktop fit-width toggle: expand the frame to match content width, centered. */
+@media (min-width: 640px) {
+  .pane-viewer--fit-width {
+    width: max-content;
+    min-width: 100%;
+    overflow: visible;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .pane-viewer--fit-width .xterm {
+    min-width: fit-content;
+  }
+}
+
 /* Send keys input bar */
 .send-keys-bar {
   @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;
