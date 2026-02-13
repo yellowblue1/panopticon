@@ -109,12 +109,10 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
 
     const frameId = requestAnimationFrame(() => {
       try {
+        terminal.reset();
         if (content != null) {
           const processed = isMobile ? filterHorizontalBorders(content) : content;
-          // Overwrite in-place: cursor home → write content → clear remaining lines
-          terminal.write(`\x1b[H${processed}\x1b[J`);
-        } else {
-          terminal.reset();
+          terminal.write(processed);
         }
       } catch {
         // Terminal renderer not yet ready; content will be written on next update
