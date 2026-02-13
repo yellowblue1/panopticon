@@ -10,6 +10,7 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
 const DEFAULT_IDLE_THRESHOLD_MS = 1000;
 const DEFAULT_SUMMARY_DELAY_MS = 3_000; // 3 seconds debounce after entering WAITING
 const DEFAULT_PANE_CHECK_INTERVAL_MS = 1000; // 1 second pane diff polling
+const AUTH_ERROR_RETRY_MS = 60_000; // 60 seconds retry probe when auth is broken
 
 /** State for a single FIFO-based pipe-pane monitor */
 interface PipePaneState {
@@ -307,7 +308,7 @@ export class SessionManager {
    * This is the sole trigger for Gemini calls — fires only if the session
    * is still WAITING when the timer expires. Cancelled on BUSY transition.
    */
-  private scheduleSummaryTimer(paneId: string): void {
+  private scheduleSummaryTimer(paneId: string, delayMs?: number): void {
     this.cancelSummaryTimer(paneId);
 
     const timer = setTimeout(() => {
@@ -320,7 +321,7 @@ export class SessionManager {
         session.summary_pending = false;
         this.generateSummaryAsync(paneId);
       }
-    }, this.summaryDelayMs);
+    }, delayMs ?? this.summaryDelayMs);
 
     this.summaryTimers.set(paneId, timer);
   }
@@ -388,8 +389,16 @@ export class SessionManager {
       } else if (current.status === "waiting") {
         // Gemini returned null (error, auth failure, empty response, etc.).
         // Don't update summaryContentHash — don't cache failed results.
-        // Schedule retry after summaryDelayMs.
-        this.scheduleSummaryTimer(paneId);
+        if (this.deps.isAuthError?.()) {
+          // Auth error: slow retry probe (60s) to detect recovery.
+          // Reset summary_pending so the probe can proceed when it fires.
+          current.summary_pending = false;
+          this.scheduleSummaryTimer(paneId, AUTH_ERROR_RETRY_MS);
+          this.notifyChange();
+        } else {
+          // Non-auth failure: retry after summaryDelayMs.
+          this.scheduleSummaryTimer(paneId);
+        }
       }
     } catch {
       const current = this.sessions.get(paneId);

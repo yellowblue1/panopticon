@@ -1313,6 +1313,85 @@ describe("SessionManager", () => {
     });
   });
 
+  describe("auth error retry suppression", () => {
+    it("uses slow retry (60s) when isAuthError returns true", async () => {
+      const generateSpy = mock(async () => null); // Always fail
+
+      const { deps } = createMockDeps({
+        generateSummary: generateSpy,
+        capturePaneContent: () => "static content",
+        isAuthError: () => true,
+      });
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 5000,
+        idleThresholdMs: 30,
+        summaryDelayMs: 100,
+        paneCheckIntervalMs: 30,
+      });
+      manager.start();
+
+      // First attempt: idle 30ms + delay 100ms = ~130ms
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+
+      // Wait 500ms more — with auth error, retry is 60s, so no second call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses normal retry when isAuthError returns false", async () => {
+      const generateSpy = mock(async () => null); // Always fail
+
+      const { deps } = createMockDeps({
+        generateSummary: generateSpy,
+        capturePaneContent: () => "static content",
+        isAuthError: () => false,
+      });
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 5000,
+        idleThresholdMs: 30,
+        summaryDelayMs: 100,
+        paneCheckIntervalMs: 30,
+      });
+      manager.start();
+
+      // First attempt
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+
+      // Normal retry at summaryDelayMs (100ms) — should call again
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(generateSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("fires onChange when auth error suppresses retry", async () => {
+      const onChangeSpy = mock(() => {});
+
+      const { deps } = createMockDeps({
+        generateSummary: async () => null,
+        capturePaneContent: () => "static content",
+        isAuthError: () => true,
+      });
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 5000,
+        idleThresholdMs: 30,
+        summaryDelayMs: 100,
+        paneCheckIntervalMs: 30,
+      });
+      manager.onChange(onChangeSpy);
+      manager.start();
+
+      // Wait for first summary attempt + auth error handling
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      // onChange should have been called (for session discovery + auth error notification)
+      expect(onChangeSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   describe("API summary filtering", () => {
     it("getSessions returns null summary for BUSY sessions", () => {
       const { deps } = createMockDeps();

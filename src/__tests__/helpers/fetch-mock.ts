@@ -26,3 +26,14 @@ export function mockGenerateContentError(message = "API error"): GenerateContent
     throw new Error(message);
   };
 }
+
+/**
+ * Create a mock generateContent that throws an auth-like error (401 status)
+ */
+export function mockGenerateContentAuthError(message = "invalid_grant"): GenerateContentFn {
+  return async () => {
+    const err = new Error(message);
+    (err as Error & { status: number }).status = 401;
+    throw err;
+  };
+}

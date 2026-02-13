@@ -18,6 +18,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     detectPaneActions: async () => ({ type: "none" }),
     getGcpProject: () => "mock-project",
     isAiAvailable: true,
+    getGeminiAuthError: () => false,
     onSseConnect: () => {},
     onSseDisconnect: () => {},
     serializeSessionsData: () => "{}",
@@ -410,6 +411,42 @@ describe("Hono API endpoints", () => {
 
       expect(data.gcp_project_configured).toBe(false);
       expect(data.ai_summary_available).toBe(false);
+    });
+
+    it("returns gemini_auth_error true when auth error is active", async () => {
+      const deps = createMockDeps({
+        getGeminiAuthError: () => true,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/auth/status");
+      const data = await res.json();
+
+      expect(data.gemini_auth_error).toBe(true);
+    });
+
+    it("returns gemini_auth_error false when no auth error", async () => {
+      const deps = createMockDeps({
+        getGeminiAuthError: () => false,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/auth/status");
+      const data = await res.json();
+
+      expect(data.gemini_auth_error).toBe(false);
+    });
+
+    it("defaults gemini_auth_error to false when getGeminiAuthError not provided", async () => {
+      const deps = createMockDeps({
+        getGeminiAuthError: undefined,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/auth/status");
+      const data = await res.json();
+
+      expect(data.gemini_auth_error).toBe(false);
     });
   });
 
