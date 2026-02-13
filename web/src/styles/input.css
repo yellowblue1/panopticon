@@ -270,10 +270,12 @@ body {
   padding: 12px;
 }
 
-/* Enable horizontal scrolling on desktop when terminal content exceeds container width */
+/* Enable horizontal scrolling on desktop when terminal content exceeds container width.
+   min-width: fit-content makes .xterm expand to .xterm-screen's pixel width (set by
+   xterm.js based on cols * cellWidth), so the parent scroll container can scroll it. */
 @media (min-width: 640px) {
-  .pane-viewer .xterm .xterm-viewport {
-    overflow-x: auto;
+  .pane-viewer .xterm {
+    min-width: fit-content;
   }
 }
 

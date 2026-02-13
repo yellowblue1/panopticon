@@ -195,7 +195,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
 
   return (
     <div className={cn("relative flex flex-col", className)}>
-      <div ref={containerRef} className="flex-1 min-h-0" />
+      <div ref={containerRef} className={cn("flex-1 min-h-0", !isMobile && "overflow-x-auto")} />
       <button
         type="button"
         aria-label="Scroll to bottom"
