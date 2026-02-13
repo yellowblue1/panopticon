@@ -2,7 +2,6 @@ import { GoogleGenAI } from "@google/genai";
 import type { GenerateContentFn } from "../domain/ports";
 import { clearAuthError, hasAuthError, setAuthError } from "./auth-error-state";
 
-const MODEL_ID = "gemini-2.5-flash";
 const REQUEST_TIMEOUT_MS = 10000;
 
 const AUTH_ERROR_PATTERNS = [
@@ -37,7 +36,11 @@ function createClient(project: string, location: string): GoogleGenAI {
  * Recreates the SDK client when recovering from auth errors to pick up
  * refreshed ADC credentials from disk.
  */
-export function createGenerateContentFn(project: string, location: string): GenerateContentFn {
+export function createGenerateContentFn(
+  project: string,
+  location: string,
+  model: string,
+): GenerateContentFn {
   let ai = createClient(project, location);
 
   return async (prompt, options) => {
@@ -49,7 +52,7 @@ export function createGenerateContentFn(project: string, location: string): Gene
 
     try {
       const response = await ai.models.generateContent({
-        model: MODEL_ID,
+        model,
         contents: prompt,
         config: {
           responseMimeType: options?.responseMimeType,

@@ -44,15 +44,20 @@ const HOST = process.env.HOST ?? DEFAULT_HOST;
 const gcpProject = getGcpProject();
 const gcpLocation = getGcpLocation();
 
-// Create SDK-based generateContent function (only if project is configured)
-const generateContent = gcpProject ? createGenerateContentFn(gcpProject, gcpLocation) : null;
+// Create separate generateContent functions per use case (only if project is configured)
+const summaryGenerateContent = gcpProject
+  ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash-lite")
+  : null;
+const actionGenerateContent = gcpProject
+  ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash")
+  : null;
 
 const summaryDeps: SummaryDeps = {
-  generateContent: generateContent ?? (async () => null),
+  generateContent: summaryGenerateContent ?? (async () => null),
 };
 
 const actionDeps: ActionDeps = {
-  generateContent: generateContent ?? (async () => null),
+  generateContent: actionGenerateContent ?? (async () => null),
 };
 
 const sessionManagerDeps: SessionManagerDeps = {
@@ -181,7 +186,7 @@ const app = createApp(
       return detectPaneActions(sanitized, actionDeps);
     },
     getGcpProject,
-    isAiAvailable: generateContent !== null,
+    isAiAvailable: gcpProject !== null,
     getGeminiAuthError: hasAuthError,
     onSseConnect: (client) => {
       clients.add(client);
