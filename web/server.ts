@@ -46,7 +46,7 @@ const gcpLocation = getGcpLocation();
 
 // Create separate generateContent functions per use case (only if project is configured)
 const summaryGenerateContent = gcpProject
-  ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash-lite")
+  ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash")
   : null;
 const actionGenerateContent = gcpProject
   ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash")
