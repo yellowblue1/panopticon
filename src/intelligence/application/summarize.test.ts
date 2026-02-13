@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import {
   mockGenerateContent,
+  mockGenerateContentAuthError,
   mockGenerateContentEmpty,
   mockGenerateContentError,
 } from "../../__tests__";
@@ -72,6 +73,14 @@ describe("summarize", () => {
 
     it("returns null on API error", async () => {
       const result = await generatePaneSummary("content", mockDeps(mockGenerateContentError()));
+      expect(result).toBeNull();
+    });
+
+    it("returns null on auth error", async () => {
+      const result = await generatePaneSummary(
+        "content",
+        mockDeps(mockGenerateContentAuthError()),
+      );
       expect(result).toBeNull();
     });
 
