@@ -10,6 +10,8 @@ import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemi
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
+import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
+import type { PaneContentDiff, PaneContentFull } from "../src/shared/types";
 import {
   buildTmuxTarget,
   getMonitoredProcesses,
@@ -90,6 +92,12 @@ const paneContentDebounce = new Map<string, ReturnType<typeof setTimeout>>();
 const paneContentHashes = new Map<string, string>();
 const PANE_CONTENT_DEBOUNCE_MS = 75;
 
+// Diff state for bandwidth optimization
+const paneContentPrev = new Map<string, string>();
+const paneContentSeq = new Map<string, number>();
+const paneContentUpdateCount = new Map<string, number>();
+const FULL_SYNC_INTERVAL = 20;
+
 // Session manager with tmux polling
 const sessionManager = new SessionManager(sessionManagerDeps);
 
@@ -118,7 +126,7 @@ sessionManager.onChange(() => {
   broadcastUpdate();
 });
 
-// Debounced pane content push via SSE
+// Debounced pane content push via SSE (with diff optimization)
 sessionManager.onPaneActivity((paneId) => {
   const watchers = paneContentClients.get(paneId);
   if (!watchers || watchers.size === 0) return;
@@ -140,8 +148,60 @@ sessionManager.onPaneActivity((paneId) => {
       if (paneContentHashes.get(paneId) === hash) return;
       paneContentHashes.set(paneId, hash);
 
+      // Increment sequence number
+      const seq = (paneContentSeq.get(paneId) ?? 0) + 1;
+      paneContentSeq.set(paneId, seq);
+
+      // Periodic full sync to prevent drift
+      const updateCount = (paneContentUpdateCount.get(paneId) ?? 0) + 1;
+      paneContentUpdateCount.set(paneId, updateCount);
+      const forceFullSync = updateCount % FULL_SYNC_INTERVAL === 0;
+
+      const prevContent = paneContentPrev.get(paneId);
+      let message: string;
+
+      if (!forceFullSync && prevContent !== undefined) {
+        const diff = computeLineDiff(prevContent, content);
+        if (diff === null) return; // identical (safety after hash guard)
+
+        if (isDiffWorthSending(content.length, diff.lines)) {
+          const payload: PaneContentDiff = {
+            type: "diff",
+            pane_id: paneId,
+            lines: diff.lines,
+            lineCount: diff.lineCount,
+            timestamp: Date.now(),
+            seq,
+          };
+          message = `data: ${JSON.stringify(payload)}\n\n`;
+        } else {
+          const payload: PaneContentFull = {
+            type: "full",
+            pane_id: paneId,
+            content,
+            timestamp: Date.now(),
+            seq,
+          };
+          message = `data: ${JSON.stringify(payload)}\n\n`;
+        }
+      } else {
+        const payload: PaneContentFull = {
+          type: "full",
+          pane_id: paneId,
+          content,
+          timestamp: Date.now(),
+          seq,
+        };
+        message = `data: ${JSON.stringify(payload)}\n\n`;
+        if (forceFullSync) {
+          paneContentUpdateCount.set(paneId, 0);
+        }
+      }
+
+      // Store current content for next diff
+      paneContentPrev.set(paneId, content);
+
       // Push to watching clients
-      const message = `data: ${JSON.stringify({ pane_id: paneId, content, timestamp: Date.now() })}\n\n`;
       const encoded = new TextEncoder().encode(message);
       const currentWatchers = paneContentClients.get(paneId);
       if (!currentWatchers) return;
@@ -207,13 +267,16 @@ const app = createApp(
         watchers.delete(client);
         if (watchers.size === 0) {
           paneContentClients.delete(paneId);
-          // Clean up debounce timer and hash when no watchers
+          // Clean up all per-pane state when no watchers
           const timer = paneContentDebounce.get(paneId);
           if (timer) {
             clearTimeout(timer);
             paneContentDebounce.delete(paneId);
           }
           paneContentHashes.delete(paneId);
+          paneContentPrev.delete(paneId);
+          paneContentSeq.delete(paneId);
+          paneContentUpdateCount.delete(paneId);
         }
       }
     },

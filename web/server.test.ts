@@ -235,7 +235,7 @@ describe("Hono API endpoints", () => {
   });
 
   describe("GET /api/sessions/:pane_id/pane-content/stream", () => {
-    it("returns SSE stream with initial pane content", async () => {
+    it("returns SSE stream with initial full pane content", async () => {
       const deps = createMockDeps({
         capturePaneContent: () => "$ hello world\n",
       });
@@ -252,8 +252,10 @@ describe("Hono API endpoints", () => {
       const text = new TextDecoder().decode(value);
       expect(text).toContain("data: ");
       const json = JSON.parse(text.replace("data: ", "").trim());
+      expect(json.type).toBe("full");
       expect(json.pane_id).toBe("%0");
       expect(json.content).toBe("$ hello world\n");
+      expect(json.seq).toBe(0);
       expect(json.timestamp).toBeGreaterThan(0);
       reader.cancel();
     });
@@ -281,7 +283,7 @@ describe("Hono API endpoints", () => {
       expect(disconnectedPaneId).toBe("%0");
     });
 
-    it("sends null content when capturePaneContent is not provided", async () => {
+    it("sends null content with type full when capturePaneContent is not provided", async () => {
       const deps = createMockDeps();
       const app = createApp(deps);
 
@@ -290,7 +292,9 @@ describe("Hono API endpoints", () => {
       const { value } = await reader.read();
       const text = new TextDecoder().decode(value);
       const json = JSON.parse(text.replace("data: ", "").trim());
+      expect(json.type).toBe("full");
       expect(json.content).toBeNull();
+      expect(json.seq).toBe(0);
       reader.cancel();
     });
   });

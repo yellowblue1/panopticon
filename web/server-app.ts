@@ -14,6 +14,7 @@ import type {
   AuthStatusResponse,
   PaneAction,
   PaneActionsResponse,
+  PaneContentFull,
   PaneContentResponse,
   SendKeysResponse,
   SessionResponse,
@@ -258,13 +259,15 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
           client = { controller };
           deps.onPaneContentSseConnect?.(paneId, client);
 
-          // Send initial content immediately
+          // Send initial content as full message
           const content = deps.capturePaneContent?.(paneId) ?? null;
           const initial = JSON.stringify({
+            type: "full",
             pane_id: paneId,
             content,
             timestamp: Date.now(),
-          } satisfies PaneContentResponse);
+            seq: 0,
+          } satisfies PaneContentFull);
           controller.enqueue(new TextEncoder().encode(`data: ${initial}\n\n`));
         },
         cancel() {
