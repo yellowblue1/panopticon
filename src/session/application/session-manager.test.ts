@@ -156,7 +156,7 @@ describe("SessionManager", () => {
       expect(manager.getSessions()[0]?.status).toBe("waiting");
     });
 
-    it("stays BUSY when pipe-pane keeps receiving data", async () => {
+    it("transitions to WAITING even when pipe-pane receives data (ANSI noise)", async () => {
       const { deps, fifoReaders } = createMockDeps();
       manager = new SessionManager(deps, {
         pollIntervalMs: 5000,
@@ -173,8 +173,8 @@ describe("SessionManager", () => {
       await new Promise((resolve) => setTimeout(resolve, 400));
       clearInterval(interval);
 
-      // Should still be BUSY because pipe-pane keeps receiving data
-      expect(manager.getSessions()[0]?.status).toBe("busy");
+      // Pipe-pane data alone (ANSI noise) should NOT prevent WAITING transition
+      expect(manager.getSessions()[0]?.status).toBe("waiting");
     });
 
     it("stays BUSY when visible content keeps changing", async () => {
@@ -907,6 +907,37 @@ describe("SessionManager", () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
       expect(manager.getSessions()[0]?.status).toBe("waiting");
     });
+
+    it("recovers from BUSY state via checkPaneContent safety net", async () => {
+      let paneContent = "initial content";
+      const { deps } = createMockDeps({
+        createFifo: () => false,
+        capturePaneContent: () => paneContent,
+      });
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 5000,
+        idleThresholdMs: 200,
+        paneCheckIntervalMs: 30,
+        summaryDelayMs: 5000,
+      });
+      manager.start();
+
+      // Wait for WAITING
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(manager.getSessions()[0]?.status).toBe("waiting");
+
+      // Trigger BUSY via content change
+      paneContent = "changed content";
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(manager.getSessions()[0]?.status).toBe("busy");
+
+      // Content is now static — idle timer from the content change should
+      // transition back to WAITING. This also validates the safety net:
+      // if the timer was somehow lost, checkPaneContent would restart it.
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      expect(manager.getSessions()[0]?.status).toBe("waiting");
+    });
   });
 
   describe("pipe-pane activity detection", () => {
@@ -926,7 +957,7 @@ describe("SessionManager", () => {
       expect(startPipePaneSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("transitions from WAITING to BUSY when pipe-pane receives data", async () => {
+    it("does not transition from WAITING to BUSY on pipe-pane data alone", async () => {
       const { deps, fifoReaders } = createMockDeps();
 
       manager = new SessionManager(deps, {
@@ -940,13 +971,13 @@ describe("SessionManager", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       expect(manager.getSessions()[0]?.status).toBe("waiting");
 
-      // Simulate pipe-pane data
+      // Simulate pipe-pane data (ANSI noise)
       const reader = Array.from(fifoReaders.values())[0];
       reader?.simulateData("some output");
 
-      // Should transition to BUSY immediately
+      // Should stay WAITING — pipe-pane data does not drive status transitions
       await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(manager.getSessions()[0]?.status).toBe("busy");
+      expect(manager.getSessions()[0]?.status).toBe("waiting");
     });
 
     it("returns null summary via API when content change triggers BUSY (cached internally)", async () => {

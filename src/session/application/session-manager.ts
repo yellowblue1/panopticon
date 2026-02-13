@@ -19,14 +19,14 @@ interface PipePaneState {
 }
 
 /**
- * Manages coding agent session state via tmux polling + pipe-pane activity detection.
+ * Manages coding agent session state via tmux polling + capture-pane content diffing.
  *
  * Session discovery: polls ps + tmux list-panes periodically.
- * Status detection: pipe-pane (FIFO) triggers WAITING → BUSY on any data.
- * Pipe-pane does NOT reset the idle timer when already BUSY — only visible content
- * changes (via capture-pane polling) do, filtering out ANSI-only noise.
- * Capture-pane polling runs as a redundant signal alongside pipe-pane, providing
- * self-healing when pipe-pane dies silently (e.g. tmux disconnects the writer).
+ * Status detection: capture-pane polling detects visible content changes for both
+ * WAITING → BUSY and BUSY → WAITING transitions. Pipe-pane (FIFO) provides
+ * real-time activity signals for the pane content viewer (SSE streaming) but
+ * does not affect session status — ANSI escape sequences flow through pipe-pane
+ * even when idle, making it unreliable for status detection.
  * Summary generation: dual-condition — when WAITING AND tmux pane content is
  * static (unchanged between consecutive captures), triggers Gemini immediately.
  * Falls back to summaryDelayMs timeout if capture-pane is unavailable.
@@ -146,7 +146,7 @@ export class SessionManager {
 
   /**
    * Main polling loop - discover/remove sessions only.
-   * Status detection is handled by pipe-pane (or capture-pane fallback).
+   * Status detection is handled by capture-pane content diffing.
    */
   private poll(): void {
     if (!this.deps.isTmuxAvailable()) {
@@ -290,6 +290,7 @@ export class SessionManager {
    * Called when idle timer expires — transition to WAITING
    */
   private onIdleTimeout(paneId: string): void {
+    this.idleTimers.delete(paneId);
     const session = this.sessions.get(paneId);
     if (!session || session.status !== "busy") return;
 
@@ -500,32 +501,25 @@ export class SessionManager {
 
   /**
    * Called when pipe-pane receives any output.
-   * Triggers WAITING → BUSY transition (fast initial detection).
-   * Does NOT reset the idle timer — ANSI escape sequences flow through pipe-pane
-   * even when the session is idle, preventing BUSY → WAITING transitions.
-   * Only visible content changes (detected by checkPaneContent) reset the timer.
+   * Updates activity timestamp and fires the pane activity callback (for SSE
+   * content streaming), but does NOT change session status. ANSI escape
+   * sequences flow through pipe-pane even when the session is idle, so
+   * pipe-pane data is unreliable for status detection. Only visible content
+   * changes (detected by checkPaneContent) drive status transitions.
    */
   private onPipePaneActivity(paneId: string): void {
     const session = this.sessions.get(paneId);
     if (!session) return;
 
-    if (session.status === "waiting") {
-      session.status = "busy";
-      session.summary_pending = false;
-      this.cancelSummaryTimer(paneId);
-      this.notifyChange();
-    }
-    // Do NOT reset idle timer — ANSI escape sequences flow through pipe-pane
-    // even when the session is idle, preventing BUSY→WAITING transitions.
-    // Only visible content changes (detected by checkPaneContent) reset the timer.
     session.last_activity = new Date().toISOString();
     this.paneActivityCallback?.(paneId);
   }
 
   /**
    * Check pane content for all sessions.
-   * Detects content changes for WAITING → BUSY transition (redundant with pipe-pane).
-   * Also resets the idle timer on content changes to prevent premature BUSY → WAITING.
+   * Detects visible content changes for WAITING → BUSY transition and resets the
+   * idle timer on changes to prevent premature BUSY → WAITING. This is the sole
+   * mechanism for status transitions — pipe-pane is not used for status detection.
    */
   private checkPaneContent(): void {
     for (const [paneId, session] of this.sessions) {
@@ -547,6 +541,10 @@ export class SessionManager {
           }
           this.resetIdleTimer(paneId);
           this.paneActivityCallback?.(paneId);
+        } else if (session.status === "busy" && !this.idleTimers.has(paneId)) {
+          // Safety net: if session is BUSY but has no idle timer running,
+          // start one to prevent getting stuck in BUSY indefinitely.
+          this.resetIdleTimer(paneId);
         }
       } catch {
         // Best effort — skip this pane and continue with others
