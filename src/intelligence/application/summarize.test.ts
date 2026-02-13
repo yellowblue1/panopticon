@@ -77,10 +77,7 @@ describe("summarize", () => {
     });
 
     it("returns null on auth error", async () => {
-      const result = await generatePaneSummary(
-        "content",
-        mockDeps(mockGenerateContentAuthError()),
-      );
+      const result = await generatePaneSummary("content", mockDeps(mockGenerateContentAuthError()));
       expect(result).toBeNull();
     });
 
