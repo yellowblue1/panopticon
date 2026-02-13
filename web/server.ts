@@ -83,6 +83,9 @@ const sessionManagerDeps: SessionManagerDeps = {
   spawnFifoReader: defaultSpawnFifoReader,
 };
 
+// Shared encoder for SSE message serialization
+const encoder = new TextEncoder();
+
 // SSE clients (session list)
 const clients: Set<SseClient> = new Set();
 
@@ -97,6 +100,10 @@ const paneContentPrev = new Map<string, string>();
 const paneContentSeq = new Map<string, number>();
 const paneContentUpdateCount = new Map<string, number>();
 const FULL_SYNC_INTERVAL = 20;
+
+function makeFullPayload(paneId: string, content: string, seq: number): PaneContentFull {
+  return { type: "full", pane_id: paneId, content, timestamp: Date.now(), seq };
+}
 
 // Session manager with tmux polling
 const sessionManager = new SessionManager(sessionManagerDeps);
@@ -114,7 +121,7 @@ function broadcastUpdate() {
 
   for (const client of clients) {
     try {
-      client.controller.enqueue(new TextEncoder().encode(message));
+      client.controller.enqueue(encoder.encode(message));
     } catch {
       clients.delete(client);
     }
@@ -175,24 +182,10 @@ sessionManager.onPaneActivity((paneId) => {
           };
           message = `data: ${JSON.stringify(payload)}\n\n`;
         } else {
-          const payload: PaneContentFull = {
-            type: "full",
-            pane_id: paneId,
-            content,
-            timestamp: Date.now(),
-            seq,
-          };
-          message = `data: ${JSON.stringify(payload)}\n\n`;
+          message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
         }
       } else {
-        const payload: PaneContentFull = {
-          type: "full",
-          pane_id: paneId,
-          content,
-          timestamp: Date.now(),
-          seq,
-        };
-        message = `data: ${JSON.stringify(payload)}\n\n`;
+        message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
         if (forceFullSync) {
           paneContentUpdateCount.set(paneId, 0);
         }
@@ -202,7 +195,7 @@ sessionManager.onPaneActivity((paneId) => {
       paneContentPrev.set(paneId, content);
 
       // Push to watching clients
-      const encoded = new TextEncoder().encode(message);
+      const encoded = encoder.encode(message);
       const currentWatchers = paneContentClients.get(paneId);
       if (!currentWatchers) return;
 
@@ -260,6 +253,14 @@ const app = createApp(
         paneContentClients.set(paneId, new Set());
       }
       paneContentClients.get(paneId)?.add(client);
+
+      // Store initial content so the first onPaneActivity can compute a diff
+      // instead of falling back to full sync
+      const initialContent = capturePaneContentEscaped(paneId);
+      if (initialContent !== null) {
+        paneContentPrev.set(paneId, initialContent);
+        paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
+      }
     },
     onPaneContentSseDisconnect: (paneId, client) => {
       const watchers = paneContentClients.get(paneId);
