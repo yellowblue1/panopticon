@@ -102,17 +102,23 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     };
   }, []);
 
-  // Write content when it changes — deferred to ensure renderer is initialized
+  // Write content when it changes — deferred to ensure renderer is initialized.
+  // Uses escape sequences instead of terminal.reset() to avoid flicker:
+  // reset() is synchronous (instant blank) while write() is async, causing
+  // a visible flash on mobile with frequent updates.
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
 
     const frameId = requestAnimationFrame(() => {
       try {
-        terminal.reset();
         if (content != null) {
-          const processed = isMobile ? filterHorizontalBorders(content) : content;
-          terminal.write(processed);
+          const processed = isMobile ? filterHorizontalBorders(content, terminal.cols) : content;
+          // Reset attributes, move to home, clear screen + scrollback, then write —
+          // all in one write() call so xterm.js renders them in a single paint.
+          terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
+        } else {
+          terminal.reset();
         }
       } catch {
         // Terminal renderer not yet ready; content will be written on next update

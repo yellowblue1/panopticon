@@ -35,6 +35,42 @@ export interface PaneContentResponse {
   timestamp: number;
 }
 
+// --- Diff-based SSE message types ---
+
+/** A single changed line in a diff update */
+export interface LineDiffEntry {
+  /** 0-based line index in the full content */
+  index: number;
+  /** The new content of the line (including ANSI escapes) */
+  content: string;
+}
+
+/** Full content message (sent on initial connect and periodic full sync) */
+export interface PaneContentFull {
+  type: "full";
+  pane_id: string;
+  content: string | null;
+  timestamp: number;
+  /** Monotonically increasing sequence number for ordering */
+  seq: number;
+}
+
+/** Diff message (sent on subsequent updates when content changes) */
+export interface PaneContentDiff {
+  type: "diff";
+  pane_id: string;
+  /** Lines that changed, applied to previous full content split by \n */
+  lines: LineDiffEntry[];
+  /** New total line count after applying diff */
+  lineCount: number;
+  timestamp: number;
+  /** Monotonically increasing sequence number for ordering */
+  seq: number;
+}
+
+/** Union type for SSE pane content messages */
+export type PaneContentMessage = PaneContentFull | PaneContentDiff;
+
 export interface SendKeysResponse {
   success: boolean;
   error?: string;

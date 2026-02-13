@@ -1,4 +1,5 @@
-import type { PaneContentResponse } from "@shared/types";
+import { applyLineDiff } from "@shared/pane-diff";
+import type { PaneContentMessage, PaneContentResponse } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sessionsApi } from "@/lib/rpc-client";
 
@@ -19,11 +20,15 @@ export function usePaneContent(paneId: string) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Track current content for diff application
+  const contentRef = useRef<string | null>(null);
+
   const startPolling = useCallback(() => {
     if (pollTimerRef.current) return;
     const poll = async () => {
       try {
         const result = await fetchPaneContent(paneId);
+        contentRef.current = result.content;
         setData(result);
         setIsLoading(false);
         setError(null);
@@ -43,14 +48,41 @@ export function usePaneContent(paneId: string) {
   }, []);
 
   useEffect(() => {
+    // Reset refs on pane change
+    contentRef.current = null;
+
     const encodedPaneId = encodeURIComponent(paneId);
     const es = new EventSource(`/api/sessions/${encodedPaneId}/pane-content/stream`);
     eventSourceRef.current = es;
 
     es.onmessage = (event) => {
       try {
-        const parsed: PaneContentResponse = JSON.parse(event.data);
-        setData(parsed);
+        const parsed = JSON.parse(event.data) as PaneContentMessage;
+
+        if (parsed.type === "full") {
+          contentRef.current = parsed.content;
+          setData({
+            pane_id: parsed.pane_id,
+            content: parsed.content,
+            timestamp: parsed.timestamp,
+          });
+        } else if (parsed.type === "diff") {
+          if (contentRef.current === null) {
+            // No baseline yet — cannot apply diff, wait for full
+            return;
+          }
+          const newContent = applyLineDiff(contentRef.current, {
+            lines: parsed.lines,
+            lineCount: parsed.lineCount,
+          });
+          contentRef.current = newContent;
+          setData({
+            pane_id: parsed.pane_id,
+            content: newContent,
+            timestamp: parsed.timestamp,
+          });
+        }
+
         setIsLoading(false);
         setError(null);
       } catch {
