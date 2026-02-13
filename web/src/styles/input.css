@@ -270,6 +270,13 @@ body {
   padding: 12px;
 }
 
+/* Enable horizontal scrolling on desktop when terminal content exceeds container width */
+@media (min-width: 640px) {
+  .pane-viewer .xterm .xterm-viewport {
+    overflow-x: auto;
+  }
+}
+
 /* Send keys input bar */
 .send-keys-bar {
   @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;

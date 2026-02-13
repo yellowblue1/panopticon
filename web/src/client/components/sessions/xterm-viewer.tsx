@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/cn";
-import { filterHorizontalBorders } from "@/lib/terminal-filters";
+import { filterHorizontalBorders, maxContentWidth } from "@/lib/terminal-filters";
 import "@xterm/xterm/css/xterm.css";
 
 interface XtermViewerProps {
@@ -42,9 +42,29 @@ const XTERM_THEME = {
 /** Pixel tolerance for "at bottom" detection in the xterm viewport. */
 const SCROLL_BOTTOM_THRESHOLD_PX = 10;
 
-function safeFit(fitAddon: FitAddon): void {
+/** Upper bound for terminal columns to prevent absurd widths from malformed content. */
+const MAX_COLS = 500;
+
+/**
+ * Fit the terminal to its container, optionally widening cols on desktop
+ * to accommodate content wider than the container (enabling horizontal scroll).
+ */
+function fitWithOverride(
+  terminal: Terminal,
+  fitAddon: FitAddon,
+  isMobile: boolean,
+  maxWidthRef: React.RefObject<number>,
+): void {
   try {
-    fitAddon.fit();
+    const dims = fitAddon.proposeDimensions();
+    if (!dims || Number.isNaN(dims.cols) || Number.isNaN(dims.rows)) return;
+
+    const effectiveCols = isMobile
+      ? dims.cols
+      : Math.min(MAX_COLS, Math.max(dims.cols, maxWidthRef.current));
+
+    if (terminal.rows === dims.rows && terminal.cols === effectiveCols) return;
+    terminal.resize(effectiveCols, dims.rows);
   } catch {
     // Renderer dimensions not yet available; will retry on next resize event
   }
@@ -57,6 +77,9 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   const isMobile = useMediaQuery("(max-width: 639px)");
   const [showButton, setShowButton] = useState(false);
   const isAtBottomRef = useRef(true);
+  const maxWidthRef = useRef(0);
+  const isMobileRef = useRef(isMobile);
+  isMobileRef.current = isMobile;
 
   // Initialize terminal and scroll listener on mount
   useEffect(() => {
@@ -88,7 +111,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
 
     // Defer fit to next animation frame so the renderer finishes initializing
     requestAnimationFrame(() => {
-      safeFit(fitAddon);
+      fitWithOverride(terminal, fitAddon, isMobileRef.current, maxWidthRef);
     });
 
     terminalRef.current = terminal;
@@ -96,7 +119,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => {
-        safeFit(fitAddon);
+        fitWithOverride(terminal, fitAddon, isMobileRef.current, maxWidthRef);
       });
     });
     resizeObserver.observe(container);
@@ -136,14 +159,24 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     // Don't disrupt the user's reading position — defer until they return to bottom
     if (!isAtBottomRef.current && content != null) return;
 
+    const fitAddon = fitAddonRef.current;
+
     const frameId = requestAnimationFrame(() => {
       try {
         if (content != null) {
-          const processed = isMobile ? filterHorizontalBorders(content, terminal.cols) : content;
-          // Reset attributes, move to home, clear screen + scrollback, then write —
-          // all in one write() call so xterm.js renders them in a single paint.
-          terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
+          if (isMobile) {
+            const processed = filterHorizontalBorders(content, terminal.cols);
+            terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
+          } else {
+            // Calculate max line width and resize terminal if needed before writing
+            maxWidthRef.current = maxContentWidth(content);
+            if (fitAddon) {
+              fitWithOverride(terminal, fitAddon, false, maxWidthRef);
+            }
+            terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
+          }
         } else {
+          maxWidthRef.current = 0;
           terminal.reset();
         }
         isAtBottomRef.current = true;

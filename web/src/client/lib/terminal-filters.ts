@@ -131,6 +131,20 @@ function truncateAnsiFromLeft(line: string, maxWidth: number): string {
  *
  * When `columns` is omitted, pure border lines are removed entirely (legacy).
  */
+/**
+ * Calculate the maximum visible (non-ANSI-escape) character width across all lines.
+ * Used by the desktop viewer to determine the required terminal column count
+ * so content is never wrapped.
+ */
+export function maxContentWidth(content: string): number {
+  let max = 0;
+  for (const line of content.split("\n")) {
+    const w = visibleWidth(line);
+    if (w > max) max = w;
+  }
+  return max;
+}
+
 export function filterHorizontalBorders(content: string, columns?: number): string {
   const lines = content.split("\n");
 

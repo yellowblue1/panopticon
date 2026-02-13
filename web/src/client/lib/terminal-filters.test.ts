@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { filterHorizontalBorders } from "./terminal-filters";
+import { filterHorizontalBorders, maxContentWidth } from "./terminal-filters";
 
 const ESC = "\x1b";
 
@@ -9,6 +9,37 @@ function testStripAnsi(input: string): string {
   const ESC2 = new RegExp(`${ESC}[A-Za-z@-~]`, "g");
   return input.replace(CSI, "").replace(ESC2, "");
 }
+
+describe("maxContentWidth", () => {
+  it("returns 0 for empty string", () => {
+    expect(maxContentWidth("")).toBe(0);
+  });
+
+  it("returns width of single line", () => {
+    expect(maxContentWidth("hello")).toBe(5);
+  });
+
+  it("returns max width across multiple lines", () => {
+    expect(maxContentWidth("short\na much longer line\nmed")).toBe(18);
+  });
+
+  it("ignores ANSI escape sequences", () => {
+    expect(maxContentWidth(`${ESC}[32mhello${ESC}[0m`)).toBe(5);
+  });
+
+  it("handles lines with only escapes", () => {
+    expect(maxContentWidth(`${ESC}[32m${ESC}[0m`)).toBe(0);
+  });
+
+  it("returns width of widest border line", () => {
+    const content = [
+      "─".repeat(200),
+      "normal text",
+      `${ESC}[38;2;102;178;255m${"─".repeat(150)}${ESC}[39m`,
+    ].join("\n");
+    expect(maxContentWidth(content)).toBe(200);
+  });
+});
 
 describe("filterHorizontalBorders", () => {
   describe("legacy mode (no columns)", () => {
