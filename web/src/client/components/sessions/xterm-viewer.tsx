@@ -152,22 +152,15 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     };
   }, []);
 
-  // Re-fit when fitWidth is toggled
+  // Re-fit when fitWidth is toggled off — reset to container-fitted dimensions.
+  // Toggling ON is handled by the content effect which recalculates width.
   useEffect(() => {
-    const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
-    if (!terminal || !fitAddon) return;
+    if (!fitAddon || fitWidth) return;
 
-    if (!fitWidth) {
-      maxWidthRef.current = 0;
-      requestAnimationFrame(() => safeFit(fitAddon));
-    } else if (content != null) {
-      maxWidthRef.current = maxContentWidth(content);
-      requestAnimationFrame(() => {
-        fitWithOverride(terminal, fitAddon, maxWidthRef.current);
-        terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
-      });
-    }
+    maxWidthRef.current = 0;
+    const frameId = requestAnimationFrame(() => safeFit(fitAddon));
+    return () => cancelAnimationFrame(frameId);
   }, [fitWidth]);
 
   // Write content when it changes — deferred to ensure renderer is initialized.
@@ -188,17 +181,16 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     const frameId = requestAnimationFrame(() => {
       try {
         if (content != null) {
-          const contentWidth = maxContentWidth(content);
-          setContentOverflows(contentWidth > terminal.cols);
-
           if (isMobile) {
             const processed = filterHorizontalBorders(content, terminal.cols);
             terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
-          } else if (fitWidth && fitAddon) {
-            maxWidthRef.current = contentWidth;
-            fitWithOverride(terminal, fitAddon, maxWidthRef.current);
-            terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
           } else {
+            const contentWidth = maxContentWidth(content);
+            setContentOverflows(contentWidth > terminal.cols);
+            if (fitWidthRef.current && fitAddon) {
+              maxWidthRef.current = contentWidth;
+              fitWithOverride(terminal, fitAddon, maxWidthRef.current);
+            }
             terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
           }
         } else {
@@ -214,7 +206,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [content, isMobile, fitWidth]);
+  }, [content, isMobile]);
 
   const handleScrollToBottom = () => {
     terminalRef.current?.scrollToBottom();
