@@ -270,6 +270,17 @@ body {
   padding: 12px;
 }
 
+/* Desktop fit-width toggle: expand terminal to content width with horizontal scroll */
+@media (min-width: 640px) {
+  .pane-viewer--fit-width {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .pane-viewer--fit-width .xterm {
+    min-width: fit-content;
+  }
+}
+
 /* Send keys input bar */
 .send-keys-bar {
   @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;

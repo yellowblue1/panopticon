@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { filterHorizontalBorders } from "./terminal-filters";
+import { filterHorizontalBorders, maxContentWidth } from "./terminal-filters";
 
 const ESC = "\x1b";
 
@@ -197,5 +197,33 @@ describe("filterHorizontalBorders", () => {
       // Label should be preserved (it's within rightmost 45 chars)
       expect(stripped).toContain("@worker");
     });
+  });
+});
+
+describe("maxContentWidth", () => {
+  it("returns 0 for empty string", () => {
+    expect(maxContentWidth("")).toBe(0);
+  });
+
+  it("returns width of single line", () => {
+    expect(maxContentWidth("hello")).toBe(5);
+  });
+
+  it("returns max width across multiple lines", () => {
+    expect(maxContentWidth("short\na longer line\nmed")).toBe(13);
+  });
+
+  it("ignores ANSI escape sequences in width calculation", () => {
+    const line = `${ESC}[32mhello${ESC}[0m`;
+    expect(maxContentWidth(line)).toBe(5);
+  });
+
+  it("handles lines with only ANSI sequences", () => {
+    expect(maxContentWidth(`${ESC}[0m`)).toBe(0);
+  });
+
+  it("handles mixed content and border lines", () => {
+    const content = ["short text", "─".repeat(80), "medium text here"].join("\n");
+    expect(maxContentWidth(content)).toBe(80);
   });
 });
