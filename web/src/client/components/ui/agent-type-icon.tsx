@@ -19,8 +19,26 @@ type AgentVariant = NonNullable<VariantProps<typeof agentIconVariants>["agent"]>
 
 function ClaudeIcon() {
   return (
-    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="w-full h-full">
-      <path d="M8 0l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" />
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      aria-hidden="true"
+      className="w-full h-full"
+    >
+      <g transform="translate(8,8)">
+        <path d="M0,-1 C0.3,-3 -0.3,-5 0.2,-6.8" />
+        <path d="M0.7,-0.7 C2.2,-2.2 3.5,-4 5,-5.2" />
+        <path d="M1,-0.2 C3.2,-0.8 5,0.2 6.5,-0.5" />
+        <path d="M0.7,0.7 C2.5,1.8 3.8,3.5 5.2,5" />
+        <path d="M0,1 C-0.4,3.2 0.3,5 -0.2,6.5" />
+        <path d="M-0.7,0.7 C-2,2.5 -3.8,3.8 -5.4,4.8" />
+        <path d="M-1,0.2 C-3,0.6 -4.8,-0.3 -6.2,0.3" />
+        <path d="M-0.7,-0.7 C-2.4,-2 -4,-3.6 -5,-5.4" />
+      </g>
+      <circle cx="8" cy="8" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
