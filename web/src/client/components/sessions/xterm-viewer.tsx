@@ -78,6 +78,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   const [showButton, setShowButton] = useState(false);
   const isAtBottomRef = useRef(true);
   const [fitWidth, setFitWidth] = useState(false);
+  const [contentOverflows, setContentOverflows] = useState(false);
   const maxWidthRef = useRef(0);
   const fitWidthRef = useRef(false);
   fitWidthRef.current = fitWidth;
@@ -187,11 +188,14 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     const frameId = requestAnimationFrame(() => {
       try {
         if (content != null) {
+          const contentWidth = maxContentWidth(content);
+          setContentOverflows(contentWidth > terminal.cols);
+
           if (isMobile) {
             const processed = filterHorizontalBorders(content, terminal.cols);
             terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
           } else if (fitWidth && fitAddon) {
-            maxWidthRef.current = maxContentWidth(content);
+            maxWidthRef.current = contentWidth;
             fitWithOverride(terminal, fitAddon, maxWidthRef.current);
             terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
           } else {
@@ -199,6 +203,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
           }
         } else {
           maxWidthRef.current = 0;
+          setContentOverflows(false);
           terminal.reset();
         }
         isAtBottomRef.current = true;
@@ -225,8 +230,8 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     >
       <div ref={containerRef} className="flex-1 min-h-0" />
 
-      {/* Fit-width toggle — desktop only */}
-      {!isMobile && (
+      {/* Fit-width toggle — desktop only, hidden when content fits */}
+      {!isMobile && (fitWidth || contentOverflows) && (
         <button
           type="button"
           aria-label={
