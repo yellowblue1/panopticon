@@ -1,8 +1,10 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { useEffect, useRef } from "react";
+import { ArrowDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { cn } from "@/lib/cn";
 import { filterHorizontalBorders } from "@/lib/terminal-filters";
 import "@xterm/xterm/css/xterm.css";
 
@@ -37,6 +39,9 @@ const XTERM_THEME = {
   brightWhite: "#ffffff",
 } as const;
 
+/** Pixel tolerance for "at bottom" detection in the xterm viewport. */
+const SCROLL_BOTTOM_THRESHOLD_PX = 10;
+
 function safeFit(fitAddon: FitAddon): void {
   try {
     fitAddon.fit();
@@ -50,8 +55,10 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isMobile = useMediaQuery("(max-width: 639px)");
+  const [showButton, setShowButton] = useState(false);
+  const isAtBottomRef = useRef(true);
 
-  // Initialize terminal on mount
+  // Initialize terminal and scroll listener on mount
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -94,7 +101,21 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     });
     resizeObserver.observe(container);
 
+    // Track scroll position via native DOM events on .xterm-viewport.
+    // terminal.onScroll doesn't fire reliably on mobile touch scrolling.
+    const viewport = container.querySelector<HTMLElement>(".xterm-viewport");
+    const handleScroll = () => {
+      if (!viewport) return;
+      const atBottom =
+        viewport.scrollTop + viewport.clientHeight >=
+        viewport.scrollHeight - SCROLL_BOTTOM_THRESHOLD_PX;
+      isAtBottomRef.current = atBottom;
+      setShowButton(!atBottom);
+    };
+    viewport?.addEventListener("scroll", handleScroll, { passive: true });
+
     return () => {
+      viewport?.removeEventListener("scroll", handleScroll);
       resizeObserver.disconnect();
       terminal.dispose();
       terminalRef.current = null;
@@ -106,9 +127,14 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   // Uses escape sequences instead of terminal.reset() to avoid flicker:
   // reset() is synchronous (instant blank) while write() is async, causing
   // a visible flash on mobile with frequent updates.
+  // Skips updates when user is scrolled up to prevent viewport jumping;
+  // latest content is applied on the next update after returning to bottom.
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
+
+    // Don't disrupt the user's reading position — defer until they return to bottom
+    if (!isAtBottomRef.current && content != null) return;
 
     const frameId = requestAnimationFrame(() => {
       try {
@@ -120,6 +146,8 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
         } else {
           terminal.reset();
         }
+        isAtBottomRef.current = true;
+        setShowButton(false);
       } catch {
         // Terminal renderer not yet ready; content will be written on next update
       }
@@ -128,5 +156,35 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     return () => cancelAnimationFrame(frameId);
   }, [content, isMobile]);
 
-  return <div ref={containerRef} className={className} />;
+  const handleScrollToBottom = () => {
+    terminalRef.current?.scrollToBottom();
+  };
+
+  return (
+    <div className={cn("relative flex flex-col", className)}>
+      <div ref={containerRef} className="flex-1 min-h-0" />
+      <button
+        type="button"
+        aria-label="Scroll to bottom"
+        className={cn(
+          "absolute right-3 bottom-3 z-10",
+          "flex items-center justify-center",
+          "w-11 h-11 sm:w-9 sm:h-9",
+          "rounded-full",
+          "bg-bg-tertiary/90 backdrop-blur-sm",
+          "border border-border-default",
+          "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
+          "shadow-lg shadow-black/30",
+          "transition-all duration-200 ease-out",
+          "cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
+          showButton ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none",
+        )}
+        onClick={handleScrollToBottom}
+        tabIndex={showButton ? 0 : -1}
+      >
+        <ArrowDown size={18} />
+      </button>
+    </div>
+  );
 }
