@@ -22,9 +22,9 @@ interface PipePaneState {
  * Manages coding agent session state via tmux polling + pipe-pane activity detection.
  *
  * Session discovery: polls ps + tmux list-panes periodically.
- * Status detection: pipe-pane (FIFO) is the primary signal for both directions:
- *   - WAITING → BUSY: any data on the pipe
- *   - BUSY → WAITING: no pipe data for idleThresholdMs
+ * Status detection: pipe-pane (FIFO) triggers WAITING → BUSY on any data.
+ * Pipe-pane does NOT reset the idle timer when already BUSY — only visible content
+ * changes (via capture-pane polling) do, filtering out ANSI-only noise.
  * Capture-pane polling runs as a redundant signal alongside pipe-pane, providing
  * self-healing when pipe-pane dies silently (e.g. tmux disconnects the writer).
  * Summary generation: dual-condition — when WAITING AND tmux pane content is
@@ -226,7 +226,7 @@ export class SessionManager {
       summary: null,
       tmux_target: this.deps.buildTmuxTarget(pane),
       last_activity: this.deps.getProcessStartTime(processPid) ?? new Date().toISOString(),
-      previousPaneContent: null,
+      previousPaneContent: this.deps.capturePaneContent(paneId) ?? null,
       summary_pending: false,
       pipePaneActive: false,
       summaryContentHash: null,
@@ -499,9 +499,11 @@ export class SessionManager {
   }
 
   /**
-   * Called when pipe-pane receives any output — session is active.
-   * Resets idle timer on every data event (both BUSY and WAITING).
-   * Summary is preserved internally for cache restoration; API methods filter it.
+   * Called when pipe-pane receives any output.
+   * Triggers WAITING → BUSY transition (fast initial detection).
+   * Does NOT reset the idle timer — ANSI escape sequences flow through pipe-pane
+   * even when the session is idle, preventing BUSY → WAITING transitions.
+   * Only visible content changes (detected by checkPaneContent) reset the timer.
    */
   private onPipePaneActivity(paneId: string): void {
     const session = this.sessions.get(paneId);
@@ -513,8 +515,9 @@ export class SessionManager {
       this.cancelSummaryTimer(paneId);
       this.notifyChange();
     }
-    // Always reset idle timer — pipe data resets idle timer even during BUSY
-    this.resetIdleTimer(paneId);
+    // Do NOT reset idle timer — ANSI escape sequences flow through pipe-pane
+    // even when the session is idle, preventing BUSY→WAITING transitions.
+    // Only visible content changes (detected by checkPaneContent) reset the timer.
     session.last_activity = new Date().toISOString();
     this.paneActivityCallback?.(paneId);
   }
@@ -522,6 +525,7 @@ export class SessionManager {
   /**
    * Check pane content for all sessions.
    * Detects content changes for WAITING → BUSY transition (redundant with pipe-pane).
+   * Also resets the idle timer on content changes to prevent premature BUSY → WAITING.
    */
   private checkPaneContent(): void {
     for (const [paneId, session] of this.sessions) {
@@ -533,9 +537,6 @@ export class SessionManager {
           session.previousPaneContent !== null && content !== session.previousPaneContent;
         session.previousPaneContent = content;
 
-        // Content change detection: redundant signal alongside pipe-pane.
-        // When pipe-pane is working, both signals fire (pipe-pane first, capture-pane ~1s later).
-        // When pipe-pane is broken (writer died silently), capture-pane catches it within 1s.
         if (isContentChanged) {
           if (session.status === "waiting") {
             session.status = "busy";

@@ -4,7 +4,6 @@ import { SessionTable } from "@/components/sessions/session-table";
 import { WarningBanner } from "@/components/ui/warning-banner";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useSessionsQuery } from "@/hooks/use-sessions";
-import { useSessionsStream } from "@/hooks/use-sessions-stream";
 import { requestNotificationPermission } from "@/lib/notifications";
 
 export const Route = createFileRoute("/")({
@@ -14,9 +13,6 @@ export const Route = createFileRoute("/")({
 function DashboardPage() {
   const { data: authStatus } = useAuthStatus();
   const { data: sessionsData } = useSessionsQuery();
-
-  // Establish SSE connection for real-time updates
-  useSessionsStream();
 
   // Request notification permission on mount
   useEffect(() => {
