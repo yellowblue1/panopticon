@@ -233,7 +233,8 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
             fitWidth ? "Fit terminal to container width" : "Fit terminal to content width"
           }
           className={cn(
-            "absolute right-3 top-3 z-10",
+            "absolute top-3 z-10",
+            fitWidth ? "left-3" : "right-3",
             "flex items-center justify-center",
             "w-9 h-9",
             "rounded-full",

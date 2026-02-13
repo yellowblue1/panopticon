@@ -270,13 +270,14 @@ body {
   padding: 12px;
 }
 
-/* Desktop fit-width toggle: expand the frame itself to match content width.
-   The pane-viewer grows wider than its parent, causing page-level horizontal scroll. */
+/* Desktop fit-width toggle: expand the frame to match content width, centered. */
 @media (min-width: 640px) {
   .pane-viewer--fit-width {
     width: max-content;
     min-width: 100%;
     overflow: visible;
+    left: 50%;
+    transform: translateX(-50%);
   }
   .pane-viewer--fit-width .xterm {
     min-width: fit-content;
