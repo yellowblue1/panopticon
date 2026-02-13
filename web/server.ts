@@ -88,7 +88,7 @@ const clients: Set<SseClient> = new Set();
 const paneContentClients = new Map<string, Set<SseClient>>();
 const paneContentDebounce = new Map<string, ReturnType<typeof setTimeout>>();
 const paneContentHashes = new Map<string, string>();
-const PANE_CONTENT_DEBOUNCE_MS = 200;
+const PANE_CONTENT_DEBOUNCE_MS = 75;
 
 // Session manager with tmux polling
 const sessionManager = new SessionManager(sessionManagerDeps);
