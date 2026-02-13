@@ -1,6 +1,9 @@
 import { TtlCache } from "./cache";
+import { createSqliteCacheStore } from "./sqlite-cache-store";
 
-const summaryCache = new TtlCache<string | null>();
+const summaryCache = new TtlCache<string | null>(
+  createSqliteCacheStore({ tableName: "summaries" }),
+);
 
 export function getCachedSummary(
   conversationTail: string,
