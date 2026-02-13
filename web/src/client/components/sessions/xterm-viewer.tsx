@@ -113,7 +113,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     const frameId = requestAnimationFrame(() => {
       try {
         if (content != null) {
-          const processed = isMobile ? filterHorizontalBorders(content) : content;
+          const processed = isMobile ? filterHorizontalBorders(content, terminal.cols) : content;
           // Reset attributes, move to home, clear screen + scrollback, then write —
           // all in one write() call so xterm.js renders them in a single paint.
           terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
