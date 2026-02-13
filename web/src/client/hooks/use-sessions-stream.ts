@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
 import { clearNotificationTracking, showBrowserNotification } from "@/lib/notifications";
-import { sessionKeys } from "@/lib/query-keys";
+import { authKeys, sessionKeys } from "@/lib/query-keys";
 import { setReadStatus } from "@/lib/storage";
 import { fetchSessions } from "./use-sessions";
 
@@ -47,6 +47,8 @@ export function useSessionsStream(): void {
       }
 
       queryClient.setQueryData<SessionsApiResponse>(sessionKeys.lists(), data);
+      // Invalidate auth status to pick up runtime auth error changes
+      queryClient.invalidateQueries({ queryKey: authKeys.status() });
     },
     [queryClient],
   );

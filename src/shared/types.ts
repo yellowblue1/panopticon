@@ -25,6 +25,8 @@ export interface AuthStatusResponse {
   gcloud_authenticated: boolean;
   gcp_project_configured: boolean;
   ai_summary_available: boolean;
+  /** Runtime Gemini auth error (e.g., expired ADC token) */
+  gemini_auth_error: boolean;
 }
 
 export interface PaneContentResponse {

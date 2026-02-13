@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type {
+  AuthStatusResponse,
   PaneAction,
   PaneActionsResponse,
   PaneContentResponse,
@@ -32,6 +33,7 @@ export interface AppDeps {
   // Auth status
   getGcpProject?: () => string | null;
   isAiAvailable?: boolean;
+  getGeminiAuthError?: () => boolean;
 
   // SSE callbacks (session list)
   onSseConnect?: (client: SseClient) => void;
@@ -191,12 +193,14 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
     .get("/api/auth/status", (c) => {
       const gcpProjectConfigured = deps.getGcpProject?.() !== null;
       const aiSummaryAvailable = deps.isAiAvailable ?? false;
+      const geminiAuthError = deps.getGeminiAuthError?.() ?? false;
 
       return c.json({
         gcloud_authenticated: gcpProjectConfigured,
         gcp_project_configured: gcpProjectConfigured,
         ai_summary_available: aiSummaryAvailable,
-      });
+        gemini_auth_error: geminiAuthError,
+      } satisfies AuthStatusResponse);
     })
 
     // Favicon routes

@@ -19,8 +19,9 @@ export function useAuthStatus() {
         gcloud_authenticated: false,
         gcp_project_configured: false,
         ai_summary_available: false,
+        gemini_auth_error: false,
       };
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 30, // 30s — auth errors can appear/disappear at runtime
   });
 }

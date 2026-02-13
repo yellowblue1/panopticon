@@ -4,6 +4,7 @@ import { serveStatic } from "hono/bun";
 import { detectPaneActions } from "../src/intelligence/application/detect-actions";
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
 import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
+import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
 import { getGcpLocation, getGcpProject } from "../src/intelligence/infrastructure/gcp-config";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { SessionManager } from "../src/session/application/session-manager";
@@ -66,6 +67,7 @@ const sessionManagerDeps: SessionManagerDeps = {
   buildTmuxTarget,
   matchProcessesToPanes,
   generateSummary: (content) => generatePaneSummary(content, summaryDeps),
+  isAuthError: hasAuthError,
   capturePaneContent,
   capturePaneContentForSummary: capturePaneContentSanitized,
   startPipePane,
@@ -180,6 +182,7 @@ const app = createApp(
     },
     getGcpProject,
     isAiAvailable: generateContent !== null,
+    getGeminiAuthError: hasAuthError,
     onSseConnect: (client) => {
       clients.add(client);
     },

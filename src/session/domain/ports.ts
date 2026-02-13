@@ -21,6 +21,8 @@ export interface SessionManagerDeps {
     processTable: ProcessInfo[],
   ) => Map<string, { process: MonitoredProcess; pane: TmuxPane }>;
   generateSummary: (content: string) => Promise<string | null>;
+  /** Check if Gemini API is currently in an auth error state */
+  isAuthError?: () => boolean;
   capturePaneContent: (paneId: string) => string | null;
   capturePaneContentForSummary: (paneId: string) => string | null;
   startPipePane: (paneId: string, target: string) => boolean;
