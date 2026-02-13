@@ -29,7 +29,7 @@ function getWarningInfo(authStatus: AuthStatusResponse): WarningInfo | null {
     return {
       message: (
         <>
-          AI summaries unavailable: Run <code>gcloud auth login</code> to enable.
+          AI summaries unavailable: Run <code>gcloud auth login --update-adc</code> to enable.
         </>
       ),
       dismissible: true,
