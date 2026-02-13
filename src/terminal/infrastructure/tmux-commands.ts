@@ -206,13 +206,15 @@ export function capturePaneContent(paneId: string, exec: ExecFn = defaultExec): 
 /**
  * Capture pane content with ANSI escape sequences preserved.
  * Uses -e flag to include color/style codes for terminal rendering.
+ * Captures up to 500 lines of scrollback history (-S -500) so users
+ * can scroll up in the viewer to see content that scrolled off screen.
  */
 export function capturePaneContentEscaped(
   paneId: string,
   exec: ExecFn = defaultExec,
 ): string | null {
   try {
-    return exec(`tmux capture-pane -p -e -t ${shellEscape(paneId)}`);
+    return exec(`tmux capture-pane -p -e -S -500 -t ${shellEscape(paneId)}`);
   } catch {
     return null;
   }
