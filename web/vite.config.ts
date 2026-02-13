@@ -31,7 +31,7 @@ export default defineConfig({
     },
   },
   server: {
-    host: true,
+    host: process.env.HOST ?? "127.0.0.1",
     allowedHosts: ["localhost", "127.0.0.1", ".ts.net"],
     port: 3847,
     proxy: {
