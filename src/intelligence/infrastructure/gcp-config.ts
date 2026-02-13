@@ -45,13 +45,13 @@ export function getGcpProject(): string | null {
 
 /**
  * Get GCP location for Gemini API
- * Priority: 1. Environment variable, 2. Default (asia-northeast1)
+ * Priority: 1. Environment variable, 2. Default (global)
  */
 export function getGcpLocation(): string {
   return (
     getConfigValue({
       envVar: "GEMINI_GCP_LOCATION",
-      defaultValue: "asia-northeast1",
-    }) ?? "asia-northeast1"
+      defaultValue: "global",
+    }) ?? "global"
   );
 }
