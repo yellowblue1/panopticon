@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { GenerateContentFn } from "../domain/ports";
-import { clearAuthError, setAuthError } from "./auth-error-state";
+import { clearAuthError, hasAuthError, setAuthError } from "./auth-error-state";
 
 const MODEL_ID = "gemini-2.5-flash";
 const REQUEST_TIMEOUT_MS = 10000;
@@ -26,19 +26,27 @@ export function isAuthError(err: unknown): boolean {
   return AUTH_ERROR_PATTERNS.some((pattern) => msg.includes(pattern));
 }
 
+function createClient(project: string, location: string): GoogleGenAI {
+  return new GoogleGenAI({ vertexai: true, project, location });
+}
+
 /**
  * Create a GenerateContentFn backed by the @google/genai SDK.
  * Authentication is handled automatically via Application Default Credentials.
  * Detects auth errors and updates the module-level auth error state.
+ * Recreates the SDK client when recovering from auth errors to pick up
+ * refreshed ADC credentials from disk.
  */
 export function createGenerateContentFn(project: string, location: string): GenerateContentFn {
-  const ai = new GoogleGenAI({
-    vertexai: true,
-    project,
-    location,
-  });
+  let ai = createClient(project, location);
 
   return async (prompt, options) => {
+    // Recreate client when recovering from auth error to pick up new ADC from disk.
+    // The SDK caches credentials in memory, so a new instance is needed.
+    if (hasAuthError()) {
+      ai = createClient(project, location);
+    }
+
     try {
       const response = await ai.models.generateContent({
         model: MODEL_ID,
