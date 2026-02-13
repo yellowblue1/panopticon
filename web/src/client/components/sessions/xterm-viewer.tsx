@@ -216,7 +216,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative flex-1 flex flex-col">
       {/* Fit-width toggle — desktop only, outside the expanding frame */}
       {!isMobile && (
         <button
