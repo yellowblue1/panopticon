@@ -76,6 +76,11 @@ export interface SendKeysResponse {
   error?: string;
 }
 
+export interface SwitchClientResponse {
+  success: boolean;
+  error?: string;
+}
+
 // Action detection types for dynamic action buttons
 export type PaneAction =
   | { type: "choices"; options: { label: string; value: string; autoEnter: boolean }[] }

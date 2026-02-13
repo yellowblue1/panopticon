@@ -191,6 +191,20 @@ export function sendRawKey(paneId: string, key: string, exec: ExecFn = defaultEx
 }
 
 /**
+ * Switch the current tmux client to the specified pane.
+ * Uses `tmux switch-client -t <pane_id>` to change the active pane
+ * in the user's terminal.
+ */
+export function switchClient(paneId: string, exec: ExecFn = defaultExec): boolean {
+  try {
+    exec(`tmux switch-client -t ${shellEscape(paneId)}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Capture the current visible content of a tmux pane.
  * Used for diff-based idle detection — if content doesn't change between
  * two consecutive captures, the pane is considered static.

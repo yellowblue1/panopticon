@@ -33,6 +33,7 @@ import {
   sendRawKey,
   startPipePane,
   stopPipePane,
+  switchClient,
 } from "../src/terminal/infrastructure/tmux-commands";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
@@ -232,6 +233,7 @@ const app = createApp(
     getSessions: () => sessionManager.getSessions(),
     sendKeys: (paneId, text) => sendKeys(paneId, text),
     sendRawKey: (paneId, key) => sendRawKey(paneId, key),
+    switchClient: (paneId) => switchClient(paneId),
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
     capturePaneContent: capturePaneContentEscaped,
     detectPaneActions: async (rawContent: string) => {

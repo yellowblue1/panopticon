@@ -1,7 +1,7 @@
 import type { SessionResponse } from "@shared/types";
 import { Link } from "@tanstack/react-router";
-import { Clipboard, ClipboardCheck, SquareTerminal } from "lucide-react";
-import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { ArrowRightToLine, SquareTerminal } from "lucide-react";
+import { useSwitchClient } from "@/hooks/use-switch-client";
 import { cn } from "@/lib/cn";
 import { AgentTypeIcon } from "../ui/agent-type-icon";
 import { StatusBadge } from "../ui/badge";
@@ -13,14 +13,19 @@ interface SessionRowProps {
 }
 
 export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
-  const copy = useCopyToClipboard();
-  const tmuxCommand = `tmux switch-client -t ${session.pane_id}`;
+  const switchClient = useSwitchClient();
 
-  const handleCopy = async () => {
-    const success = await copy(tmuxCommand, "tmux command");
-    if (success && !isRead) {
-      onMarkAsRead(session.pane_id);
-    }
+  const handleSwitch = () => {
+    switchClient.mutate(
+      { paneId: session.pane_id },
+      {
+        onSuccess: () => {
+          if (!isRead) {
+            onMarkAsRead(session.pane_id);
+          }
+        },
+      },
+    );
   };
 
   const statusClass = session.status === "busy" ? "row-busy" : "row-waiting";
@@ -67,11 +72,12 @@ export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
           </Link>
           <button
             type="button"
-            className={cn("action-btn copy-action", isRead && "copied")}
-            title={tmuxCommand}
-            onClick={handleCopy}
+            className="action-btn"
+            title={`Switch to ${session.pane_id}`}
+            onClick={handleSwitch}
+            disabled={switchClient.isPending}
           >
-            {isRead ? <ClipboardCheck size={20} /> : <Clipboard size={20} />}
+            <ArrowRightToLine size={20} />
           </button>
         </div>
       </td>
