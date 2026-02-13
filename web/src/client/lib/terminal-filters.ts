@@ -1,9 +1,11 @@
 const ESC = String.fromCharCode(0x1b);
 
-// CSI sequences: ESC[ ... final byte (0x40-0x7E)
-const CSI_RE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, "g");
+// CSI sequences: ESC[ [?] params final-byte — includes DEC private modes (\x1b[?25l etc.)
+const CSI_RE = new RegExp(`${ESC}\\[[?]?[0-9;:]*[A-Za-z]`, "g");
 // OSC sequences: ESC] ... ST (ESC\\ or BEL)
 const OSC_RE = new RegExp(`${ESC}\\][\\s\\S]*?(?:${ESC}\\\\|\\x07)`, "g");
+// Character set designation: ESC ( char, ESC ) char — used by tmux for ACS
+const CHARSET_RE = new RegExp(`${ESC}[()\\*+][A-Za-z0-9]`, "g");
 // Two-byte ESC sequences: ESC followed by a single char (0x40-0x7E)
 const ESC2_RE = new RegExp(`${ESC}[A-Za-z@-~]`, "g");
 
@@ -11,7 +13,7 @@ const ESC2_RE = new RegExp(`${ESC}[A-Za-z@-~]`, "g");
  * Strip all ANSI escape sequences from a string (for pattern matching only).
  */
 function stripAnsi(input: string): string {
-  return input.replace(CSI_RE, "").replace(OSC_RE, "").replace(ESC2_RE, "");
+  return input.replace(CSI_RE, "").replace(OSC_RE, "").replace(CHARSET_RE, "").replace(ESC2_RE, "");
 }
 
 // Matches lines consisting entirely of horizontal box-drawing characters and whitespace.

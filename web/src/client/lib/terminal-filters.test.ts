@@ -73,4 +73,19 @@ describe("filterHorizontalBorders", () => {
     const input = "line 1\nline 2\nline 3";
     expect(filterHorizontalBorders(input)).toBe(input);
   });
+
+  it("removes borders with DEC private mode sequences", () => {
+    const input = `text\n${ESC}[?7h${ESC}[2m──────────${ESC}[0m\nmore`;
+    expect(filterHorizontalBorders(input)).toBe("text\nmore");
+  });
+
+  it("removes borders with character set designation sequences", () => {
+    const input = `text\n${ESC}(B${ESC}[2m──────────${ESC}[0m\nmore`;
+    expect(filterHorizontalBorders(input)).toBe("text\nmore");
+  });
+
+  it("removes borders with colon-separated color params", () => {
+    const input = `text\n${ESC}[38:5:240m──────────${ESC}[0m\nmore`;
+    expect(filterHorizontalBorders(input)).toBe("text\nmore");
+  });
 });
