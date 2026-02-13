@@ -1,7 +1,8 @@
 import type { PaneAction } from "../../shared/types";
 import { TtlCache } from "./cache";
+import { createSqliteCacheStore } from "./sqlite-cache-store";
 
-const actionCache = new TtlCache<PaneAction>();
+const actionCache = new TtlCache<PaneAction>(createSqliteCacheStore({ tableName: "actions" }));
 
 export function getCachedAction(
   contentTail: string,
