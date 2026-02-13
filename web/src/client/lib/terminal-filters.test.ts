@@ -98,25 +98,27 @@ describe("filterHorizontalBorders", () => {
     });
   });
 
-  describe("truncation mode (with columns)", () => {
-    it("truncates pure border line to column width", () => {
+  describe("truncation mode (with columns) — trims from left", () => {
+    it("truncates pure border line to column width from left", () => {
       const border = "─".repeat(80);
       const result = filterHorizontalBorders(border, 40);
+      // Last 40 chars kept (all identical ─)
       expect(result).toBe("─".repeat(40));
     });
 
-    it("truncates border line with ANSI to column width", () => {
+    it("truncates border line with ANSI, keeping rightmost content", () => {
       const line = `${ESC}[38;2;102;178;255m${"─".repeat(80)}${ESC}[39m`;
       const result = filterHorizontalBorders(line, 40);
-      expect(testStripAnsi(result)).toBe("─".repeat(40));
+      const stripped = testStripAnsi(result);
+      expect(stripped).toBe("─".repeat(40));
     });
 
-    it("truncates mixed border line with embedded label", () => {
-      // Real pattern: ──────── @worker-phase2 ──────────
-      const line = `${"─".repeat(20)} @worker ${"─".repeat(20)}`;
+    it("preserves right-side label when truncating from left", () => {
+      // Real pattern: ────────────────────── @worker-phase2 ──
+      const line = `${"─".repeat(40)} @worker-phase2 ${"─".repeat(2)}`;
       const result = filterHorizontalBorders(line, 30);
-      // 30 visible chars: 20 borders + " @worker " (9 chars) + 1 border
-      expect(result).toBe(`${"─".repeat(20)} @worker ${"─"}`);
+      // Should keep the rightmost 30 chars: 12 borders + " @worker-phase2 " + 2 borders
+      expect(result).toBe(`${"─".repeat(12)} @worker-phase2 ${"─".repeat(2)}`);
     });
 
     it("does not truncate non-border lines", () => {
@@ -137,11 +139,14 @@ describe("filterHorizontalBorders", () => {
       expect(result).toBe(line);
     });
 
-    it("preserves ANSI escape sequences in truncated output", () => {
-      const line = `${ESC}[38;2;102;178;255m${"─".repeat(80)}${ESC}[39m`;
-      const result = filterHorizontalBorders(line, 10);
-      expect(result.startsWith(`${ESC}[38;2;102;178;255m`)).toBe(true);
-      expect(result).toBe(`${ESC}[38;2;102;178;255m${"─".repeat(10)}`);
+    it("preserves ANSI in the kept portion", () => {
+      // Color code wraps the label at the right side
+      const line = `${"─".repeat(60)}${ESC}[32m @label ${ESC}[39m${"─".repeat(5)}`;
+      const result = filterHorizontalBorders(line, 20);
+      // Should keep rightmost 20 visible chars, with ANSI in the kept portion preserved
+      const stripped = testStripAnsi(result);
+      expect(stripped.length).toBe(20);
+      expect(stripped).toContain("@label");
     });
 
     it("leaves border line unchanged when shorter than columns", () => {
@@ -155,20 +160,23 @@ describe("filterHorizontalBorders", () => {
         "some output text that is quite long",
         `${ESC}[38;2;102;178;255m${"─".repeat(80)}${ESC}[39m`,
         "❯ user input",
-        `${ESC}[38;2;102;178;255m${"─".repeat(80)}${ESC}[39m`,
+        `${ESC}[38;2;102;178;255m${"─".repeat(60)} @worker ${ESC}[39m${"─".repeat(2)}`,
         `${ESC}[38;2;153;153;153m[Opus 4.6] 72% context${ESC}[39m`,
       ].join("\n");
       const result = filterHorizontalBorders(input, 45);
-      const lines = result.split("\n");
-      expect(lines).toHaveLength(5);
+      const resultLines = result.split("\n");
+      expect(resultLines).toHaveLength(5);
       // Non-border lines preserved as-is
-      expect(lines[0]).toBe("some output text that is quite long");
-      expect(lines[2]).toBe("❯ user input");
-      // Border lines truncated to 45 visible chars
-      expect(testStripAnsi(lines[1])).toBe("─".repeat(45));
-      expect(testStripAnsi(lines[3])).toBe("─".repeat(45));
+      expect(resultLines[0]).toBe("some output text that is quite long");
+      expect(resultLines[2]).toBe("❯ user input");
+      // Pure border line truncated to 45 visible chars
+      expect(testStripAnsi(resultLines[1])).toBe("─".repeat(45));
+      // Mixed border line: label near right side preserved
+      const stripped3 = testStripAnsi(resultLines[3]);
+      expect(stripped3.length).toBe(45);
+      expect(stripped3).toContain("@worker");
       // Status line is NOT border-like (< 50% border chars)
-      expect(lines[4]).toBe(`${ESC}[38;2;153;153;153m[Opus 4.6] 72% context${ESC}[39m`);
+      expect(resultLines[4]).toBe(`${ESC}[38;2;153;153;153m[Opus 4.6] 72% context${ESC}[39m`);
     });
 
     it("preserves empty lines", () => {
@@ -181,10 +189,13 @@ describe("filterHorizontalBorders", () => {
       expect(filterHorizontalBorders("═".repeat(80), 20)).toBe("═".repeat(20));
     });
 
-    it("handles border with label and ANSI colors", () => {
+    it("handles border with label and ANSI colors from right", () => {
       const line = `${ESC}[38;2;102;178;255m${"─".repeat(30)}${ESC}[39m ${ESC}[32m@worker${ESC}[39m ${ESC}[38;2;102;178;255m${"─".repeat(30)}${ESC}[39m`;
       const result = filterHorizontalBorders(line, 45);
-      expect(testStripAnsi(result).length).toBe(45);
+      const stripped = testStripAnsi(result);
+      expect(stripped.length).toBe(45);
+      // Label should be preserved (it's within rightmost 45 chars)
+      expect(stripped).toContain("@worker");
     });
   });
 });

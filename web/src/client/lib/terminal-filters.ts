@@ -17,6 +17,62 @@ function stripAnsi(input: string): string {
   return input.replace(CSI_RE, "").replace(OSC_RE, "").replace(CHARSET_RE, "").replace(ESC2_RE, "");
 }
 
+/**
+ * Advance past an ANSI escape sequence starting at position `i`.
+ * Returns the new position after the sequence.
+ * If there is no escape sequence at `i`, returns `i` unchanged.
+ */
+function skipEscapeAt(line: string, i: number): number {
+  if (line.charCodeAt(i) !== ESC_CODE || i + 1 >= line.length) return i;
+  const next = line.charCodeAt(i + 1);
+  if (next === 0x5b) {
+    // CSI: ESC[ params final-byte (0x40-0x7e)
+    let j = i + 2;
+    while (j < line.length && line.charCodeAt(j) < 0x40) j++;
+    return j < line.length ? j + 1 : j;
+  }
+  if (next === 0x5d) {
+    // OSC: ESC] ... (ESC\ or BEL)
+    let j = i + 2;
+    while (j < line.length) {
+      if (
+        line.charCodeAt(j) === ESC_CODE &&
+        j + 1 < line.length &&
+        line.charCodeAt(j + 1) === 0x5c
+      ) {
+        return j + 2;
+      }
+      if (line.charCodeAt(j) === 0x07) return j + 1;
+      j++;
+    }
+    return j;
+  }
+  if (next === 0x28 || next === 0x29 || next === 0x2a || next === 0x2b) {
+    // Charset designation: ESC ( char, ESC ) char, etc.
+    return i + 3;
+  }
+  // Other 2-byte ESC sequence
+  return i + 2;
+}
+
+/**
+ * Count the visible (non-escape) characters in a line.
+ */
+function visibleWidth(line: string): number {
+  let count = 0;
+  let i = 0;
+  while (i < line.length) {
+    const next = skipEscapeAt(line, i);
+    if (next !== i) {
+      i = next;
+    } else {
+      count++;
+      i++;
+    }
+  }
+  return count;
+}
+
 // U+2500 ─ (light horizontal), U+2501 ━ (heavy horizontal), U+2550 ═ (double horizontal)
 const BORDER_CHAR_SET = new Set([0x2500, 0x2501, 0x2550]);
 
@@ -35,63 +91,43 @@ function isBorderLike(stripped: string): boolean {
 }
 
 /**
- * Truncate a string with ANSI escapes to a maximum visible width.
- * ANSI escape sequences are skipped (zero width) and preserved in output.
+ * Truncate a line from the LEFT so that the rightmost `maxWidth` visible
+ * characters are preserved.  Labels like `@worker-phase2` that appear near
+ * the right end of border lines are kept; leading border chars are trimmed.
+ *
+ * ANSI escape sequences embedded in the kept portion are preserved.
+ * Escape sequences before the truncation point are discarded (the kept
+ * portion's own sequences provide the correct rendering state).
  */
-function truncateAnsiToWidth(line: string, maxWidth: number): string {
-  let visible = 0;
-  let i = 0;
+function truncateAnsiFromLeft(line: string, maxWidth: number): string {
+  const total = visibleWidth(line);
+  if (total <= maxWidth) return line;
 
-  while (i < line.length && visible < maxWidth) {
-    if (line.charCodeAt(i) === ESC_CODE && i + 1 < line.length) {
-      const next = line.charCodeAt(i + 1);
-      if (next === 0x5b) {
-        // CSI: ESC[ params final-byte (0x40-0x7e)
-        let j = i + 2;
-        while (j < line.length && line.charCodeAt(j) < 0x40) j++;
-        i = j < line.length ? j + 1 : j;
-      } else if (next === 0x5d) {
-        // OSC: ESC] ... (ESC\ or BEL)
-        let j = i + 2;
-        while (j < line.length) {
-          if (
-            line.charCodeAt(j) === ESC_CODE &&
-            j + 1 < line.length &&
-            line.charCodeAt(j + 1) === 0x5c
-          ) {
-            j += 2;
-            break;
-          }
-          if (line.charCodeAt(j) === 0x07) {
-            j++;
-            break;
-          }
-          j++;
-        }
-        i = j;
-      } else if (next === 0x28 || next === 0x29 || next === 0x2a || next === 0x2b) {
-        // Charset designation: ESC ( char, ESC ) char, etc.
-        i += 3;
-      } else {
-        // Other 2-byte ESC sequence
-        i += 2;
-      }
+  // Skip (total - maxWidth) visible characters from the front
+  const skipCount = total - maxWidth;
+  let skipped = 0;
+  let i = 0;
+  while (i < line.length && skipped < skipCount) {
+    const next = skipEscapeAt(line, i);
+    if (next !== i) {
+      i = next; // skip escape without counting
     } else {
-      visible++;
+      skipped++;
       i++;
     }
   }
 
-  return line.substring(0, i);
+  return line.substring(i);
 }
 
 /**
  * Process terminal content for mobile display.
  *
  * When `columns` is provided, border-like lines (lines where >50% of visible
- * characters are horizontal box-drawing chars) are truncated to exactly
- * `columns` visible characters.  This gives a clean edge-to-edge appearance
- * on narrow screens without removing the visual separator entirely.
+ * characters are horizontal box-drawing chars) are truncated from the LEFT
+ * to exactly `columns` visible characters.  This preserves labels like
+ * `@worker-phase2` that appear near the right end of border lines, while
+ * trimming the leading decorative border characters.
  *
  * When `columns` is omitted, pure border lines are removed entirely (legacy).
  */
@@ -102,7 +138,7 @@ export function filterHorizontalBorders(content: string, columns?: number): stri
     const processed = lines.map((line) => {
       const stripped = stripAnsi(line);
       if (isBorderLike(stripped)) {
-        return truncateAnsiToWidth(line, columns);
+        return truncateAnsiFromLeft(line, columns);
       }
       return line;
     });
