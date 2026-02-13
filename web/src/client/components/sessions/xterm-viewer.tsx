@@ -216,8 +216,16 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
   };
 
   return (
-    <div className="relative flex-1 flex flex-col">
-      {/* Fit-width toggle — desktop only, outside the expanding frame */}
+    <div
+      className={cn(
+        "relative flex flex-col",
+        !isMobile && fitWidth && "pane-viewer--fit-width",
+        className,
+      )}
+    >
+      <div ref={containerRef} className="flex-1 min-h-0" />
+
+      {/* Fit-width toggle — desktop only */}
       {!isMobile && (
         <button
           type="button"
@@ -225,7 +233,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
             fitWidth ? "Fit terminal to container width" : "Fit terminal to content width"
           }
           className={cn(
-            "absolute right-3 top-3 z-20",
+            "absolute right-3 top-3 z-10",
             "flex items-center justify-center",
             "w-9 h-9",
             "rounded-full",
@@ -243,41 +251,29 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
         </button>
       )}
 
-      <div
+      {/* Scroll to bottom */}
+      <button
+        type="button"
+        aria-label="Scroll to bottom"
         className={cn(
-          "relative flex flex-col",
-          !isMobile && fitWidth && "pane-viewer--fit-width",
-          className,
+          "absolute right-3 bottom-3 z-10",
+          "flex items-center justify-center",
+          "w-11 h-11 sm:w-9 sm:h-9",
+          "rounded-full",
+          "bg-bg-tertiary/90 backdrop-blur-sm",
+          "border border-border-default",
+          "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
+          "shadow-lg shadow-black/30",
+          "transition-all duration-200 ease-out",
+          "cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
+          showButton ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none",
         )}
+        onClick={handleScrollToBottom}
+        tabIndex={showButton ? 0 : -1}
       >
-        <div ref={containerRef} className="flex-1 min-h-0" />
-
-        {/* Scroll to bottom */}
-        <button
-          type="button"
-          aria-label="Scroll to bottom"
-          className={cn(
-            "absolute right-3 bottom-3 z-10",
-            "flex items-center justify-center",
-            "w-11 h-11 sm:w-9 sm:h-9",
-            "rounded-full",
-            "bg-bg-tertiary/90 backdrop-blur-sm",
-            "border border-border-default",
-            "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary",
-            "shadow-lg shadow-black/30",
-            "transition-all duration-200 ease-out",
-            "cursor-pointer",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
-            showButton
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-2 pointer-events-none",
-          )}
-          onClick={handleScrollToBottom}
-          tabIndex={showButton ? 0 : -1}
-        >
-          <ArrowDown size={18} />
-        </button>
-      </div>
+        <ArrowDown size={18} />
+      </button>
     </div>
   );
 }
