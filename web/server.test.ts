@@ -14,6 +14,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     getSessions: () => [],
     sendKeys: () => true,
     sendRawKey: () => true,
+    switchClient: () => true,
     capturePaneContent: () => null,
     detectPaneActions: async () => ({ type: "none" }),
     getGcpProject: () => "mock-project",
@@ -189,6 +190,47 @@ describe("Hono API endpoints", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: "Escape", raw: true }),
+      });
+
+      expect(res.status).toBe(501);
+    });
+  });
+
+  describe("POST /api/sessions/:pane_id/switch", () => {
+    it("returns success when switchClient succeeds", async () => {
+      const switchClientSpy = mock((_paneId: string) => true);
+      const deps = createMockDeps({ switchClient: switchClientSpy });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/switch", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(switchClientSpy).toHaveBeenCalledWith("%0");
+    });
+
+    it("returns 500 when switchClient fails", async () => {
+      const deps = createMockDeps({ switchClient: () => false });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/switch", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+    });
+
+    it("returns 501 when switchClient dependency is not provided", async () => {
+      const { switchClient: _, ...depsWithout } = createMockDeps();
+      const app = createApp(depsWithout as AppDeps);
+
+      const res = await app.request("/api/sessions/%250/switch", {
+        method: "POST",
       });
 
       expect(res.status).toBe(501);

@@ -407,10 +407,6 @@ body {
     white-space: nowrap;
   }
 
-  .copy-action {
-    display: none;
-  }
-
   .pane-viewer {
     max-height: calc(100vh - 260px);
     max-height: calc(100dvh - 260px);

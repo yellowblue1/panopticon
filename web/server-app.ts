@@ -18,6 +18,7 @@ import type {
   PaneContentResponse,
   SendKeysResponse,
   SessionResponse,
+  SwitchClientResponse,
 } from "../src/shared/types";
 
 /**
@@ -28,6 +29,7 @@ export interface AppDeps {
   getSessions: () => SessionResponse[];
   sendKeys?: (paneId: string, text: string) => boolean;
   sendRawKey?: (paneId: string, key: string) => boolean;
+  switchClient?: (paneId: string) => boolean;
   capturePaneContent?: (paneId: string) => string | null;
   detectPaneActions?: (content: string) => Promise<PaneAction>;
 
@@ -133,6 +135,30 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       }
       return c.json(
         { success: false, error: "Failed to send keys to pane" } satisfies SendKeysResponse,
+        500,
+      );
+    })
+
+    // POST /api/sessions/:pane_id/switch
+    .post("/api/sessions/:pane_id/switch", (c) => {
+      if (!deps.switchClient) {
+        return c.json(
+          { success: false, error: "Not available" } satisfies SwitchClientResponse,
+          501,
+        );
+      }
+
+      const paneId = c.req.param("pane_id");
+      const success = deps.switchClient(paneId);
+
+      if (success) {
+        return c.json({ success: true } satisfies SwitchClientResponse);
+      }
+      return c.json(
+        {
+          success: false,
+          error: "Failed to switch to pane",
+        } satisfies SwitchClientResponse,
         500,
       );
     })

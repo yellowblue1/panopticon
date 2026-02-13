@@ -10,6 +10,7 @@ import {
   isTmuxAvailable,
   startPipePane,
   stopPipePane,
+  switchClient,
 } from "./tmux-commands";
 
 describe("isTmuxAvailable", () => {
@@ -232,5 +233,28 @@ describe("stopPipePane", () => {
     };
 
     expect(stopPipePane("%99", exec)).toBe(false);
+  });
+});
+
+describe("switchClient", () => {
+  it("calls tmux switch-client with escaped pane id", () => {
+    let executedCommand = "";
+    const exec = (cmd: string) => {
+      executedCommand = cmd;
+      return "";
+    };
+
+    const result = switchClient("%0", exec);
+    expect(result).toBe(true);
+    expect(executedCommand).toContain("tmux switch-client");
+    expect(executedCommand).toContain("%0");
+  });
+
+  it("returns false on failure", () => {
+    const exec = () => {
+      throw new Error("pane not found");
+    };
+
+    expect(switchClient("%99", exec)).toBe(false);
   });
 });
