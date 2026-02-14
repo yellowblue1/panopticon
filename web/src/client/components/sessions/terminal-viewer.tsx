@@ -81,7 +81,8 @@ export function TerminalViewer({
   // Auto-scroll to bottom when content changes (if user is at bottom).
   // useLayoutEffect fires synchronously after DOM mutations but before paint,
   // ensuring the scroll position is correct before the user sees anything.
-  // This avoids the rAF cancellation issue with rapid SSE updates.
+  // Depends on both content AND containerWidth because the rendered HTML changes
+  // when containerWidth updates (mobile border filtering uses cols derived from it).
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || content == null) return;
@@ -89,7 +90,7 @@ export function TerminalViewer({
     if (!isAtBottomRef.current) return;
 
     container.scrollTop = container.scrollHeight;
-  }, [content]);
+  }, [content, containerWidth]);
 
   // Determine the effective content to render:
   // freeze display when user is scrolled up, resume on return to bottom
