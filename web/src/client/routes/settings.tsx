@@ -7,7 +7,7 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   return (
     <>
-      <title>Settings - Claude Monitoring</title>
+      <title>Settings - Panopticon</title>
       <div className="mb-4">
         <Link to="/" className="text-accent-blue hover:underline text-sm">
           &larr; Back to sessions
