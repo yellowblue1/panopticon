@@ -21,31 +21,46 @@ const DEFAULT_CHAR_WIDTH_PX = 8.4;
 /** Singleton converter instance (stateless, safe to reuse). */
 const converter = new FancyAnsi();
 
+/** CSS for the terminal font used in measurement spans. */
+const TERMINAL_FONT_CSS =
+  "position:absolute;visibility:hidden;white-space:pre;" +
+  "font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,monospace;" +
+  "font-size:14px";
+
 /**
- * Measure the actual width of a monospace character by rendering a hidden
- * span with the terminal font inside the given container.
+ * Measure the maximum character width across regular ASCII and box-drawing
+ * characters. On some platforms (e.g. Android), the monospace font may not
+ * include box-drawing glyphs, causing fallback to a wider font.
  */
 function measureCharWidth(container: HTMLElement): number {
   const span = document.createElement("span");
-  span.style.cssText =
-    "position:absolute;visibility:hidden;white-space:pre;" +
-    "font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,monospace;" +
-    "font-size:14px";
-  span.textContent = "M".repeat(50);
+  span.style.cssText = TERMINAL_FONT_CSS;
   container.appendChild(span);
-  const width = span.getBoundingClientRect().width / 50;
+
+  // Measure regular ASCII character
+  span.textContent = "M".repeat(50);
+  const asciiWidth = span.getBoundingClientRect().width / 50;
+
+  // Measure box-drawing character (U+2500 ─) which may use a fallback font
+  span.textContent = "\u2500".repeat(50);
+  const borderWidth = span.getBoundingClientRect().width / 50;
+
   container.removeChild(span);
+
+  // Use the wider of the two to ensure both fit
+  const width = Math.max(asciiWidth, borderWidth);
   return width > 0 ? width : DEFAULT_CHAR_WIDTH_PX;
 }
 
 /**
  * Calculate the number of character columns that fit in the container,
- * accounting for 12px padding on each side and a 1-column safety margin
- * for sub-pixel rounding differences across devices.
+ * accounting for 12px padding on each side. Subtracts a 2-column safety
+ * margin to absorb cumulative sub-pixel rounding in character placement
+ * across different devices and rendering engines.
  */
 function calcCols(containerWidth: number, charWidth: number): number {
   if (containerWidth <= 24) return 0;
-  return Math.max(0, Math.floor((containerWidth - 24) / charWidth) - 1);
+  return Math.max(0, Math.floor((containerWidth - 24) / charWidth) - 2);
 }
 
 export function TerminalViewer({
