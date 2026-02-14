@@ -33,18 +33,19 @@ function measureCharWidth(container: HTMLElement): number {
     "font-size:14px";
   span.textContent = "M".repeat(50);
   container.appendChild(span);
-  const width = span.offsetWidth / 50;
+  const width = span.getBoundingClientRect().width / 50;
   container.removeChild(span);
   return width > 0 ? width : DEFAULT_CHAR_WIDTH_PX;
 }
 
 /**
  * Calculate the number of character columns that fit in the container,
- * accounting for 12px padding on each side.
+ * accounting for 12px padding on each side and a 1-column safety margin
+ * for sub-pixel rounding differences across devices.
  */
 function calcCols(containerWidth: number, charWidth: number): number {
   if (containerWidth <= 24) return 0;
-  return Math.floor((containerWidth - 24) / charWidth);
+  return Math.max(0, Math.floor((containerWidth - 24) / charWidth) - 1);
 }
 
 export function TerminalViewer({
