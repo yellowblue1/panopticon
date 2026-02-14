@@ -45,7 +45,11 @@ import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
 const DEFAULT_HOST = "127.0.0.1";
-const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : DEFAULT_PORT;
+const PORT = process.env.PORT
+  ? Number.parseInt(process.env.PORT, 10)
+  : process.env.DEV_PORT
+    ? Number.parseInt(process.env.DEV_PORT, 10) + 1
+    : DEFAULT_PORT;
 const HOST = process.env.HOST ?? DEFAULT_HOST;
 
 // ═══ Wire dependencies ═══

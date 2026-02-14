@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"PORT=3848 bun --watch run server.ts\"",
+    "dev": "DEV_PORT=${DEV_PORT:-3847} concurrently -k \"vite\" \"bun --watch run server.ts\"",
     "build": "vite build",
     "preview": "vite preview",
     "start": "bun run server.ts",
