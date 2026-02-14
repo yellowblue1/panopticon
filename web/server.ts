@@ -45,6 +45,8 @@ import {
   stopPipePane,
   switchClient,
 } from "../src/terminal/infrastructure/tmux-commands";
+import { BuiltinCommandProvider } from "./builtin-command-fetcher";
+import { discoverAllSlashCommands } from "./command-discovery";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
@@ -59,6 +61,7 @@ const HOST = process.env.HOST ?? DEFAULT_HOST;
 // ═══ Slash commands config ═══
 
 const CONFIG_DIR = join(homedir(), ".config", "panopticon");
+const CACHE_DIR = join(homedir(), ".cache", "panopticon");
 const SLASH_COMMANDS_PATH = join(CONFIG_DIR, "slash-commands.json");
 
 function isValidSlashCommand(item: unknown): item is SlashCommand {
@@ -90,6 +93,20 @@ function writeSlashCommands(commands: SlashCommand[]): void {
   mkdirSync(CONFIG_DIR, { recursive: true });
   writeFileSync(SLASH_COMMANDS_PATH, JSON.stringify(commands, null, 2), "utf-8");
 }
+
+// ═══ Builtin command fetcher ═══
+
+const builtinCommandProvider = new BuiltinCommandProvider({
+  fetchText: async (url) => {
+    const res = await fetch(url);
+    return res.text();
+  },
+  readFileSync: (path) => readFileSync(path, "utf-8"),
+  writeFileSync: (path, data) => writeFileSync(path, data, "utf-8"),
+  existsSync,
+  mkdirSync: (path) => mkdirSync(path, { recursive: true }),
+  cacheDir: CACHE_DIR,
+});
 
 // ═══ Wire dependencies ═══
 
@@ -369,10 +386,19 @@ const app = createApp(
       }
       return success;
     },
+    getBuiltinCommands: () => builtinCommandProvider.getCommands(),
     getSlashCommands: readSlashCommands,
     setSlashCommands: (commands) => {
       writeSlashCommands(commands);
       return commands;
+    },
+    discoverSlashCommands: () => {
+      const cwds: string[] = [];
+      for (const session of sessionManager.getSessions()) {
+        const cwd = sessionManager.getSessionCwd(session.pane_id);
+        if (cwd) cwds.push(cwd);
+      }
+      return discoverAllSlashCommands(cwds);
     },
     onSseConnect: (client) => {
       clients.add(client);
@@ -472,6 +498,9 @@ async function main() {
 
   // Start session polling
   sessionManager.start();
+
+  // Start background fetch for built-in commands
+  builtinCommandProvider.start();
 }
 
 main();

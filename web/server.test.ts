@@ -613,6 +613,116 @@ describe("Settings API endpoints", () => {
       const data = await res.json();
       expect(data.commands).toEqual([]);
     });
+
+    it("includes discovered commands in response", async () => {
+      const discovered = [
+        { command: "/plan", description: "Custom command (project)" },
+        { command: "/deploy", description: "Custom command (global)" },
+      ];
+      const deps = createMockDeps({
+        getSlashCommands: () => [],
+        discoverSlashCommands: () => discovered,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.commands).toEqual(discovered);
+    });
+
+    it("configured commands take priority over discovered with same name", async () => {
+      const configured = [{ command: "/review", description: "Review a pull request" }];
+      const discovered = [
+        { command: "/review", description: "Custom command (project)" },
+        { command: "/plan", description: "Custom command (global)" },
+      ];
+      const deps = createMockDeps({
+        getSlashCommands: () => configured,
+        discoverSlashCommands: () => discovered,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.commands).toEqual([
+        { command: "/review", description: "Review a pull request" },
+        { command: "/plan", description: "Custom command (global)" },
+      ]);
+    });
+
+    it("works without discoverSlashCommands dep (backward-compatible)", async () => {
+      const deps = createMockDeps({
+        discoverSlashCommands: undefined,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
+    });
+
+    it("uses fetched builtin commands as base layer", async () => {
+      const builtin = [
+        { command: "/clear", description: "Clear history" },
+        { command: "/plan", description: "Enter plan mode" },
+      ];
+      const deps = createMockDeps({
+        getSlashCommands: () => [],
+        discoverSlashCommands: () => [],
+        getBuiltinCommands: () => builtin,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+      const data = await res.json();
+      expect(data.commands).toEqual(builtin);
+    });
+
+    it("falls back to DEFAULT_SLASH_COMMANDS when getBuiltinCommands returns null", async () => {
+      const deps = createMockDeps({
+        getSlashCommands: () => [],
+        discoverSlashCommands: () => [],
+        getBuiltinCommands: () => null,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+      const data = await res.json();
+      expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
+    });
+
+    it("configured > discovered > builtin priority with dedup", async () => {
+      const configured = [{ command: "/clear", description: "User clear" }];
+      const discovered = [
+        { command: "/clear", description: "Discovered clear" },
+        { command: "/deploy", description: "Custom command (project)" },
+      ];
+      const builtin = [
+        { command: "/clear", description: "Built-in clear" },
+        { command: "/deploy", description: "Built-in deploy" },
+        { command: "/plan", description: "Enter plan mode" },
+      ];
+      const deps = createMockDeps({
+        getSlashCommands: () => configured,
+        discoverSlashCommands: () => discovered,
+        getBuiltinCommands: () => builtin,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+      const data = await res.json();
+      expect(data.commands).toEqual([
+        { command: "/clear", description: "User clear" },
+        { command: "/deploy", description: "Custom command (project)" },
+        { command: "/plan", description: "Enter plan mode" },
+      ]);
+    });
   });
 
   describe("PUT /api/settings/slash-commands", () => {
