@@ -1,6 +1,7 @@
 import type { SessionResponse } from "@shared/types";
 import { useMemo } from "react";
 import { usePlansAvailability } from "@/hooks/use-plans-availability";
+import { usePullRequests } from "@/hooks/use-pull-requests";
 import { useReadStatus } from "@/hooks/use-read-status";
 import { SessionRow } from "./session-row";
 
@@ -12,6 +13,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
   const paneIds = useMemo(() => sessions.map((s) => s.pane_id), [sessions]);
   const { readStatuses, markAsRead } = useReadStatus(paneIds);
   const { data: plansData } = usePlansAvailability();
+  const { data: prsData } = usePullRequests();
 
   if (sessions.length === 0) {
     return (
@@ -42,6 +44,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
             session={session}
             isRead={readStatuses.get(session.pane_id) ?? false}
             hasPlan={plansData?.plans[session.pane_id] ?? false}
+            pullRequest={prsData?.pull_requests[session.pane_id] ?? null}
             onMarkAsRead={markAsRead}
           />
         ))}

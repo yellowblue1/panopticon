@@ -145,6 +145,32 @@ body {
   @apply text-text-muted italic text-sm opacity-70;
 }
 
+.branch-group {
+  @apply flex items-center gap-1.5 flex-wrap;
+}
+
+/* PR badge */
+.pr-badge {
+  @apply inline-flex items-center gap-1 text-xs font-mono no-underline shrink-0;
+}
+
+.pr-badge:hover {
+  @apply underline;
+}
+
+/* Desktop: show PR badge in branch column, status badge in status column */
+.pr-badge-mobile {
+  display: none;
+}
+
+.pr-badge-desktop {
+  display: inline-flex;
+}
+
+.status-badge-mobile {
+  display: none;
+}
+
 /* Status badge */
 .status-badge {
   @apply inline-block text-xl leading-none cursor-default;
@@ -553,6 +579,15 @@ html.vertical-expand [data-app-shell] {
   .sessions-table td {
     @apply py-2.5 px-3.5;
   }
+
+  /* Medium: branch column hidden, so show PR badge next to project name */
+  .pr-badge-mobile {
+    display: inline-flex;
+  }
+
+  .pr-badge-desktop {
+    display: none;
+  }
 }
 
 /* Small screens (<640px): card layout */
@@ -574,11 +609,11 @@ html.vertical-expand [data-app-shell] {
   /* Card: transform <tr> into a CSS Grid card */
   .sessions-table tbody tr {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     grid-template-areas:
-      "project  status actions"
-      "summary  summary summary"
-      "branch   branch  branch";
+      "project  actions"
+      "summary  summary"
+      "branch   branch";
     gap: 4px 8px;
     align-items: center;
     padding: 14px 16px;
@@ -604,10 +639,11 @@ html.vertical-expand [data-app-shell] {
   }
 
   .col-status {
-    grid-area: status;
-    width: auto;
-    min-width: 0;
-    text-align: right;
+    display: none;
+  }
+
+  .status-badge-mobile {
+    display: inline-block;
   }
 
   .col-actions {
@@ -659,8 +695,16 @@ html.vertical-expand [data-app-shell] {
     min-width: fit-content;
   }
 
-  .switch-action-btn,
   .plan-placeholder {
+    display: none;
+  }
+
+  /* Mobile: show PR badge next to project name, hide in branch column */
+  .pr-badge-mobile {
+    display: inline-flex;
+  }
+
+  .pr-badge-desktop {
     display: none;
   }
 

@@ -1,3 +1,4 @@
+import type { PullRequestInfo } from "../../shared/types";
 import type { ProcessInfo, TmuxPane } from "../domain/types";
 import { sanitizePaneContent } from "./sanitize";
 
@@ -156,6 +157,47 @@ export function getProjectName(cwd: string, exec: ExecFn = defaultExec): string 
 export function getGitBranch(cwd: string, exec: ExecFn = defaultExec): string | null {
   try {
     return exec(`git -C ${shellEscape(cwd)} rev-parse --abbrev-ref HEAD`) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get pull request info for a branch using the GitHub CLI.
+ * Returns null if gh is not installed, auth fails, or no PR exists.
+ */
+export function getPullRequestInfo(
+  cwd: string,
+  branch: string,
+  exec: ExecFn = defaultExec,
+): PullRequestInfo | null {
+  try {
+    const output = exec(
+      `cd ${shellEscape(cwd)} && gh pr list --head ${shellEscape(branch)} --json url,number,title,isDraft,state --limit 1`,
+    );
+    if (!output || output.trim() === "[]") return null;
+
+    const prs = JSON.parse(output);
+    if (!Array.isArray(prs) || prs.length === 0) return null;
+
+    const pr = prs[0];
+    let state: PullRequestInfo["state"];
+    if (pr.isDraft) {
+      state = "draft";
+    } else if (pr.state === "MERGED") {
+      state = "merged";
+    } else if (pr.state === "CLOSED") {
+      state = "closed";
+    } else {
+      state = "open";
+    }
+
+    return {
+      number: pr.number,
+      url: pr.url,
+      title: pr.title,
+      state,
+    };
   } catch {
     return null;
   }

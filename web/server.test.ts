@@ -26,6 +26,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     serializeSessionsData: () => "{}",
     onPaneContentSseConnect: () => {},
     onPaneContentSseDisconnect: () => {},
+    getPullRequests: () => ({}),
     getSlashCommands: () => DEFAULT_SLASH_COMMANDS,
     setSlashCommands: (commands) => commands,
     ...overrides,
@@ -542,6 +543,41 @@ describe("Hono API endpoints", () => {
       expect(text).toContain(`data: ${initialData}`);
       expect(text).toContain("\n\n");
     });
+  });
+});
+
+describe("GET /api/sessions/prs", () => {
+  it("returns pull requests with timestamp", async () => {
+    const deps = createMockDeps({
+      getPullRequests: () => ({
+        "%0": {
+          number: 42,
+          url: "https://github.com/o/r/pull/42",
+          title: "Fix bug",
+          state: "open",
+        },
+        "%1": null,
+      }),
+    });
+    const app = createApp(deps);
+    const res = await app.request("/api/sessions/prs");
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.pull_requests["%0"].number).toBe(42);
+    expect(data.pull_requests["%0"].state).toBe("open");
+    expect(data.pull_requests["%1"]).toBeNull();
+    expect(data.timestamp).toBeGreaterThan(0);
+  });
+
+  it("returns empty object when getPullRequests is not provided", async () => {
+    const deps = createMockDeps({ getPullRequests: undefined });
+    const app = createApp(deps);
+    const res = await app.request("/api/sessions/prs");
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.pull_requests).toEqual({});
   });
 });
 

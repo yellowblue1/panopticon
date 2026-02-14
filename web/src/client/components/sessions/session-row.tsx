@@ -1,19 +1,27 @@
-import type { SessionResponse } from "@shared/types";
+import type { PullRequestInfo, SessionResponse } from "@shared/types";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightToLine, FileText, SquareTerminal } from "lucide-react";
 import { useSwitchClient } from "@/hooks/use-switch-client";
 import { cn } from "@/lib/cn";
 import { AgentTypeIcon } from "../ui/agent-type-icon";
 import { StatusBadge } from "../ui/badge";
+import { PrBadge } from "../ui/pr-badge";
 
 interface SessionRowProps {
   session: SessionResponse;
   isRead: boolean;
   hasPlan: boolean;
+  pullRequest: PullRequestInfo | null;
   onMarkAsRead: (paneId: string) => void;
 }
 
-export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRowProps) {
+export function SessionRow({
+  session,
+  isRead,
+  hasPlan,
+  pullRequest,
+  onMarkAsRead,
+}: SessionRowProps) {
   const switchClient = useSwitchClient();
 
   const handleSwitch = () => {
@@ -37,11 +45,18 @@ export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRo
         <div className="flex items-center gap-2">
           <AgentTypeIcon agentType={session.agent_type} />
           <span className="project-name">{session.project_name}</span>
+          <span className="status-badge-mobile">
+            <StatusBadge variant={session.status} />
+          </span>
+          {pullRequest && <PrBadge pr={pullRequest} className="pr-badge-mobile" />}
         </div>
       </td>
       <td className="col-branch">
         {session.git_branch ? (
-          <span className="git-branch">{session.git_branch}</span>
+          <span className="branch-group">
+            <span className="git-branch">{session.git_branch}</span>
+            {pullRequest && <PrBadge pr={pullRequest} className="pr-badge-desktop" />}
+          </span>
         ) : (
           <span className="no-branch">-</span>
         )}

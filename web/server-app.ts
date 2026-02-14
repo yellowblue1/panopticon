@@ -19,6 +19,8 @@ import type {
   PaneContentResponse,
   PlanResponse,
   PlansAvailabilityResponse,
+  PullRequestInfo,
+  PullRequestsResponse,
   SendKeysResponse,
   SessionResponse,
   SlashCommand,
@@ -55,6 +57,9 @@ export interface AppDeps {
   // Plan viewer
   getPlan?: (paneId: string) => { slug: string; content: string } | null;
   getPlansAvailability?: () => Record<string, boolean>;
+
+  // Pull request info
+  getPullRequests?: () => Record<string, PullRequestInfo | null>;
 
   // Settings: slash commands
   getSlashCommands?: () => SlashCommand[];
@@ -116,6 +121,15 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         plans,
         timestamp: Date.now(),
       } satisfies PlansAvailabilityResponse);
+    })
+
+    // GET /api/sessions/prs (batch PR info — must be before :pane_id routes)
+    .get("/api/sessions/prs", (c) => {
+      const pullRequests = deps.getPullRequests?.() ?? {};
+      return c.json({
+        pull_requests: pullRequests,
+        timestamp: Date.now(),
+      } satisfies PullRequestsResponse);
     })
 
     // POST /api/sessions/:pane_id/send-keys

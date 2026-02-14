@@ -19,7 +19,12 @@ import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
 import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
-import type { PaneContentDiff, PaneContentFull, SlashCommand } from "../src/shared/types";
+import type {
+  PaneContentDiff,
+  PaneContentFull,
+  PullRequestInfo,
+  SlashCommand,
+} from "../src/shared/types";
 import {
   buildTmuxTarget,
   getMonitoredProcesses,
@@ -36,6 +41,7 @@ import {
   getProcessStartTime,
   getProcessTable,
   getProjectName,
+  getPullRequestInfo,
   isTmuxAvailable,
   sendKeys,
   sendRawKey,
@@ -170,6 +176,10 @@ const sessionManager = new SessionManager(sessionManagerDeps);
 // Plan discovery (slug cache: cwd → slug, stable per session lifetime)
 const planDeps = createPlanDiscoveryDeps();
 const slugCache = new Map<string, string | null>();
+
+// PR info cache (cwd:branch → PR info, 2-minute TTL)
+const PR_CACHE_TTL_MS = 120_000;
+const prCache = new Map<string, { data: PullRequestInfo | null; fetchedAt: number }>();
 
 function serializeSessionsData(): string {
   return JSON.stringify({
@@ -348,6 +358,37 @@ const app = createApp(
         }
         result[session.pane_id] = planFileExists(slug, planDeps);
       }
+      return result;
+    },
+    getPullRequests: () => {
+      const result: Record<string, PullRequestInfo | null> = {};
+      const now = Date.now();
+
+      for (const session of sessionManager.getSessions()) {
+        const branch = session.git_branch;
+        if (!branch || branch === "main" || branch === "master") {
+          result[session.pane_id] = null;
+          continue;
+        }
+
+        const cwd = sessionManager.getSessionCwd(session.pane_id);
+        if (!cwd) {
+          result[session.pane_id] = null;
+          continue;
+        }
+
+        const cacheKey = `${cwd}:${branch}`;
+        const cached = prCache.get(cacheKey);
+        if (cached && now - cached.fetchedAt < PR_CACHE_TTL_MS) {
+          result[session.pane_id] = cached.data;
+          continue;
+        }
+
+        const pr = getPullRequestInfo(cwd, branch);
+        prCache.set(cacheKey, { data: pr, fetchedAt: now });
+        result[session.pane_id] = pr;
+      }
+
       return result;
     },
     getSlashCommands: readSlashCommands,

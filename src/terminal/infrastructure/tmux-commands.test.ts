@@ -7,6 +7,7 @@ import {
   getProcessStartTime,
   getProcessTable,
   getProjectName,
+  getPullRequestInfo,
   isTmuxAvailable,
   startPipePane,
   stopPipePane,
@@ -170,6 +171,90 @@ describe("getGitBranch", () => {
       throw new Error("not a git repo");
     };
     expect(getGitBranch("/some/path", exec)).toBeNull();
+  });
+});
+
+describe("getPullRequestInfo", () => {
+  it("returns PR info for an open PR", () => {
+    const exec = () =>
+      JSON.stringify([
+        {
+          number: 42,
+          url: "https://github.com/org/repo/pull/42",
+          title: "Add feature X",
+          isDraft: false,
+          state: "OPEN",
+        },
+      ]);
+    const result = getPullRequestInfo("/path/to/repo", "feat/x", exec);
+    expect(result).toEqual({
+      number: 42,
+      url: "https://github.com/org/repo/pull/42",
+      title: "Add feature X",
+      state: "open",
+    });
+  });
+
+  it("returns draft state when isDraft is true", () => {
+    const exec = () =>
+      JSON.stringify([
+        {
+          number: 1,
+          url: "https://github.com/o/r/pull/1",
+          title: "WIP",
+          isDraft: true,
+          state: "OPEN",
+        },
+      ]);
+    const result = getPullRequestInfo("/path", "branch", exec);
+    expect(result?.state).toBe("draft");
+  });
+
+  it("returns merged state", () => {
+    const exec = () =>
+      JSON.stringify([
+        {
+          number: 1,
+          url: "https://github.com/o/r/pull/1",
+          title: "Done",
+          isDraft: false,
+          state: "MERGED",
+        },
+      ]);
+    const result = getPullRequestInfo("/path", "branch", exec);
+    expect(result?.state).toBe("merged");
+  });
+
+  it("returns closed state", () => {
+    const exec = () =>
+      JSON.stringify([
+        {
+          number: 1,
+          url: "https://github.com/o/r/pull/1",
+          title: "Closed",
+          isDraft: false,
+          state: "CLOSED",
+        },
+      ]);
+    const result = getPullRequestInfo("/path", "branch", exec);
+    expect(result?.state).toBe("closed");
+  });
+
+  it("returns null when no PRs found", () => {
+    const exec = () => "[]";
+    expect(getPullRequestInfo("/path", "branch", exec)).toBeNull();
+  });
+
+  it("returns null when gh command fails", () => {
+    const exec = () => {
+      throw new Error("gh not found");
+    };
+    expect(getPullRequestInfo("/path", "branch", exec)).toBeNull();
+  });
+
+  it("returns null for empty output", () => {
+    const exec = () => "";
+    expect(getPullRequestInfo("/path", "branch", exec)).toBeNull();
   });
 });
 

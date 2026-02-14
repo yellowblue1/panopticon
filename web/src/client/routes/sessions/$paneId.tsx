@@ -6,8 +6,10 @@ import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
 import { TerminalViewer } from "@/components/sessions/terminal-viewer";
 import { StatusBadge } from "@/components/ui/badge";
+import { PrBadge } from "@/components/ui/pr-badge";
 import { usePaneContent } from "@/hooks/use-pane-content";
 import { usePlan } from "@/hooks/use-plan";
+import { usePullRequests } from "@/hooks/use-pull-requests";
 import { useSessionsQuery } from "@/hooks/use-sessions";
 import { cn } from "@/lib/cn";
 
@@ -30,7 +32,10 @@ function SessionDetailPage() {
   const { data: planData } = usePlan(paneId);
   const { data: sessionsData } = useSessionsQuery();
 
+  const { data: prsData } = usePullRequests();
+
   const session = sessionsData?.sessions.find((s) => s.pane_id === paneId);
+  const pullRequest = prsData?.pull_requests[paneId] ?? null;
   const hasPlan = planData?.plan != null;
 
   const tabs = [
@@ -82,6 +87,7 @@ function SessionDetailPage() {
               {session.git_branch && (
                 <span className="font-mono text-accent-purple">{session.git_branch}</span>
               )}
+              {pullRequest && <PrBadge pr={pullRequest} />}
               <StatusBadge variant={session.status} />
               <span className="text-text-muted">{paneId}</span>
             </div>

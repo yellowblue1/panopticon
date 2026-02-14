@@ -5,6 +5,13 @@ export type SessionStatus = "busy" | "waiting";
 
 export type AgentType = "claude" | "codex";
 
+export interface PullRequestInfo {
+  number: number;
+  url: string;
+  title: string;
+  state: "open" | "closed" | "merged" | "draft";
+}
+
 export interface SessionResponse {
   pane_id: string;
   project_name: string;
@@ -105,6 +112,12 @@ export interface PlanResponse {
 
 export interface PlansAvailabilityResponse {
   plans: Record<string, boolean>;
+  timestamp: number;
+}
+
+// Pull request availability types
+export interface PullRequestsResponse {
+  pull_requests: Record<string, PullRequestInfo | null>;
   timestamp: number;
 }
 

@@ -19,6 +19,11 @@ export const planKeys = {
   availability: () => [...planKeys.all, "availability"] as const,
 };
 
+export const prKeys = {
+  all: ["pull-requests"] as const,
+  availability: () => [...prKeys.all, "availability"] as const,
+};
+
 export const settingsKeys = {
   all: ["settings"] as const,
   slashCommands: () => [...settingsKeys.all, "slash-commands"] as const,
