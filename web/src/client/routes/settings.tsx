@@ -2,7 +2,7 @@ import { DEFAULT_SLASH_COMMANDS } from "@shared/default-slash-commands";
 import type { SlashCommand } from "@shared/types";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSlashCommands, useUpdateSlashCommands } from "@/hooks/use-slash-commands";
 import { cn } from "@/lib/cn";
@@ -11,53 +11,72 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
+/** Draft command with a stable client-side ID for React key stability during edits. */
+interface DraftCommand extends SlashCommand {
+  _id: number;
+}
+
+let nextId = 0;
+
+function toDraft(commands: SlashCommand[]): DraftCommand[] {
+  return commands.map((cmd) => ({ ...cmd, _id: nextId++ }));
+}
+
+function fromDraft(commands: DraftCommand[]): SlashCommand[] {
+  return commands.map(({ command, description }) => ({ command, description }));
+}
+
 function SettingsPage() {
   const { data, isLoading } = useSlashCommands();
   const updateMutation = useUpdateSlashCommands();
-  const [draft, setDraft] = useState<SlashCommand[]>([]);
+  const [draft, setDraft] = useState<DraftCommand[]>([]);
   const [isDirty, setIsDirty] = useState(false);
+  const initialized = useRef(false);
 
   // Sync server state to draft on first load
   useEffect(() => {
-    if (data?.commands) {
-      setDraft(data.commands);
-      setIsDirty(false);
+    if (data?.commands && !initialized.current) {
+      setDraft(toDraft(data.commands));
+      initialized.current = true;
     }
   }, [data]);
 
-  const updateDraft = (newDraft: SlashCommand[]) => {
+  const updateDraft = (newDraft: DraftCommand[]) => {
     setDraft(newDraft);
     setIsDirty(true);
   };
 
-  const handleChange = (index: number, field: keyof SlashCommand, value: string) => {
-    const target = sortedDraft[index];
-    const updated = draft.map((cmd) => (cmd === target ? { ...cmd, [field]: value } : cmd));
-    setDraft(updated);
+  const handleChange = (id: number, field: keyof SlashCommand, value: string) => {
+    setDraft((prev) => prev.map((cmd) => (cmd._id === id ? { ...cmd, [field]: value } : cmd)));
     setIsDirty(true);
   };
 
-  const handleDelete = (index: number) => {
-    const target = sortedDraft[index];
-    updateDraft(draft.filter((cmd) => cmd !== target));
+  const handleDelete = (id: number) => {
+    updateDraft(draft.filter((cmd) => cmd._id !== id));
   };
 
   const handleAdd = () => {
-    updateDraft([...draft, { command: "/", description: "" }]);
+    updateDraft([...draft, { command: "/", description: "", _id: nextId++ }]);
   };
 
   const handleReset = () => {
     updateMutation.mutate(DEFAULT_SLASH_COMMANDS, {
       onSuccess: () => {
+        setDraft(toDraft(DEFAULT_SLASH_COMMANDS));
         setIsDirty(false);
         toast.success("Reset to default commands");
+      },
+      onError: () => {
+        toast.error("Failed to reset commands");
       },
     });
   };
 
   const handleSave = () => {
+    const commands = fromDraft(draft);
+
     // Validate
-    for (const cmd of draft) {
+    for (const cmd of commands) {
       if (!cmd.command.startsWith("/")) {
         toast.error(`Command "${cmd.command}" must start with /`);
         return;
@@ -74,7 +93,7 @@ function SettingsPage() {
 
     // Check duplicates
     const seen = new Set<string>();
-    for (const cmd of draft) {
+    for (const cmd of commands) {
       if (seen.has(cmd.command)) {
         toast.error(`Duplicate command: ${cmd.command}`);
         return;
@@ -82,10 +101,13 @@ function SettingsPage() {
       seen.add(cmd.command);
     }
 
-    updateMutation.mutate(draft, {
+    updateMutation.mutate(commands, {
       onSuccess: () => {
         setIsDirty(false);
         toast.success("Slash commands saved");
+      },
+      onError: () => {
+        toast.error("Failed to save commands");
       },
     });
   };
@@ -146,9 +168,9 @@ function SettingsPage() {
         ) : (
           <>
             <div className="space-y-2">
-              {sortedDraft.map((cmd, i) => (
+              {sortedDraft.map((cmd) => (
                 <div
-                  key={cmd.command}
+                  key={cmd._id}
                   className={cn(
                     "flex items-center gap-2 p-2 rounded-lg",
                     "bg-bg-secondary border border-border-default",
@@ -158,7 +180,7 @@ function SettingsPage() {
                   <input
                     type="text"
                     value={cmd.command}
-                    onChange={(e) => handleChange(i, "command", e.target.value)}
+                    onChange={(e) => handleChange(cmd._id, "command", e.target.value)}
                     placeholder="/command"
                     className={cn(
                       "w-36 shrink-0 bg-bg-primary border border-border-default rounded px-2 py-1.5",
@@ -171,7 +193,7 @@ function SettingsPage() {
                   <input
                     type="text"
                     value={cmd.description}
-                    onChange={(e) => handleChange(i, "description", e.target.value)}
+                    onChange={(e) => handleChange(cmd._id, "description", e.target.value)}
                     placeholder="Description"
                     className={cn(
                       "flex-1 bg-bg-primary border border-border-default rounded px-2 py-1.5",
@@ -183,7 +205,7 @@ function SettingsPage() {
                   {/* Delete button */}
                   <button
                     type="button"
-                    onClick={() => handleDelete(i)}
+                    onClick={() => handleDelete(cmd._id)}
                     className={cn(
                       "shrink-0 p-1.5 rounded",
                       "text-text-muted hover:text-red-400 hover:bg-bg-tertiary",
