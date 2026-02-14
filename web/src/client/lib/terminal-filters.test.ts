@@ -232,16 +232,12 @@ describe("filterHorizontalBorders", () => {
       expect(resultAdjusted).toBe(resultBase);
     });
 
-    it("preserves right-side label with correct extra chars", () => {
-      // Line: 100 borders + " @label " + 2 borders = 110 visible
+    it("preserves label when bonus rounds to zero", () => {
+      // 8 non-border chars → bonus = floor(8 * 0.7 / 8.5) = 0, so output = baseCols
       const line = `${"─".repeat(100)} @label ${"─".repeat(2)}`;
       const result = filterHorizontalBorders(line, 40, androidWidths);
       const stripped = testStripAnsi(result);
-      // Rightmost 40 chars: 30 borders + " @label " (8 chars) + 2 borders = 40
-      // Non-border count in rightmost 40: 8 chars (" @label ")
-      // Extra: floor(8 * (8.5 - 7.8) / 8.5) = floor(8 * 0.0824) = floor(0.659) = 0
-      // Hmm, with only 8 non-border chars the bonus is 0
-      // Let's use a larger label
+      expect(stripped.length).toBe(40);
       expect(stripped).toContain("@label");
     });
 
