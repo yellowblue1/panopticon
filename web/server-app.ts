@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type {
   AuthStatusResponse,
+  GeminiBackend,
   PaneAction,
   PaneActionsResponse,
   PaneContentFull,
@@ -34,7 +35,7 @@ export interface AppDeps {
   detectPaneActions?: (content: string) => Promise<PaneAction>;
 
   // Auth status
-  getGcpProject?: () => string | null;
+  geminiBackend?: GeminiBackend | null;
   isAiAvailable?: boolean;
   getGeminiAuthError?: () => boolean;
 
@@ -218,15 +219,10 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
     // GET /api/auth/status
     .get("/api/auth/status", (c) => {
-      const gcpProjectConfigured = deps.getGcpProject?.() !== null;
-      const aiSummaryAvailable = deps.isAiAvailable ?? false;
-      const geminiAuthError = deps.getGeminiAuthError?.() ?? false;
-
       return c.json({
-        gcloud_authenticated: gcpProjectConfigured,
-        gcp_project_configured: gcpProjectConfigured,
-        ai_summary_available: aiSummaryAvailable,
-        gemini_auth_error: geminiAuthError,
+        ai_summary_available: deps.isAiAvailable ?? false,
+        gemini_auth_error: deps.getGeminiAuthError?.() ?? false,
+        gemini_backend: deps.geminiBackend ?? null,
       } satisfies AuthStatusResponse);
     })
 

@@ -16,10 +16,9 @@ export function useAuthStatus() {
         console.warn("Failed to check auth status:", err);
       }
       return {
-        gcloud_authenticated: false,
-        gcp_project_configured: false,
         ai_summary_available: false,
         gemini_auth_error: false,
+        gemini_backend: null,
       };
     },
     staleTime: 1000 * 30, // 30s — auth errors can appear/disappear at runtime

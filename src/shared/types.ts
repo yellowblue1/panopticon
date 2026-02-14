@@ -21,12 +21,14 @@ export interface SessionsApiResponse {
   timestamp: number;
 }
 
+export type GeminiBackend = "google-ai" | "vertex-ai";
+
 export interface AuthStatusResponse {
-  gcloud_authenticated: boolean;
-  gcp_project_configured: boolean;
   ai_summary_available: boolean;
-  /** Runtime Gemini auth error (e.g., expired ADC token) */
+  /** Runtime Gemini auth error (e.g., expired ADC token or invalid API key) */
   gemini_auth_error: boolean;
+  /** Which Gemini backend is active, or null when unconfigured */
+  gemini_backend: GeminiBackend | null;
 }
 
 export interface PaneContentResponse {

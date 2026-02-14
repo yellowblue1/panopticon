@@ -5,8 +5,8 @@ import { detectPaneActions } from "../src/intelligence/application/detect-action
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
 import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
 import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
-import { getGcpLocation, getGcpProject } from "../src/intelligence/infrastructure/gcp-config";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
+import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
@@ -44,16 +44,11 @@ const HOST = process.env.HOST ?? DEFAULT_HOST;
 
 // ═══ Wire dependencies ═══
 
-const gcpProject = getGcpProject();
-const gcpLocation = getGcpLocation();
+const geminiBackend = bootstrapGeminiEnv();
 
-// Create separate generateContent functions per use case (only if project is configured)
-const summaryGenerateContent = gcpProject
-  ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash")
-  : null;
-const actionGenerateContent = gcpProject
-  ? createGenerateContentFn(gcpProject, gcpLocation, "gemini-2.5-flash")
-  : null;
+// Create separate generateContent functions per use case (only if Gemini is configured)
+const summaryGenerateContent = geminiBackend ? createGenerateContentFn("gemini-2.5-flash") : null;
+const actionGenerateContent = geminiBackend ? createGenerateContentFn("gemini-2.5-flash") : null;
 
 const summaryDeps: SummaryDeps = {
   generateContent: summaryGenerateContent ?? (async () => null),
@@ -240,8 +235,8 @@ const app = createApp(
       const sanitized = sanitizePaneContent(rawContent);
       return detectPaneActions(sanitized, actionDeps);
     },
-    getGcpProject,
-    isAiAvailable: gcpProject !== null,
+    geminiBackend,
+    isAiAvailable: geminiBackend !== null,
     getGeminiAuthError: hasAuthError,
     onSseConnect: (client) => {
       clients.add(client);

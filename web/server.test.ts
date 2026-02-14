@@ -17,7 +17,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     switchClient: () => true,
     capturePaneContent: () => null,
     detectPaneActions: async () => ({ type: "none" }),
-    getGcpProject: () => "mock-project",
+    geminiBackend: "vertex-ai",
     isAiAvailable: true,
     getGeminiAuthError: () => false,
     onSseConnect: () => {},
@@ -415,9 +415,9 @@ describe("Hono API endpoints", () => {
   });
 
   describe("GET /api/auth/status", () => {
-    it("returns all true when project configured and AI available", async () => {
+    it("returns available with backend when configured", async () => {
       const deps = createMockDeps({
-        getGcpProject: () => "my-project",
+        geminiBackend: "vertex-ai",
         isAiAvailable: true,
       });
       const app = createApp(deps);
@@ -426,14 +426,28 @@ describe("Hono API endpoints", () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.gcloud_authenticated).toBe(true);
-      expect(data.gcp_project_configured).toBe(true);
       expect(data.ai_summary_available).toBe(true);
+      expect(data.gemini_backend).toBe("vertex-ai");
+      expect(data.gemini_auth_error).toBe(false);
     });
 
-    it("returns false when AI is not available", async () => {
+    it("returns google-ai backend when using API key", async () => {
       const deps = createMockDeps({
-        getGcpProject: () => "my-project",
+        geminiBackend: "google-ai",
+        isAiAvailable: true,
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/auth/status");
+      const data = await res.json();
+
+      expect(data.ai_summary_available).toBe(true);
+      expect(data.gemini_backend).toBe("google-ai");
+    });
+
+    it("returns unavailable with null backend when not configured", async () => {
+      const deps = createMockDeps({
+        geminiBackend: null,
         isAiAvailable: false,
       });
       const app = createApp(deps);
@@ -441,22 +455,8 @@ describe("Hono API endpoints", () => {
       const res = await app.request("/api/auth/status");
       const data = await res.json();
 
-      expect(data.gcloud_authenticated).toBe(true);
       expect(data.ai_summary_available).toBe(false);
-    });
-
-    it("returns false when project not configured", async () => {
-      const deps = createMockDeps({
-        getGcpProject: () => null,
-        isAiAvailable: false,
-      });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/auth/status");
-      const data = await res.json();
-
-      expect(data.gcp_project_configured).toBe(false);
-      expect(data.ai_summary_available).toBe(false);
+      expect(data.gemini_backend).toBeNull();
     });
 
     it("returns gemini_auth_error true when auth error is active", async () => {
