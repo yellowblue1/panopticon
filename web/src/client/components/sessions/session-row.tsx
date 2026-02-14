@@ -37,6 +37,9 @@ export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRo
         <div className="flex items-center gap-2">
           <AgentTypeIcon agentType={session.agent_type} />
           <span className="project-name">{session.project_name}</span>
+          <span className="status-badge-mobile">
+            <StatusBadge variant={session.status} />
+          </span>
         </div>
       </td>
       <td className="col-branch">
