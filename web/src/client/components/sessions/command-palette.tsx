@@ -5,23 +5,22 @@ import { cn } from "@/lib/cn";
 
 interface SlashCommand {
   command: string;
-  label: string;
   description: string;
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
-  { command: "/compact", label: "Compact", description: "Compact conversation context" },
-  { command: "/clear", label: "Clear", description: "Clear conversation history" },
-  { command: "/cost", label: "Cost", description: "Show token usage and costs" },
-  { command: "/doctor", label: "Doctor", description: "Check Claude Code health" },
-  { command: "/help", label: "Help", description: "Show available commands" },
-  { command: "/init", label: "Init", description: "Initialize CLAUDE.md in project" },
-  { command: "/login", label: "Login", description: "Switch Anthropic accounts" },
-  { command: "/logout", label: "Logout", description: "Sign out from Anthropic" },
-  { command: "/memory", label: "Memory", description: "Edit CLAUDE.md memory files" },
-  { command: "/model", label: "Model", description: "Switch AI model" },
-  { command: "/permissions", label: "Permissions", description: "View or update tool permissions" },
-  { command: "/review", label: "Review", description: "Review a pull request" },
+  { command: "/compact", description: "Compact conversation context" },
+  { command: "/clear", description: "Clear conversation history" },
+  { command: "/cost", description: "Show token usage and costs" },
+  { command: "/doctor", description: "Check Claude Code health" },
+  { command: "/help", description: "Show available commands" },
+  { command: "/init", description: "Initialize CLAUDE.md in project" },
+  { command: "/login", description: "Switch Anthropic accounts" },
+  { command: "/logout", description: "Sign out from Anthropic" },
+  { command: "/memory", description: "Edit CLAUDE.md memory files" },
+  { command: "/model", description: "Switch AI model" },
+  { command: "/permissions", description: "View or update tool permissions" },
+  { command: "/review", description: "Review a pull request" },
 ];
 
 // --- Fuzzy matching (fzf-style) ---
@@ -204,9 +203,6 @@ export function CommandPalette({ isOpen, onClose, onExecute, isPending }: Comman
       e.preventDefault();
       const entry = scoredCommands[selectedIndex];
       if (entry && !isPending) handleSelect(entry.command);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
     }
   };
 
@@ -241,9 +237,7 @@ export function CommandPalette({ isOpen, onClose, onExecute, isPending }: Comman
             (isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"),
         )}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
+        onKeyDown={() => {}} // Keyboard events handled by document-level listener
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"

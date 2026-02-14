@@ -1,6 +1,6 @@
 import type { PaneAction } from "@shared/types";
 import { Send } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActionDetection } from "@/hooks/use-action-detection";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -118,11 +118,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         },
       },
     );
-  };
-
-  const handleFormSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    handleSend(text);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -277,7 +272,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       />
 
       {/* Input row: [textarea] [/ ↔ send] — morphing action button */}
-      <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
+      <div className="flex items-end gap-2">
         <textarea
           ref={inputRef}
           value={text}
@@ -308,6 +303,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           className={cn(
             "rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center",
             "transition-all duration-200 ease-out",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
             hasText
               ? "bg-accent-blue text-white hover:opacity-90"
               : "bg-bg-secondary text-text-secondary border border-border-default hover:text-text-primary hover:bg-bg-tertiary",
@@ -316,7 +312,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         >
           {hasText ? <Send size={18} /> : <span className="font-mono text-base font-bold">/</span>}
         </button>
-      </form>
+      </div>
     </div>
   );
 }
