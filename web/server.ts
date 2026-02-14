@@ -91,6 +91,22 @@ const encoder = new TextEncoder();
 // SSE clients (session list)
 const clients: Set<SseClient> = new Set();
 
+// SSE heartbeat to prevent Bun idleTimeout (255s) from closing idle connections
+// and to detect dead clients early. Sends a data message every 30s so clients
+// can track connection health and reconnect if messages stop arriving.
+const SSE_HEARTBEAT_INTERVAL_MS = 30_000;
+const heartbeatMessage = encoder.encode(`data: {"type":"heartbeat"}\n\n`);
+
+setInterval(() => {
+  for (const client of clients) {
+    try {
+      client.controller.enqueue(heartbeatMessage);
+    } catch {
+      clients.delete(client);
+    }
+  }
+}, SSE_HEARTBEAT_INTERVAL_MS);
+
 // SSE clients (pane content — per-pane)
 const paneContentClients = new Map<string, Set<SseClient>>();
 const paneContentDebounce = new Map<string, ReturnType<typeof setTimeout>>();

@@ -10,12 +10,20 @@ import { fetchSessions } from "./use-sessions";
 const POLL_INTERVAL_MS = 5000;
 const RECONNECT_TIMEOUT_MS = 30000;
 
+// Staleness detection: if no SSE message (data or heartbeat) arrives within
+// this threshold, the connection is considered dead and will be reconnected.
+// Must be > server heartbeat interval (30s) to avoid false positives.
+const SSE_STALENESS_THRESHOLD_MS = 45_000;
+const STALENESS_CHECK_INTERVAL_MS = 15_000;
+
 export function useSessionsStream(): void {
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stalenessCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMessageRef = useRef<number>(Date.now());
   const previousStatusesRef = useRef(new Map<string, string>());
 
   const handleSessionsUpdate = useCallback(
@@ -62,26 +70,50 @@ export function useSessionsStream(): void {
     }
   }, [handleSessionsUpdate]);
 
+  const clearStalenessCheck = useCallback(() => {
+    if (stalenessCheckRef.current) {
+      clearInterval(stalenessCheckRef.current);
+      stalenessCheckRef.current = null;
+    }
+  }, []);
+
   const connectSSE = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
+    clearStalenessCheck();
 
     const es = new EventSource("/api/sessions/stream");
     eventSourceRef.current = es;
 
     es.onopen = () => {
       setStatus("connected");
+      lastMessageRef.current = Date.now();
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
         pollTimerRef.current = null;
       }
+
+      // Start staleness monitoring — reconnect if no messages arrive
+      clearStalenessCheck();
+      stalenessCheckRef.current = setInterval(() => {
+        if (Date.now() - lastMessageRef.current > SSE_STALENESS_THRESHOLD_MS) {
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          clearStalenessCheck();
+          connectSSE();
+        }
+      }, STALENESS_CHECK_INTERVAL_MS);
     };
 
     es.onmessage = (event) => {
+      lastMessageRef.current = Date.now();
       try {
-        const data: SessionsApiResponse = JSON.parse(event.data);
-        handleSessionsUpdate(data);
+        const parsed = JSON.parse(event.data);
+        if (parsed.type === "heartbeat") return;
+        handleSessionsUpdate(parsed as SessionsApiResponse);
       } catch (err) {
         console.warn("Failed to parse SSE message:", err);
       }
@@ -89,6 +121,7 @@ export function useSessionsStream(): void {
 
     es.onerror = () => {
       setStatus("disconnected");
+      clearStalenessCheck();
       if (es) {
         es.close();
         eventSourceRef.current = null;
@@ -107,7 +140,7 @@ export function useSessionsStream(): void {
         }
       }, RECONNECT_TIMEOUT_MS);
     };
-  }, [setStatus, handleSessionsUpdate, pollSessions]);
+  }, [setStatus, handleSessionsUpdate, pollSessions, clearStalenessCheck]);
 
   useEffect(() => {
     connectSSE();
@@ -125,6 +158,7 @@ export function useSessionsStream(): void {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      clearStalenessCheck();
     };
-  }, [connectSSE]);
+  }, [connectSSE, clearStalenessCheck]);
 }
