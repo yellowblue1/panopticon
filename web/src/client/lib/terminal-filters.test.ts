@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { filterHorizontalBorders, maxContentWidth } from "./terminal-filters";
+import { type CharWidthInfo, filterHorizontalBorders, maxContentWidth } from "./terminal-filters";
 
 const ESC = "\x1b";
 
@@ -196,6 +196,61 @@ describe("filterHorizontalBorders", () => {
       expect(stripped.length).toBe(45);
       // Label should be preserved (it's within rightmost 45 chars)
       expect(stripped).toContain("@worker");
+    });
+  });
+
+  describe("mixed-width adjustment (with charWidths)", () => {
+    // Simulate Android where border chars are wider than ASCII
+    const androidWidths: CharWidthInfo = { ascii: 7.8, border: 8.5 };
+
+    it("allows more chars for border lines with labels", () => {
+      // ─×80 + " @worker-phase2 " + ─×2 = 98 visible chars
+      const line = `${"─".repeat(80)} @worker-phase2 ${"─".repeat(2)}`;
+      const resultBase = filterHorizontalBorders(line, 40);
+      const resultAdjusted = filterHorizontalBorders(line, 40, androidWidths);
+      const baseLen = testStripAnsi(resultBase).length;
+      const adjustedLen = testStripAnsi(resultAdjusted).length;
+      // Adjusted should be longer since label chars are narrower
+      expect(adjustedLen).toBeGreaterThan(baseLen);
+      // Label should be preserved in both
+      expect(testStripAnsi(resultAdjusted)).toContain("@worker-phase2");
+    });
+
+    it("does not adjust pure border lines", () => {
+      const line = "─".repeat(80);
+      const resultBase = filterHorizontalBorders(line, 40);
+      const resultAdjusted = filterHorizontalBorders(line, 40, androidWidths);
+      // Pure border line has no non-border chars, so no adjustment
+      expect(resultAdjusted).toBe(resultBase);
+    });
+
+    it("does not adjust when border width equals ascii width", () => {
+      const sameWidths: CharWidthInfo = { ascii: 8.0, border: 8.0 };
+      const line = `${"─".repeat(60)} @worker ${"─".repeat(2)}`;
+      const resultBase = filterHorizontalBorders(line, 40);
+      const resultAdjusted = filterHorizontalBorders(line, 40, sameWidths);
+      expect(resultAdjusted).toBe(resultBase);
+    });
+
+    it("preserves label when bonus rounds to zero", () => {
+      // 8 non-border chars → bonus = floor(8 * 0.7 / 8.5) = 0, so output = baseCols
+      const line = `${"─".repeat(100)} @label ${"─".repeat(2)}`;
+      const result = filterHorizontalBorders(line, 40, androidWidths);
+      const stripped = testStripAnsi(result);
+      expect(stripped.length).toBe(40);
+      expect(stripped).toContain("@label");
+    });
+
+    it("computes correct bonus for large labels", () => {
+      // Line: 80 borders + " @worker-html-renderer " (24 chars) + 2 borders = 106 visible
+      const line = `${"─".repeat(80)} @worker-html-renderer ${"─".repeat(2)}`;
+      const result = filterHorizontalBorders(line, 40, androidWidths);
+      const stripped = testStripAnsi(result);
+      // Rightmost 40: 14 borders + " @worker-html-renderer " (24) + 2 borders = 40
+      // Non-border count: 24 (the label with spaces)
+      // Extra: floor(24 * (8.5 - 7.8) / 8.5) = floor(24 * 0.0824) = floor(1.976) = 1
+      expect(stripped.length).toBe(41); // 40 + 1 bonus
+      expect(stripped).toContain("@worker-html-renderer");
     });
   });
 });

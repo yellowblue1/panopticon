@@ -133,6 +133,48 @@ function truncateAnsiFromLeft(line: string, maxWidth: number): string {
   return line.substring(i);
 }
 
+/** Character width info for mixed-content border line adjustment. */
+export interface CharWidthInfo {
+  ascii: number;
+  border: number;
+}
+
+/**
+ * Calculate the adjusted truncation width for a border line that contains
+ * non-border characters (e.g. labels like `@worker-phase2`).
+ *
+ * When border characters are wider than regular ASCII characters (common on
+ * Android where box-drawing glyphs fall back to a wider font), a line
+ * truncated to `baseCols` visible characters will be visually shorter than
+ * a pure border line of the same character count, because the non-border
+ * characters occupy fewer pixels.  This function computes how many extra
+ * characters to include so the mixed line fills the same pixel width.
+ */
+function adjustedColumnsForMixedLine(
+  stripped: string,
+  baseCols: number,
+  { ascii, border }: CharWidthInfo,
+): number {
+  if (border <= ascii) return baseCols;
+
+  // Take the rightmost baseCols chars of the stripped line
+  const right =
+    stripped.length <= baseCols ? stripped : stripped.substring(stripped.length - baseCols);
+
+  // Count non-border chars — these render narrower than border chars
+  let nonBorderCount = 0;
+  for (let i = 0; i < right.length; i++) {
+    if (!BORDER_CHAR_SET.has(right.charCodeAt(i))) nonBorderCount++;
+  }
+
+  if (nonBorderCount === 0) return baseCols;
+
+  // Each non-border char saves (border - ascii) pixels vs a border-width char.
+  // We can fit extra border chars with those saved pixels.
+  const extraChars = Math.floor((nonBorderCount * (border - ascii)) / border);
+  return baseCols + extraChars;
+}
+
 /**
  * Process terminal content for mobile display.
  *
@@ -142,16 +184,26 @@ function truncateAnsiFromLeft(line: string, maxWidth: number): string {
  * `@worker-phase2` that appear near the right end of border lines, while
  * trimming the leading decorative border characters.
  *
+ * When `charWidths` is also provided, lines with mixed border and non-border
+ * characters (e.g. labels) are allowed more visible characters to compensate
+ * for the narrower pixel width of non-border characters.
+ *
  * When `columns` is omitted, pure border lines are removed entirely (legacy).
  */
-export function filterHorizontalBorders(content: string, columns?: number): string {
+export function filterHorizontalBorders(
+  content: string,
+  columns?: number,
+  charWidths?: CharWidthInfo,
+): string {
   const lines = content.split("\n");
 
   if (columns != null) {
     const processed = lines.map((line) => {
       const stripped = stripAnsi(line);
       if (isBorderLike(stripped)) {
-        return truncateAnsiFromLeft(line, columns);
+        const targetCols =
+          charWidths != null ? adjustedColumnsForMixedLine(stripped, columns, charWidths) : columns;
+        return truncateAnsiFromLeft(line, targetCols);
       }
       return line;
     });

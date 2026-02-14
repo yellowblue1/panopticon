@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PlanViewer } from "@/components/sessions/plan-viewer";
 import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
-import { XtermViewer } from "@/components/sessions/xterm-viewer";
+import { TerminalViewer } from "@/components/sessions/terminal-viewer";
 import { StatusBadge } from "@/components/ui/badge";
 import { usePaneContent } from "@/hooks/use-pane-content";
 import { usePlan } from "@/hooks/use-plan";
@@ -120,7 +120,7 @@ function SessionDetailPage() {
           )}
 
           {paneData?.content != null && (
-            <XtermViewer
+            <TerminalViewer
               content={paneData.content}
               className={cn("pane-viewer", isFullscreen && "pane-viewer--fullscreen")}
               isFullscreen={isFullscreen}
