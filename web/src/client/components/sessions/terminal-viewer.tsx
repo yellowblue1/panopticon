@@ -15,19 +15,36 @@ interface TerminalViewerProps {
 /** Pixel tolerance for "at bottom" detection in the scroll container. */
 const SCROLL_BOTTOM_THRESHOLD_PX = 10;
 
-/** Approximate width of a monospace character at 14px font-size. */
-const CHAR_WIDTH_PX = 7.8;
+/** Fallback character width if measurement fails. */
+const DEFAULT_CHAR_WIDTH_PX = 8.4;
 
 /** Singleton converter instance (stateless, safe to reuse). */
 const converter = new FancyAnsi();
 
 /**
- * Estimate the number of character columns that fit in the container,
+ * Measure the actual width of a monospace character by rendering a hidden
+ * span with the terminal font inside the given container.
+ */
+function measureCharWidth(container: HTMLElement): number {
+  const span = document.createElement("span");
+  span.style.cssText =
+    "position:absolute;visibility:hidden;white-space:pre;" +
+    "font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,monospace;" +
+    "font-size:14px";
+  span.textContent = "M".repeat(50);
+  container.appendChild(span);
+  const width = span.offsetWidth / 50;
+  container.removeChild(span);
+  return width > 0 ? width : DEFAULT_CHAR_WIDTH_PX;
+}
+
+/**
+ * Calculate the number of character columns that fit in the container,
  * accounting for 12px padding on each side.
  */
-function estimateCols(containerWidth: number): number {
+function calcCols(containerWidth: number, charWidth: number): number {
   if (containerWidth <= 24) return 0;
-  return Math.floor((containerWidth - 24) / CHAR_WIDTH_PX);
+  return Math.floor((containerWidth - 24) / charWidth);
 }
 
 export function TerminalViewer({
@@ -41,6 +58,7 @@ export function TerminalViewer({
   const isAtBottomRef = useRef(true);
   const [fitWidth, setFitWidth] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
+  const charWidthRef = useRef(DEFAULT_CHAR_WIDTH_PX);
 
   // Track the last rendered content so we can freeze display when scrolled up
   const lastRenderedContentRef = useRef<string | null>(null);
@@ -62,13 +80,19 @@ export function TerminalViewer({
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Track container width via ResizeObserver for overflow detection
+  // Track container width via ResizeObserver for overflow detection.
+  // Also measure actual monospace character width on first observation.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    let measured = false;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
+        if (!measured) {
+          charWidthRef.current = measureCharWidth(container);
+          measured = true;
+        }
         setContainerWidth(entry.contentRect.width);
       }
     });
@@ -98,7 +122,7 @@ export function TerminalViewer({
   }
 
   // Compute derived values from effective content
-  const cols = estimateCols(containerWidth);
+  const cols = calcCols(containerWidth, charWidthRef.current);
   const contentWidth = effectiveContent != null ? maxContentWidth(effectiveContent) : 0;
   const contentOverflows = effectiveContent != null && contentWidth > cols;
 
