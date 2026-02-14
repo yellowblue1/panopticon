@@ -1,6 +1,6 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { ArrowDown, ArrowLeftRight } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, Maximize, Minimize } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -11,6 +11,8 @@ import "@xterm/xterm/css/xterm.css";
 interface XtermViewerProps {
   content: string | null;
   className?: string;
+  isFullscreen?: boolean;
+  onFullscreenToggle?: () => void;
 }
 
 // GitHub Dark theme matching existing CSS custom properties
@@ -70,7 +72,12 @@ function fitWithOverride(terminal: Terminal, fitAddon: FitAddon, maxWidth: numbe
   }
 }
 
-export function XtermViewer({ content, className }: XtermViewerProps) {
+export function XtermViewer({
+  content,
+  className,
+  isFullscreen,
+  onFullscreenToggle,
+}: XtermViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -271,6 +278,30 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
         ref={containerRef}
         className={cn("flex-1 min-h-0", isMobile && fitWidth && "overflow-x-auto")}
       />
+
+      {/* Fullscreen toggle */}
+      {onFullscreenToggle && (
+        <button
+          type="button"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          className={cn(
+            "absolute left-3 top-3 z-10",
+            "flex items-center justify-center",
+            "w-11 h-11 sm:w-9 sm:h-9",
+            "rounded-full",
+            "shadow-lg shadow-black/30",
+            "transition-all duration-200 ease-out",
+            "cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
+            isFullscreen
+              ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/50 hover:bg-accent-blue/30"
+              : "bg-bg-tertiary/90 backdrop-blur-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-border-default",
+          )}
+          onClick={onFullscreenToggle}
+        >
+          {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+        </button>
+      )}
 
       {/* Fit-width toggle — shown when content overflows or fit-width is active */}
       {(fitWidth || contentOverflows) && (

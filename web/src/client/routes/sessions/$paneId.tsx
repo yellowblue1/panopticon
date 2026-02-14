@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FileText, SquareTerminal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PlanViewer } from "@/components/sessions/plan-viewer";
 import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
@@ -23,6 +23,7 @@ function SessionDetailPage() {
   const { paneId } = Route.useParams();
   const { tab: initialTab } = Route.useSearch();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? "terminal");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const { data: paneData, isLoading: paneLoading, error: paneError } = usePaneContent(paneId);
   const { data: planData } = usePlan(paneId);
@@ -35,6 +36,36 @@ function SessionDetailPage() {
     { id: "terminal" as const, label: "Terminal", icon: <SquareTerminal size={16} /> },
     ...(hasPlan ? [{ id: "plan" as const, label: "Plan", icon: <FileText size={16} /> }] : []),
   ];
+
+  // Exit fullscreen on Escape key (unless focus is in an input field)
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !(e.target instanceof HTMLInputElement)) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
+
+  if (isFullscreen) {
+    return (
+      <>
+        <title>{session?.project_name ?? paneId} - Panopticon</title>
+        <div className="fixed inset-0 z-50 bg-bg-primary flex flex-col pt-[env(safe-area-inset-top)]">
+          <XtermViewer
+            content={paneData?.content ?? null}
+            className="pane-viewer pane-viewer--fullscreen"
+            isFullscreen
+            onFullscreenToggle={() => setIsFullscreen(false)}
+          />
+          <SendKeysInput paneId={paneId} />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -88,7 +119,11 @@ function SessionDetailPage() {
           )}
 
           {paneData?.content != null && (
-            <XtermViewer content={paneData.content} className="pane-viewer" />
+            <XtermViewer
+              content={paneData.content}
+              className="pane-viewer"
+              onFullscreenToggle={() => setIsFullscreen(true)}
+            />
           )}
         </>
       )}
