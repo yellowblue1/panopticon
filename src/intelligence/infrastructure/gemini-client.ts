@@ -25,29 +25,31 @@ export function isAuthError(err: unknown): boolean {
   return AUTH_ERROR_PATTERNS.some((pattern) => msg.includes(pattern));
 }
 
-function createClient(project: string, location: string): GoogleGenAI {
-  return new GoogleGenAI({ vertexai: true, project, location });
+function createClient(): GoogleGenAI {
+  return new GoogleGenAI({});
 }
 
 /**
  * Create a GenerateContentFn backed by the @google/genai SDK.
- * Authentication is handled automatically via Application Default Credentials.
+ *
+ * The SDK reads configuration from environment variables automatically
+ * (GOOGLE_API_KEY / GEMINI_API_KEY for Google AI, or GOOGLE_CLOUD_PROJECT /
+ * GOOGLE_CLOUD_LOCATION with GOOGLE_GENAI_USE_VERTEXAI for Vertex AI).
+ * Call {@link bootstrapGeminiEnv} before using this function to ensure
+ * the environment is properly set up.
+ *
  * Detects auth errors and updates the module-level auth error state.
  * Recreates the SDK client when recovering from auth errors to pick up
- * refreshed ADC credentials from disk.
+ * refreshed credentials.
  */
-export function createGenerateContentFn(
-  project: string,
-  location: string,
-  model: string,
-): GenerateContentFn {
-  let ai = createClient(project, location);
+export function createGenerateContentFn(model: string): GenerateContentFn {
+  let ai = createClient();
 
   return async (prompt, options) => {
-    // Recreate client when recovering from auth error to pick up new ADC from disk.
+    // Recreate client when recovering from auth error to pick up new credentials.
     // The SDK caches credentials in memory, so a new instance is needed.
     if (hasAuthError()) {
-      ai = createClient(project, location);
+      ai = createClient();
     }
 
     try {

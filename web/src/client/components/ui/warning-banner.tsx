@@ -12,11 +12,21 @@ interface WarningInfo {
 function getWarningInfo(authStatus: AuthStatusResponse): WarningInfo | null {
   // Runtime auth error takes priority — token expired while running
   if (authStatus.gemini_auth_error) {
+    if (authStatus.gemini_backend === "vertex-ai") {
+      return {
+        message: (
+          <>
+            Authentication expired. Run <code>gcloud auth login --update-adc</code> to
+            re-authenticate.
+          </>
+        ),
+        dismissible: false,
+      };
+    }
     return {
       message: (
         <>
-          Authentication expired. Run <code>gcloud auth login --update-adc</code> to
-          re-authenticate.
+          Gemini API authentication failed. Check your <code>GOOGLE_API_KEY</code>.
         </>
       ),
       dismissible: false,
@@ -25,29 +35,13 @@ function getWarningInfo(authStatus: AuthStatusResponse): WarningInfo | null {
 
   if (authStatus.ai_summary_available) return null;
 
-  if (!authStatus.gcloud_authenticated) {
-    return {
-      message: (
-        <>
-          AI summaries unavailable: Run <code>gcloud auth login --update-adc</code> to enable.
-        </>
-      ),
-      dismissible: true,
-    };
-  }
-  if (!authStatus.gcp_project_configured) {
-    return {
-      message: (
-        <>
-          AI summaries unavailable: Configure GCP project with{" "}
-          <code>gcloud config set project PROJECT_ID</code>.
-        </>
-      ),
-      dismissible: true,
-    };
-  }
   return {
-    message: "AI summaries unavailable: Check your GCloud configuration.",
+    message: (
+      <>
+        AI summaries unavailable. Set <code>GOOGLE_API_KEY</code> for Google AI, or configure Vertex
+        AI with <code>GOOGLE_CLOUD_PROJECT</code> and <code>gcloud auth login --update-adc</code>.
+      </>
+    ),
     dismissible: true,
   };
 }

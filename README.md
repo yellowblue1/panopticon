@@ -18,7 +18,7 @@ Automatically detects Claude Code and Codex processes, tracks their activity in 
 
 - [Bun](https://bun.sh/) v1.x
 - tmux
-- A GCP project with the Vertex AI API enabled (for Gemini)
+- A Google AI API key **or** a GCP project with the Vertex AI API enabled (for Gemini-powered features)
 
 ## Quick Start
 
@@ -60,20 +60,35 @@ The dashboard will be available at `https://<your-machine>.ts.net`.
 
 ## Configuration
 
-### GCP (Gemini API)
+### Gemini API
 
-AI summaries and action detection use the `@google/genai` SDK with Application Default Credentials (ADC):
+AI summaries and action detection are powered by Gemini. Two backends are supported:
+
+#### Option 1: Google AI (API key)
+
+Set the `GOOGLE_API_KEY` environment variable:
+
+```bash
+export GOOGLE_API_KEY="your-api-key"
+```
+
+#### Option 2: Vertex AI (GCP)
+
+Authenticate with Application Default Credentials and set your project:
 
 ```bash
 gcloud auth login --update-adc
+export GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
-By default, the GCP project and location are read from your `gcloud` configuration. You can override them with environment variables:
+If `GOOGLE_CLOUD_PROJECT` is not set, Panopticon falls back to `gcloud config get-value project`.
 
-| Setting | Env var | Default |
-|---------|---------|---------|
-| Project | `GEMINI_GCP_PROJECT` | `gcloud config get-value project` |
-| Location | `GEMINI_GCP_LOCATION` | `global` |
+| Env var | Description | Default |
+|---------|-------------|---------|
+| `GOOGLE_API_KEY` | Google AI API key (alternative: `GEMINI_API_KEY`) | — |
+| `GOOGLE_CLOUD_PROJECT` | GCP project for Vertex AI | `gcloud config get-value project` |
+| `GOOGLE_CLOUD_LOCATION` | GCP region for Vertex AI | `global` |
+| `GOOGLE_GENAI_USE_VERTEXAI` | Force Vertex AI mode | Auto-detected |
 
 ### Server
 
