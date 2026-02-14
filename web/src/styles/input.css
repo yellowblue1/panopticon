@@ -34,6 +34,13 @@
   --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
+/* Restore cursor: pointer for interactive elements
+   (Tailwind CSS 4 Preflight resets it to auto) */
+button,
+a {
+  cursor: pointer;
+}
+
 /* ============================================
    Safe Area Support (notched devices)
    ============================================ */
