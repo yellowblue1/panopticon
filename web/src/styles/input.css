@@ -390,6 +390,10 @@ body {
   @apply my-2 pl-6;
 }
 
+.plan-content ul {
+  list-style-type: disc;
+}
+
 .plan-content ol {
   list-style-type: decimal;
 }

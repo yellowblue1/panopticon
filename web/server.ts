@@ -8,9 +8,9 @@ import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-stat
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
 import {
-  discoverPlan,
   findSlugForCwd,
   planFileExists,
+  readPlanContent,
 } from "../src/plan/application/discover-plan";
 import { createPlanDiscoveryDeps } from "../src/plan/infrastructure/file-operations";
 import { SessionManager } from "../src/session/application/session-manager";
@@ -261,7 +261,17 @@ const app = createApp(
     getPlan: (paneId) => {
       const cwd = sessionManager.getSessionCwd(paneId);
       if (!cwd) return null;
-      return discoverPlan(cwd, planDeps);
+
+      // Reuse slug cache to avoid re-reading JSONL files
+      if (!slugCache.has(cwd)) {
+        slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
+      }
+      const slug = slugCache.get(cwd);
+      if (!slug) return null;
+
+      const content = readPlanContent(slug, planDeps);
+      if (!content) return null;
+      return { slug, content };
     },
     getPlansAvailability: () => {
       const result: Record<string, boolean> = {};
