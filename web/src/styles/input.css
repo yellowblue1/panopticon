@@ -304,11 +304,16 @@ body {
   line-height: 1.2;
   color: #c9d1d9;
   background: transparent;
-  white-space: pre;
-  overflow-wrap: normal;
-  word-break: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   user-select: text;
   -webkit-user-select: text;
+}
+
+/* Fit-width: disable wrapping so content extends to its natural width */
+.pane-viewer--fit-width .terminal-content {
+  white-space: pre;
+  overflow-wrap: normal;
 }
 
 /* Desktop fit-width toggle: expand the frame to match content width, centered. */
