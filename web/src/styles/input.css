@@ -330,18 +330,28 @@ body {
   }
 }
 
-/* Fullscreen pane viewer overlay — compound selector for higher specificity
+/* Vertical expand mode — hide root header and remove vertical padding */
+html.vertical-expand [data-app-header] {
+  display: none;
+}
+
+html.vertical-expand [data-app-shell] {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Expanded pane viewer — compound selector for higher specificity
    to override mobile .pane-viewer max-height constraints */
-.pane-viewer.pane-viewer--fullscreen {
+.pane-viewer.pane-viewer--expanded {
   @apply border-0 rounded-none;
   flex: 1;
   min-height: 0;
   max-height: none;
 }
 
-/* Suppress centering transform in fullscreen fit-width mode */
+/* Suppress centering transform in expanded fit-width mode */
 @media (min-width: 640px) {
-  .pane-viewer--fullscreen.pane-viewer--fit-width {
+  .pane-viewer--expanded.pane-viewer--fit-width {
     left: auto;
     transform: none;
     overflow-x: auto;

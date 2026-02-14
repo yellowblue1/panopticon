@@ -1,5 +1,5 @@
 import { FancyAnsi } from "fancy-ansi";
-import { ArrowDown, ArrowLeftRight, Maximize, Minimize } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ChevronsDown, ChevronsUp } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
@@ -12,8 +12,8 @@ import {
 interface TerminalViewerProps {
   content: string | null;
   className?: string;
-  isFullscreen?: boolean;
-  onFullscreenToggle?: () => void;
+  isExpanded?: boolean;
+  onExpandToggle?: () => void;
 }
 
 /** Pixel tolerance for "at bottom" detection in the scroll container. */
@@ -72,8 +72,8 @@ function calcCols(containerWidth: number, charWidth: number): number {
 export function TerminalViewer({
   content,
   className,
-  isFullscreen,
-  onFullscreenToggle,
+  isExpanded,
+  onExpandToggle,
 }: TerminalViewerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showButton, setShowButton] = useState(false);
@@ -188,11 +188,11 @@ export function TerminalViewer({
         ) : null}
       </div>
 
-      {/* Fullscreen toggle */}
-      {onFullscreenToggle && (
+      {/* Vertical expand toggle */}
+      {onExpandToggle && (
         <button
           type="button"
-          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          aria-label={isExpanded ? "Collapse" : "Expand vertically"}
           className={cn(
             "absolute left-3 top-3 z-10",
             "flex items-center justify-center",
@@ -202,13 +202,13 @@ export function TerminalViewer({
             "transition-all duration-200 ease-out",
             "cursor-pointer",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
-            isFullscreen
+            isExpanded
               ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/50 hover:bg-accent-blue/30"
               : "bg-bg-tertiary/90 backdrop-blur-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-border-default",
           )}
-          onClick={onFullscreenToggle}
+          onClick={onExpandToggle}
         >
-          {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+          {isExpanded ? <ChevronsDown size={16} /> : <ChevronsUp size={16} />}
         </button>
       )}
 
