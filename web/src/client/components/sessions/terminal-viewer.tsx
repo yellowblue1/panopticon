@@ -3,7 +3,11 @@ import { ArrowDown, ArrowLeftRight, Maximize, Minimize } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
-import { filterHorizontalBorders, maxContentWidth } from "@/lib/terminal-filters";
+import {
+  type CharWidthInfo,
+  filterHorizontalBorders,
+  maxContentWidth,
+} from "@/lib/terminal-filters";
 
 interface TerminalViewerProps {
   content: string | null;
@@ -28,28 +32,30 @@ const TERMINAL_FONT_CSS =
   "font-size:14px";
 
 /**
- * Measure the maximum character width across regular ASCII and box-drawing
- * characters. On some platforms (e.g. Android), the monospace font may not
- * include box-drawing glyphs, causing fallback to a wider font.
+ * Measure character widths for regular ASCII and box-drawing characters.
+ * On some platforms (e.g. Android), the monospace font may not include
+ * box-drawing glyphs, causing fallback to a wider font.
+ * Returns both widths so the border filter can adjust for mixed-content lines.
  */
-function measureCharWidth(container: HTMLElement): number {
+function measureCharWidths(container: HTMLElement): CharWidthInfo {
   const span = document.createElement("span");
   span.style.cssText = TERMINAL_FONT_CSS;
   container.appendChild(span);
 
   // Measure regular ASCII character
   span.textContent = "M".repeat(50);
-  const asciiWidth = span.getBoundingClientRect().width / 50;
+  const ascii = span.getBoundingClientRect().width / 50;
 
   // Measure box-drawing character (U+2500 ─) which may use a fallback font
   span.textContent = "\u2500".repeat(50);
-  const borderWidth = span.getBoundingClientRect().width / 50;
+  const border = span.getBoundingClientRect().width / 50;
 
   container.removeChild(span);
 
-  // Use the wider of the two to ensure both fit
-  const width = Math.max(asciiWidth, borderWidth);
-  return width > 0 ? width : DEFAULT_CHAR_WIDTH_PX;
+  return {
+    ascii: ascii > 0 ? ascii : DEFAULT_CHAR_WIDTH_PX,
+    border: border > 0 ? border : DEFAULT_CHAR_WIDTH_PX,
+  };
 }
 
 /**
@@ -74,7 +80,10 @@ export function TerminalViewer({
   const isAtBottomRef = useRef(true);
   const [fitWidth, setFitWidth] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
-  const charWidthRef = useRef(DEFAULT_CHAR_WIDTH_PX);
+  const charWidthsRef = useRef<CharWidthInfo>({
+    ascii: DEFAULT_CHAR_WIDTH_PX,
+    border: DEFAULT_CHAR_WIDTH_PX,
+  });
 
   // Track the last rendered content so we can freeze display when scrolled up
   const lastRenderedContentRef = useRef<string | null>(null);
@@ -106,7 +115,7 @@ export function TerminalViewer({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (!measured) {
-          charWidthRef.current = measureCharWidth(container);
+          charWidthsRef.current = measureCharWidths(container);
           measured = true;
         }
         setContainerWidth(entry.contentRect.width);
@@ -138,7 +147,9 @@ export function TerminalViewer({
   }
 
   // Compute derived values from effective content
-  const cols = calcCols(containerWidth, charWidthRef.current);
+  const charWidths = charWidthsRef.current;
+  const maxCharWidth = Math.max(charWidths.ascii, charWidths.border);
+  const cols = calcCols(containerWidth, maxCharWidth);
   const contentWidth = effectiveContent != null ? maxContentWidth(effectiveContent) : 0;
   const contentOverflows = effectiveContent != null && contentWidth > cols;
 
@@ -146,7 +157,7 @@ export function TerminalViewer({
   if (effectiveContent != null) {
     let processed = effectiveContent;
     if (!fitWidth) {
-      processed = filterHorizontalBorders(effectiveContent, cols);
+      processed = filterHorizontalBorders(effectiveContent, cols, charWidths);
     }
     processedHtml = converter.toHtml(processed);
   }
