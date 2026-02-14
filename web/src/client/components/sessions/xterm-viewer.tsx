@@ -198,16 +198,20 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     const frameId = requestAnimationFrame(() => {
       try {
         if (content != null) {
-          if (isMobile) {
+          const contentWidth = maxContentWidth(content);
+          setContentOverflows(contentWidth > terminal.cols);
+
+          if (fitWidthRef.current && fitAddon) {
+            // fitWidth ON (both mobile & desktop): expand terminal columns
+            maxWidthRef.current = contentWidth;
+            fitWithOverride(terminal, fitAddon, maxWidthRef.current);
+            terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
+          } else if (isMobile) {
+            // Mobile, fitWidth OFF: filter horizontal borders
             const processed = filterHorizontalBorders(content, terminal.cols);
             terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
           } else {
-            const contentWidth = maxContentWidth(content);
-            setContentOverflows(contentWidth > terminal.cols);
-            if (fitWidthRef.current && fitAddon) {
-              maxWidthRef.current = contentWidth;
-              fitWithOverride(terminal, fitAddon, maxWidthRef.current);
-            }
+            // Desktop, fitWidth OFF: write as-is
             terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
           }
         } else {
@@ -225,22 +229,51 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     return () => cancelAnimationFrame(frameId);
   }, [content, isMobile]);
 
+  // Mobile: reprocess content when fitWidth toggles.
+  // On desktop, CSS width expansion triggers ResizeObserver which handles the resize.
+  // On mobile, the container stays the same width (overflow handles scrolling),
+  // so we need to explicitly expand/reset the terminal and rewrite content.
+  useEffect(() => {
+    if (!isMobile) return;
+    const terminal = terminalRef.current;
+    const fitAddon = fitAddonRef.current;
+    if (!terminal || !fitAddon || content == null) return;
+
+    const frameId = requestAnimationFrame(() => {
+      try {
+        if (fitWidth) {
+          const contentWidth = maxContentWidth(content);
+          maxWidthRef.current = contentWidth;
+          fitWithOverride(terminal, fitAddon, contentWidth);
+          terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${content}`);
+        } else {
+          maxWidthRef.current = 0;
+          safeFit(fitAddon);
+          const processed = filterHorizontalBorders(content, terminal.cols);
+          terminal.write(`\x1b[0m\x1b[H\x1b[2J\x1b[3J${processed}`);
+        }
+        isAtBottomRef.current = true;
+        setShowButton(false);
+      } catch {
+        // Terminal renderer not yet ready
+      }
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [fitWidth, isMobile]);
+
   const handleScrollToBottom = () => {
     terminalRef.current?.scrollToBottom();
   };
 
   return (
-    <div
-      className={cn(
-        "relative flex flex-col",
-        !isMobile && fitWidth && "pane-viewer--fit-width",
-        className,
-      )}
-    >
-      <div ref={containerRef} className="flex-1 min-h-0" />
+    <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
+      <div
+        ref={containerRef}
+        className={cn("flex-1 min-h-0", isMobile && fitWidth && "overflow-x-auto")}
+      />
 
-      {/* Fit-width toggle — desktop only, hidden when content fits */}
-      {!isMobile && (fitWidth || contentOverflows) && (
+      {/* Fit-width toggle — shown when content overflows or fit-width is active */}
+      {(fitWidth || contentOverflows) && (
         <button
           type="button"
           aria-label={
@@ -249,7 +282,7 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
           className={cn(
             "absolute right-3 top-3 z-10",
             "flex items-center justify-center",
-            "w-9 h-9",
+            "w-11 h-11 sm:w-9 sm:h-9",
             "rounded-full",
             "shadow-lg shadow-black/30",
             "transition-all duration-200 ease-out",
