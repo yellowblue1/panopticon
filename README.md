@@ -71,12 +71,14 @@ GOOGLE_API_KEY="your-api-key" bunx @yellowblue1/panopticon
 |---------|---------|-------------|
 | `PORT` | `3847` | HTTP server port |
 | `HOST` | `127.0.0.1` | Bind address |
+| `DEV_PORT` | `3847` | Vite dev server port (backend auto-assigns `DEV_PORT + 1`) |
 
 ## Development
 
 ```bash
 bun install
-bun run dev          # Start dev server (frontend + backend)
+bun run dev          # Start dev server (frontend: 3847, backend: 3848)
+DEV_PORT=4000 bun run dev  # Custom ports (frontend: 4000, backend: 4001)
 bun test             # Run all tests
 bun run lint         # Lint & format check (Biome)
 bun run typecheck    # TypeScript strict mode

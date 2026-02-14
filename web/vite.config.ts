@@ -4,6 +4,9 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const devPort = process.env.DEV_PORT ? Number.parseInt(process.env.DEV_PORT, 10) : 3847;
+const backendPort = devPort + 1;
+
 export default defineConfig({
   plugins: [
     TanStackRouterVite({
@@ -33,14 +36,14 @@ export default defineConfig({
   server: {
     host: process.env.HOST ?? "127.0.0.1",
     allowedHosts: ["localhost", "127.0.0.1", ".ts.net"],
-    port: 3847,
+    port: devPort,
     proxy: {
       "/api/": {
-        target: "http://localhost:3848",
+        target: `http://localhost:${backendPort}`,
         changeOrigin: true,
       },
       "/favicon.ico": {
-        target: "http://localhost:3848",
+        target: `http://localhost:${backendPort}`,
         changeOrigin: true,
       },
     },
