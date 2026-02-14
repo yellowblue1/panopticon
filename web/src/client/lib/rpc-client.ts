@@ -5,3 +5,4 @@ const client = hc<AppType>("");
 
 export const sessionsApi = client.api.sessions;
 export const authApi = client.api.auth;
+export const settingsApi = client.api.settings;
