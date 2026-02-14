@@ -28,6 +28,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     onPaneContentSseDisconnect: () => {},
     getSlashCommands: () => DEFAULT_SLASH_COMMANDS,
     setSlashCommands: (commands) => commands,
+    deletePlan: () => true,
     ...overrides,
   };
 }
@@ -237,6 +238,49 @@ describe("Hono API endpoints", () => {
       });
 
       expect(res.status).toBe(501);
+    });
+  });
+
+  describe("DELETE /api/sessions/:pane_id/plan", () => {
+    it("returns success when plan is deleted", async () => {
+      const deletePlanSpy = mock((_paneId: string) => true);
+      const deps = createMockDeps({ deletePlan: deletePlanSpy });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/plan", {
+        method: "DELETE",
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(deletePlanSpy).toHaveBeenCalledWith("%0");
+    });
+
+    it("returns 404 when plan does not exist", async () => {
+      const deps = createMockDeps({ deletePlan: () => false });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/plan", {
+        method: "DELETE",
+      });
+
+      expect(res.status).toBe(404);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+    });
+
+    it("returns 501 when deletePlan dependency is not provided", async () => {
+      const deps = createMockDeps({ deletePlan: undefined });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/plan", {
+        method: "DELETE",
+      });
+
+      expect(res.status).toBe(501);
+      const data = await res.json();
+      expect(data.success).toBe(false);
     });
   });
 

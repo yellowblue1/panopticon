@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type {
   AuthStatusResponse,
+  DeletePlanResponse,
   GeminiBackend,
   PaneAction,
   PaneActionsResponse,
@@ -55,6 +56,7 @@ export interface AppDeps {
   // Plan viewer
   getPlan?: (paneId: string) => { slug: string; content: string } | null;
   getPlansAvailability?: () => Record<string, boolean>;
+  deletePlan?: (paneId: string) => boolean;
 
   // Settings: slash commands
   getSlashCommands?: () => SlashCommand[];
@@ -247,6 +249,27 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         plan,
         timestamp: Date.now(),
       } satisfies PlanResponse);
+    })
+
+    // DELETE /api/sessions/:pane_id/plan
+    .delete("/api/sessions/:pane_id/plan", (c) => {
+      if (!deps.deletePlan) {
+        return c.json({ success: false, error: "Not available" } satisfies DeletePlanResponse, 501);
+      }
+
+      const paneId = c.req.param("pane_id");
+      const success = deps.deletePlan(paneId);
+
+      if (success) {
+        return c.json({ success: true } satisfies DeletePlanResponse);
+      }
+      return c.json(
+        {
+          success: false,
+          error: "Plan not found",
+        } satisfies DeletePlanResponse,
+        404,
+      );
     })
 
     // GET /api/auth/status

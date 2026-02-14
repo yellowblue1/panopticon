@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import type { PlanDiscoveryDeps } from "../domain/ports";
 
@@ -27,5 +27,13 @@ export function createPlanDiscoveryDeps(): PlanDiscoveryDeps {
       }
     },
     homeDir: () => homedir(),
+    deleteFile: (path) => {
+      try {
+        unlinkSync(path);
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }

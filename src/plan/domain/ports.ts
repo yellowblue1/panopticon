@@ -4,4 +4,5 @@ export interface PlanDiscoveryDeps {
   listDir: (path: string) => string[];
   getFileMtime: (path: string) => number;
   homeDir: () => string;
+  deleteFile: (path: string) => boolean;
 }

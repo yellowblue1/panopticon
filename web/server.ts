@@ -9,6 +9,7 @@ import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-stat
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
 import {
+  deletePlan,
   findSlugForCwd,
   planFileExists,
   readPlanContent,
@@ -351,6 +352,22 @@ const app = createApp(
         result[session.pane_id] = planFileExists(slug, planDeps);
       }
       return result;
+    },
+    deletePlan: (paneId) => {
+      const cwd = sessionManager.getSessionCwd(paneId);
+      if (!cwd) return false;
+
+      if (!slugCache.has(cwd)) {
+        slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
+      }
+      const slug = slugCache.get(cwd);
+      if (!slug) return false;
+
+      const success = deletePlan(slug, planDeps);
+      if (success) {
+        slugCache.delete(cwd);
+      }
+      return success;
     },
     getSlashCommands: readSlashCommands,
     setSlashCommands: (commands) => {

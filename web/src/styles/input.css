@@ -419,7 +419,7 @@ html.vertical-expand [data-app-shell] {
 }
 
 .plan-header {
-  @apply px-5 py-3 border-b border-border-default bg-bg-secondary;
+  @apply px-5 py-3 border-b border-border-default bg-bg-secondary flex items-center justify-between;
 }
 
 .plan-slug {
