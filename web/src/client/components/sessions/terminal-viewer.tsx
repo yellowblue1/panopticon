@@ -2,7 +2,6 @@ import { FancyAnsi } from "fancy-ansi";
 import { ArrowDown, ArrowLeftRight, Maximize, Minimize } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/cn";
 import { filterHorizontalBorders, maxContentWidth } from "@/lib/terminal-filters";
 
@@ -38,7 +37,6 @@ export function TerminalViewer({
   onFullscreenToggle,
 }: TerminalViewerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isMobile = useMediaQuery("(max-width: 639px)");
   const [showButton, setShowButton] = useState(false);
   const isAtBottomRef = useRef(true);
   const [fitWidth, setFitWidth] = useState(false);
@@ -107,7 +105,7 @@ export function TerminalViewer({
   let processedHtml: string | null = null;
   if (effectiveContent != null) {
     let processed = effectiveContent;
-    if (!fitWidth && isMobile) {
+    if (!fitWidth) {
       processed = filterHorizontalBorders(effectiveContent, cols);
     }
     processedHtml = converter.toHtml(processed);
