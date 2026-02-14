@@ -32,6 +32,8 @@ function AppShell() {
 
   return (
     <div className="font-sans bg-bg-primary text-text-primary min-h-dvh flex flex-col text-base leading-relaxed">
+      {/* data-app-shell / data-app-header: used by vertical-expand CSS in input.css
+           to hide the header when the session detail page is in expanded mode */}
       <div
         className="max-w-[1400px] mx-auto p-6 max-md:p-4 w-full flex-1 flex flex-col"
         data-app-shell
