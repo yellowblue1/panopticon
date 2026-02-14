@@ -3,8 +3,10 @@ import { Send } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActionDetection } from "@/hooks/use-action-detection";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSendKeys } from "@/hooks/use-send-keys";
 import { cn } from "@/lib/cn";
+import { CommandPalette } from "./command-palette";
 
 interface SendKeysInputProps {
   paneId: string;
@@ -12,10 +14,31 @@ interface SendKeysInputProps {
 
 export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const [text, setText] = useState("");
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const sendKeys = useSendKeys();
   const { action, isDetecting, detect, clear } = useActionDetection(paneId);
+  const isMobile = useMediaQuery("(max-width: 639px)");
+
+  const hasText = text.trim().length > 0;
+
+  // Open command palette with "/" key when no input is focused
+  useEffect(() => {
+    const handleSlashKey = (e: globalThis.KeyboardEvent) => {
+      if (
+        e.key === "/" &&
+        !isPaletteOpen &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        e.preventDefault();
+        setIsPaletteOpen(true);
+      }
+    };
+    document.addEventListener("keydown", handleSlashKey);
+    return () => document.removeEventListener("keydown", handleSlashKey);
+  }, [isPaletteOpen]);
 
   // Adjust send-keys-bar position when the virtual keyboard opens/closes
   useEffect(() => {
@@ -107,6 +130,11 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       e.preventDefault();
       handleSend(text);
     }
+    // Typing "/" in an empty textarea opens the command palette (Slack pattern)
+    if (e.key === "/" && !text) {
+      e.preventDefault();
+      setIsPaletteOpen(true);
+    }
   };
 
   /** Send text with Enter (y, n, etc.) and hide action buttons */
@@ -121,6 +149,39 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         },
       },
     );
+  };
+
+  /** Send a slash command: text + Enter (selects autocomplete) + Enter (executes) */
+  const handleSlashCommand = (command: string) => {
+    sendKeys.mutate(
+      { paneId, text: command },
+      {
+        onSuccess: () => {
+          // Claude Code's autocomplete consumes the first Enter to select the command.
+          // Send a second Enter after a short delay to actually execute it.
+          setTimeout(() => {
+            sendKeys.mutate(
+              { paneId, text: "Enter", raw: true },
+              {
+                onSuccess: () => {
+                  toast.success(`Sent: ${command}`);
+                  inputRef.current?.focus();
+                },
+              },
+            );
+          }, 200);
+        },
+      },
+    );
+  };
+
+  /** Morphing action button: "/" when empty (opens palette), Send when has text */
+  const handleActionButton = () => {
+    if (hasText) {
+      handleSend(text);
+    } else {
+      setIsPaletteOpen(true);
+    }
   };
 
   /** Send a raw tmux key name (Escape, i, etc.) without Enter */
@@ -141,9 +202,18 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
 
   return (
     <div ref={barRef} className="send-keys-bar">
-      {/* Raw key buttons + AI detect (always visible) */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <span className="text-xs text-text-muted">Keys:</span>
+      {/* Raw key buttons — right-aligned for thumb reachability */}
+      <div className="flex items-center gap-2 mb-2 justify-end">
+        <button
+          type="button"
+          className="quick-action-btn !text-xl !leading-none"
+          onClick={() => detect()}
+          disabled={isDetecting}
+          title="Detect actions with AI"
+        >
+          {isDetecting ? "..." : "\u{1F9E0}"}
+        </button>
+        {!isMobile && <span className="text-xs text-text-muted">Keys:</span>}
         <button
           type="button"
           className="quick-action-btn"
@@ -189,16 +259,15 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         >
           Enter
         </button>
-        <button
-          type="button"
-          className="quick-action-btn !text-xl !leading-none"
-          onClick={() => detect()}
-          disabled={isDetecting}
-          title="Detect actions with AI"
-        >
-          {isDetecting ? "..." : "\u{1F9E0}"}
-        </button>
       </div>
+
+      {/* Command palette */}
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onClose={() => setIsPaletteOpen(false)}
+        onExecute={handleSlashCommand}
+        isPending={sendKeys.isPending}
+      />
 
       {/* Dynamic AI-detected actions */}
       <DynamicActions
@@ -207,7 +276,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         isPending={sendKeys.isPending}
       />
 
-      {/* Input row */}
+      {/* Input row: [textarea] [/ ↔ send] — morphing action button */}
       <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
         <textarea
           ref={inputRef}
@@ -222,7 +291,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
               ? action.placeholder
               : action.type === "choices" && action.options.some((o) => !o.autoEnter)
                 ? "Type here (auto-selects 'Type something')"
-                : "Send text to pane..."
+                : "Send text to terminal..."
           }
           disabled={sendKeys.isPending}
           className={cn(
@@ -233,16 +302,19 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           )}
         />
         <button
-          type="submit"
-          disabled={sendKeys.isPending || !text.trim()}
+          type="button"
+          onClick={handleActionButton}
+          disabled={sendKeys.isPending}
           className={cn(
-            "action-btn bg-accent-blue text-white rounded-lg min-h-[44px] min-w-[44px]",
-            "disabled:opacity-40 disabled:cursor-not-allowed",
-            "hover:opacity-90 transition-opacity",
+            "rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center",
+            "transition-all duration-200 ease-out",
+            hasText
+              ? "bg-accent-blue text-white hover:opacity-90"
+              : "bg-bg-secondary text-text-secondary border border-border-default hover:text-text-primary hover:bg-bg-tertiary",
           )}
-          title="Send text to pane"
+          title={hasText ? "Send text to pane" : "Open command palette (/)"}
         >
-          <Send size={18} />
+          {hasText ? <Send size={18} /> : <span className="font-mono text-base font-bold">/</span>}
         </button>
       </form>
     </div>
