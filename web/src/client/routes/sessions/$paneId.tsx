@@ -24,7 +24,7 @@ function SessionDetailPage() {
   const { paneId } = Route.useParams();
   const { tab: initialTab } = Route.useSearch();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? "terminal");
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const { data: paneData, isLoading: paneLoading, error: paneError } = usePaneContent(paneId);
   const { data: planData } = usePlan(paneId);
@@ -38,9 +38,15 @@ function SessionDetailPage() {
     ...(hasPlan ? [{ id: "plan" as const, label: "Plan", icon: <FileText size={16} /> }] : []),
   ];
 
-  // Exit fullscreen on Escape key (unless focus is in a text input or textarea)
+  // Toggle vertical-expand class on <html> to hide root header via CSS
   useEffect(() => {
-    if (!isFullscreen) return;
+    document.documentElement.classList.toggle("vertical-expand", isExpanded);
+    return () => document.documentElement.classList.remove("vertical-expand");
+  }, [isExpanded]);
+
+  // Exit expanded mode on Escape key (unless focus is in a text input or textarea)
+  useEffect(() => {
+    if (!isExpanded) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -48,19 +54,19 @@ function SessionDetailPage() {
         !(e.target instanceof HTMLInputElement) &&
         !(e.target instanceof HTMLTextAreaElement)
       ) {
-        setIsFullscreen(false);
+        setIsExpanded(false);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreen]);
+  }, [isExpanded]);
 
   return (
     <>
       <title>{session?.project_name ?? paneId} - Panopticon</title>
 
-      {/* Header elements — hidden in fullscreen */}
-      {!isFullscreen && (
+      {/* Header elements — hidden in expanded mode */}
+      {!isExpanded && (
         <>
           <div className="mb-4">
             <Link to="/" className="text-accent-blue hover:underline text-sm">
@@ -91,14 +97,9 @@ function SessionDetailPage() {
         </>
       )}
 
-      {/* Terminal content — wrapper becomes fixed overlay in fullscreen */}
+      {/* Terminal content */}
       {activeTab === "terminal" && (
-        <div
-          className={cn(
-            "flex-1 flex flex-col",
-            isFullscreen && "fixed inset-0 z-50 bg-bg-primary pt-[env(safe-area-inset-top)]",
-          )}
-        >
+        <div className="flex-1 flex flex-col">
           {paneLoading && (
             <div className="empty-state">
               <p>Loading pane content...</p>
@@ -122,9 +123,9 @@ function SessionDetailPage() {
           {paneData?.content != null && (
             <TerminalViewer
               content={paneData.content}
-              className={cn("pane-viewer", isFullscreen && "pane-viewer--fullscreen")}
-              isFullscreen={isFullscreen}
-              onFullscreenToggle={() => setIsFullscreen((prev) => !prev)}
+              className={cn("pane-viewer", isExpanded && "pane-viewer--expanded")}
+              isExpanded={isExpanded}
+              onExpandToggle={() => setIsExpanded((prev) => !prev)}
             />
           )}
 
@@ -132,7 +133,7 @@ function SessionDetailPage() {
         </div>
       )}
 
-      {activeTab === "plan" && !isFullscreen && hasPlan && planData?.plan && (
+      {activeTab === "plan" && !isExpanded && hasPlan && planData?.plan && (
         <PlanViewer content={planData.plan.content} slug={planData.plan.slug} />
       )}
     </>
