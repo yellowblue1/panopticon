@@ -47,6 +47,12 @@ const SCROLL_BOTTOM_THRESHOLD_PX = 10;
 /** Upper bound for terminal columns to prevent absurd widths from malformed content. */
 const MAX_COLS = 500;
 
+/** Duration (ms) a touch must be held to trigger text selection. */
+const LONG_PRESS_MS = 400;
+
+/** Squared distance (px²) threshold to distinguish a tap/hold from a drag. */
+const MOVE_THRESHOLD_SQ = 100;
+
 function safeFit(fitAddon: FitAddon): void {
   try {
     fitAddon.fit();
@@ -90,6 +96,13 @@ export function XtermViewer({
   const maxWidthRef = useRef(0);
   const fitWidthRef = useRef(false);
   fitWidthRef.current = fitWidth;
+
+  // Touch-based text selection state (mobile)
+  const [copyBtnPos, setCopyBtnPos] = useState<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSelectingRef = useRef(false);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const selectionAnchorRef = useRef<{ col: number; row: number } | null>(null);
 
   // Initialize terminal and scroll listener on mount
   useEffect(() => {
@@ -165,7 +178,143 @@ export function XtermViewer({
       viewport.addEventListener("touchmove", stopBubble, { passive: true });
     }
 
+    // Touch-based text selection: long-press selects a word, drag extends range.
+    const screen = container.querySelector<HTMLElement>(".xterm-screen");
+    let screenTouchHandlers: (() => void) | null = null;
+
+    if (isMobileAtMount && screen) {
+      const getCellFromTouch = (clientX: number, clientY: number) => {
+        const rect = screen.getBoundingClientRect();
+        const cellWidth = rect.width / terminal.cols;
+        const cellHeight = rect.height / terminal.rows;
+        const col = Math.max(
+          0,
+          Math.min(terminal.cols - 1, Math.floor((clientX - rect.left) / cellWidth)),
+        );
+        const row = Math.max(
+          0,
+          Math.min(terminal.rows - 1, Math.floor((clientY - rect.top) / cellHeight)),
+        );
+        return { col, row };
+      };
+
+      const selectWordAt = (col: number, viewportRow: number) => {
+        const bufferRow = viewportRow + terminal.buffer.active.viewportY;
+        const line = terminal.buffer.active.getLine(bufferRow);
+        if (!line) return;
+
+        const isWordChar = (c: number): boolean => {
+          if (c < 0 || c >= terminal.cols) return false;
+          const cell = line.getCell(c);
+          if (!cell) return false;
+          const ch = cell.getChars();
+          return ch.length > 0 && ch !== " " && ch !== "\t";
+        };
+
+        if (!isWordChar(col)) return;
+
+        let start = col;
+        let end = col;
+        while (start > 0 && isWordChar(start - 1)) start--;
+        while (end < terminal.cols - 1 && isWordChar(end + 1)) end++;
+
+        terminal.select(start, viewportRow, end - start + 1);
+        selectionAnchorRef.current = { col, row: viewportRow };
+      };
+
+      const updateSelection = (endCol: number, endRow: number) => {
+        const anchor = selectionAnchorRef.current;
+        if (!anchor) return;
+
+        let sCol = anchor.col;
+        let sRow = anchor.row;
+        let eCol = endCol;
+        let eRow = endRow;
+
+        if (eRow < sRow || (eRow === sRow && eCol < sCol)) {
+          [sCol, sRow, eCol, eRow] = [eCol, eRow, sCol, sRow];
+        }
+
+        const length = (eRow - sRow) * terminal.cols + (eCol - sCol + 1);
+        terminal.select(sCol, sRow, Math.max(1, length));
+      };
+
+      const onTouchStart = (e: TouchEvent) => {
+        const touch = e.touches[0];
+        touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+        isSelectingRef.current = false;
+
+        longPressTimerRef.current = setTimeout(() => {
+          isSelectingRef.current = true;
+          navigator.vibrate?.(50);
+          const cell = getCellFromTouch(touch.clientX, touch.clientY);
+          selectWordAt(cell.col, cell.row);
+        }, LONG_PRESS_MS);
+      };
+
+      const onTouchMove = (e: TouchEvent) => {
+        const touch = e.touches[0];
+        const start = touchStartPosRef.current;
+
+        // Cancel long-press if finger moved too far (it's a scroll)
+        if (!isSelectingRef.current && start && longPressTimerRef.current) {
+          const dx = touch.clientX - start.x;
+          const dy = touch.clientY - start.y;
+          if (dx * dx + dy * dy > MOVE_THRESHOLD_SQ) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+        }
+
+        // Extend selection while dragging in selection mode
+        if (isSelectingRef.current) {
+          e.preventDefault();
+          const cell = getCellFromTouch(touch.clientX, touch.clientY);
+          updateSelection(cell.col, cell.row);
+        }
+      };
+
+      const onTouchEnd = (e: TouchEvent) => {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+
+        if (isSelectingRef.current && terminal.hasSelection()) {
+          // Selection complete — show floating copy button
+          const touch = e.changedTouches[0];
+          const containerRect = container.getBoundingClientRect();
+          setCopyBtnPos({
+            x: Math.max(
+              8,
+              Math.min(containerRect.width - 88, touch.clientX - containerRect.left - 40),
+            ),
+            y: Math.max(8, touch.clientY - containerRect.top - 48),
+          });
+        } else if (!isSelectingRef.current) {
+          // Quick tap — clear any existing selection
+          terminal.clearSelection();
+          setCopyBtnPos(null);
+        }
+
+        isSelectingRef.current = false;
+        touchStartPosRef.current = null;
+      };
+
+      screen.addEventListener("touchstart", onTouchStart, { passive: true });
+      screen.addEventListener("touchmove", onTouchMove, { passive: false });
+      screen.addEventListener("touchend", onTouchEnd, { passive: true });
+
+      screenTouchHandlers = () => {
+        screen.removeEventListener("touchstart", onTouchStart);
+        screen.removeEventListener("touchmove", onTouchMove);
+        screen.removeEventListener("touchend", onTouchEnd);
+      };
+    }
+
     return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      screenTouchHandlers?.();
       if (isMobileAtMount && viewport) {
         viewport.removeEventListener("touchstart", stopBubble);
         viewport.removeEventListener("touchmove", stopBubble);
@@ -290,6 +439,22 @@ export function XtermViewer({
     }
   };
 
+  const handleCopySelection = async () => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    const text = terminal.getSelection();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      terminal.clearSelection();
+      setCopyBtnPos(null);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access denied or unavailable
+    }
+  };
+
   return (
     <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
       <div
@@ -368,6 +533,27 @@ export function XtermViewer({
           onClick={handleCopy}
         >
           {copied ? <Check size={18} /> : <Copy size={18} />}
+        </button>
+      )}
+
+      {/* Floating copy button — appears near selected text after long-press */}
+      {copyBtnPos && (
+        <button
+          type="button"
+          aria-label="Copy selection"
+          className={cn(
+            "absolute z-20",
+            "flex items-center gap-1.5 px-3 py-1.5",
+            "rounded-full text-sm font-medium",
+            "bg-accent-blue text-white",
+            "shadow-lg shadow-black/40",
+            "active:scale-95 transition-transform",
+          )}
+          style={{ left: copyBtnPos.x, top: copyBtnPos.y }}
+          onClick={handleCopySelection}
+        >
+          <Copy size={14} />
+          Copy
         </button>
       )}
 
