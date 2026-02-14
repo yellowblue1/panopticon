@@ -291,6 +291,24 @@ body {
   }
 }
 
+/* Fullscreen pane viewer overlay — compound selector for higher specificity
+   to override mobile .pane-viewer max-height constraints */
+.pane-viewer.pane-viewer--fullscreen {
+  @apply border-0 rounded-none;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+/* Suppress centering transform in fullscreen fit-width mode */
+@media (min-width: 640px) {
+  .pane-viewer--fullscreen.pane-viewer--fit-width {
+    left: auto;
+    transform: none;
+    overflow-x: auto;
+  }
+}
+
 /* ============================================
    Session Tabs
    ============================================ */
