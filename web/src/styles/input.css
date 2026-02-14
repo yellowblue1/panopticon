@@ -263,6 +263,29 @@ body {
 }
 
 /* ============================================
+   Terminal ANSI Color Theme (fancy-ansi)
+   ============================================ */
+
+:root {
+  --ansi-black: #586069;
+  --ansi-red: #f85149;
+  --ansi-green: #3fb950;
+  --ansi-yellow: #d29922;
+  --ansi-blue: #58a6ff;
+  --ansi-magenta: #bc8cff;
+  --ansi-cyan: #39c5cf;
+  --ansi-white: #f0f6fc;
+  --ansi-bright-black: #8b949e;
+  --ansi-bright-red: #ff7b72;
+  --ansi-bright-green: #56d364;
+  --ansi-bright-yellow: #e3b341;
+  --ansi-bright-blue: #79c0ff;
+  --ansi-bright-magenta: #d2a8ff;
+  --ansi-bright-cyan: #56d4dd;
+  --ansi-bright-white: #ffffff;
+}
+
+/* ============================================
    Pane Content Viewer
    ============================================ */
 
@@ -273,8 +296,19 @@ body {
   overscroll-behavior: contain;
 }
 
-.pane-viewer .xterm {
+.pane-viewer .terminal-content {
   padding: 12px;
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.2;
+  color: #c9d1d9;
+  background: transparent;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Desktop fit-width toggle: expand the frame to match content width, centered. */
@@ -286,7 +320,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
   }
-  .pane-viewer--fit-width .xterm {
+  .pane-viewer--fit-width .terminal-content {
     min-width: fit-content;
   }
 }
@@ -605,16 +639,9 @@ body {
     @apply rounded-none border-x-0;
   }
 
-  /* Let touch events pass through the canvas layer to the scrollable viewport
-     underneath, enabling native scroll with momentum instead of xterm's manual
-     scrollTop manipulation which feels "sticky" on mobile. */
-  .pane-viewer .xterm-screen {
-    pointer-events: none;
-  }
-
-  /* Mobile fit-width: let .xterm expand to content width inside the
-     horizontally-scrollable container (overflow-x:auto on containerRef). */
-  .pane-viewer--fit-width .xterm {
+  /* Mobile fit-width: let terminal content expand to content width inside the
+     horizontally-scrollable container (overflow-x:auto on scrollContainerRef). */
+  .pane-viewer--fit-width .terminal-content {
     min-width: fit-content;
   }
 
