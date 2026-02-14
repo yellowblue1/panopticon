@@ -281,9 +281,13 @@ export function XtermViewer({
     const text = terminal.getSelection();
     terminal.clearSelection();
     if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access denied or unavailable (e.g. mobile Safari permissions)
+    }
   };
 
   return (
