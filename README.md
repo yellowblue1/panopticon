@@ -1,8 +1,6 @@
 # Panopticon
 
-A monitoring dashboard for Claude Code and Codex sessions running in tmux.
-
-Automatically detects Claude Code and Codex processes, tracks their activity in real time, and generates AI-powered summaries when sessions go idle — all accessible through a web-based dashboard.
+Monitoring dashboard for Claude Code and Codex sessions running in tmux. Auto-discovers AI coding sessions, tracks activity in real time, generates AI summaries with Gemini 2.5 Flash, and serves a live dashboard on localhost:3847.
 
 ## Features
 
@@ -12,26 +10,43 @@ Automatically detects Claude Code and Codex processes, tracks their activity in 
 - **Action detection** — identifies what type of input the agent expects (yes/no, choices, free-text, or none)
 - **Live dashboard** — Server-Sent Events push updates to the React UI in real time
 - **Terminal viewer** — xterm.js renders full ANSI output; send keystrokes directly from the browser
-- **Mobile access** — access the dashboard from your phone over Tailscale VPN
+- **Remote access** — reach the dashboard from any device via Tailscale
 
-## Prerequisites
+## Quick Start
+
+### Prerequisites
 
 - [Bun](https://bun.sh/) v1.x
 - tmux
-- A Google AI API key **or** a GCP project with the Vertex AI API enabled (for Gemini-powered features)
+- A [Google AI API key](https://aistudio.google.com/apikey) **or** a GCP project with the Vertex AI API enabled
 
-## Quick Start
+### Install and run
 
 ```bash
 git clone git@github.com:yellowblue1/panopticon.git
 cd panopticon
 bun install
-bun run web/server.ts
+GOOGLE_API_KEY="your-api-key" bun run web/server.ts
 ```
 
 Open http://localhost:3847 in your browser.
 
-### Alternative: run via bunx
+### Using Vertex AI instead
+
+If you prefer Vertex AI over an API key:
+
+```bash
+gcloud auth login --update-adc
+bun run web/server.ts
+```
+
+Panopticon auto-detects your GCP project from `gcloud config`. To target a specific project, set the environment explicitly (the same variables work with `bunx`):
+
+```bash
+GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT="your-project-id" bun run web/server.ts
+```
+
+### Run via bunx (no clone)
 
 If you prefer not to clone the repo, you can run directly via GitHub Packages.
 
@@ -45,52 +60,12 @@ echo "@yellowblue1:registry=https://npm.pkg.github.com" >> ~/.npmrc
 Then:
 
 ```bash
-bunx @yellowblue1/panopticon
+GOOGLE_API_KEY="your-api-key" bunx @yellowblue1/panopticon
 ```
 
-## Remote Access via [Tailscale](https://tailscale.com/)
-
-Expose the dashboard to your Tailscale network so you can monitor sessions from your phone:
-
-```bash
-tailscale serve --bg 3847
-```
-
-The dashboard will be available at `https://<your-machine>.ts.net`.
+> Panopticon uses the [`@google/genai`](https://github.com/googleapis/js-genai) SDK, which reads all Gemini configuration from environment variables. See the [SDK README](https://github.com/googleapis/js-genai#readme) for the full list of supported variables.
 
 ## Configuration
-
-### Gemini API
-
-AI summaries and action detection are powered by Gemini. Two backends are supported:
-
-#### Option 1: Google AI (API key)
-
-Set the `GOOGLE_API_KEY` environment variable:
-
-```bash
-export GOOGLE_API_KEY="your-api-key"
-```
-
-#### Option 2: Vertex AI (GCP)
-
-Authenticate with Application Default Credentials and set your project:
-
-```bash
-gcloud auth login --update-adc
-export GOOGLE_CLOUD_PROJECT="your-project-id"
-```
-
-If `GOOGLE_CLOUD_PROJECT` is not set, Panopticon falls back to `gcloud config get-value project`.
-
-| Env var | Description | Default |
-|---------|-------------|---------|
-| `GOOGLE_API_KEY` | Google AI API key (alternative: `GEMINI_API_KEY`) | — |
-| `GOOGLE_CLOUD_PROJECT` | GCP project for Vertex AI | `gcloud config get-value project` |
-| `GOOGLE_CLOUD_LOCATION` | GCP region for Vertex AI | `global` |
-| `GOOGLE_GENAI_USE_VERTEXAI` | Force Vertex AI mode | Auto-detected |
-
-### Server
 
 | Env var | Default | Description |
 |---------|---------|-------------|
@@ -135,3 +110,13 @@ web/
 bin/
   cli.ts          # CLI entrypoint for bunx
 ```
+
+## Remote Access via [Tailscale](https://tailscale.com/)
+
+Expose the dashboard to your Tailscale network so you can monitor sessions from your phone:
+
+```bash
+tailscale serve --bg 3847
+```
+
+The dashboard will be available at `https://<your-machine>.ts.net`.
