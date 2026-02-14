@@ -605,13 +605,6 @@ body {
     @apply rounded-none border-x-0;
   }
 
-  /* Let touch events pass through the canvas layer to the scrollable viewport
-     underneath, enabling native scroll with momentum instead of xterm's manual
-     scrollTop manipulation which feels "sticky" on mobile. */
-  .pane-viewer .xterm-screen {
-    pointer-events: none;
-  }
-
   /* Mobile fit-width: let .xterm expand to content width inside the
      horizontally-scrollable container (overflow-x:auto on containerRef). */
   .pane-viewer--fit-width .xterm {

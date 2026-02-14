@@ -1,6 +1,6 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { ArrowDown, ArrowLeftRight, Maximize, Minimize } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, Check, Copy, Maximize, Minimize } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -83,6 +83,7 @@ export function XtermViewer({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isMobile = useMediaQuery("(max-width: 639px)");
   const [showButton, setShowButton] = useState(false);
+  const [copied, setCopied] = useState(false);
   const isAtBottomRef = useRef(true);
   const [fitWidth, setFitWidth] = useState(false);
   const [contentOverflows, setContentOverflows] = useState(false);
@@ -153,9 +154,10 @@ export function XtermViewer({
     // On mobile, bypass xterm's manual touch scrolling to use native scroll.
     // xterm.js attaches touch handlers on .xterm that manually set scrollTop,
     // which bypasses native scroll momentum and causes sticky scrolling.
-    // CSS sets pointer-events:none on .xterm-screen so touches reach the
-    // viewport (overflow-y:scroll); stopPropagation prevents the event from
-    // bubbling to xterm's handler, avoiding double-scroll.
+    // stopPropagation on the viewport prevents touch events from bubbling up
+    // to xterm's handler on .xterm, while still allowing native scroll
+    // (browser handles scrolling at compositor level for any touch inside a
+    // scrollable container) and pointer events on .xterm-screen for selection.
     const isMobileAtMount = window.matchMedia("(max-width: 639px)").matches;
     const stopBubble = (e: Event) => e.stopPropagation();
     if (isMobileAtMount && viewport) {
@@ -272,6 +274,18 @@ export function XtermViewer({
     terminalRef.current?.scrollToBottom();
   };
 
+  const handleCopy = async () => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.selectAll();
+    const text = terminal.getSelection();
+    terminal.clearSelection();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
       <div
@@ -326,6 +340,30 @@ export function XtermViewer({
           onClick={() => setFitWidth((prev) => !prev)}
         >
           <ArrowLeftRight size={16} />
+        </button>
+      )}
+
+      {/* Copy terminal content (mobile) */}
+      {isMobile && (
+        <button
+          type="button"
+          aria-label={copied ? "Copied" : "Copy terminal content"}
+          className={cn(
+            "absolute left-3 bottom-3 z-10",
+            "flex items-center justify-center",
+            "w-11 h-11",
+            "rounded-full",
+            "shadow-lg shadow-black/30",
+            "transition-all duration-200 ease-out",
+            "cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
+            copied
+              ? "bg-green-500/20 text-green-400 border border-green-500/50"
+              : "bg-bg-tertiary/90 backdrop-blur-sm text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-border-default",
+          )}
+          onClick={handleCopy}
+        >
+          {copied ? <Check size={18} /> : <Copy size={18} />}
         </button>
       )}
 
