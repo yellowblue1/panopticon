@@ -1,6 +1,6 @@
 import { FancyAnsi } from "fancy-ansi";
 import { ArrowDown, ArrowLeftRight, Maximize, Minimize } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/cn";
@@ -78,18 +78,17 @@ export function TerminalViewer({
     return () => observer.disconnect();
   }, []);
 
-  // Auto-scroll to bottom when content changes (if user is at bottom)
-  useEffect(() => {
+  // Auto-scroll to bottom when content changes (if user is at bottom).
+  // useLayoutEffect fires synchronously after DOM mutations but before paint,
+  // ensuring the scroll position is correct before the user sees anything.
+  // This avoids the rAF cancellation issue with rapid SSE updates.
+  useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || content == null) return;
 
     if (!isAtBottomRef.current) return;
 
-    const frameId = requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
-    });
-
-    return () => cancelAnimationFrame(frameId);
+    container.scrollTop = container.scrollHeight;
   }, [content]);
 
   // Determine the effective content to render:
