@@ -143,7 +143,24 @@ export function XtermViewer({ content, className }: XtermViewerProps) {
     };
     viewport?.addEventListener("scroll", handleScroll, { passive: true });
 
+    // On mobile, bypass xterm's manual touch scrolling to use native scroll.
+    // xterm.js attaches touch handlers on .xterm that manually set scrollTop,
+    // which bypasses native scroll momentum and causes sticky scrolling.
+    // CSS sets pointer-events:none on .xterm-screen so touches reach the
+    // viewport (overflow-y:scroll); stopPropagation prevents the event from
+    // bubbling to xterm's handler, avoiding double-scroll.
+    const isMobileAtMount = window.matchMedia("(max-width: 639px)").matches;
+    const stopBubble = (e: Event) => e.stopPropagation();
+    if (isMobileAtMount && viewport) {
+      viewport.addEventListener("touchstart", stopBubble, { passive: true });
+      viewport.addEventListener("touchmove", stopBubble, { passive: true });
+    }
+
     return () => {
+      if (isMobileAtMount && viewport) {
+        viewport.removeEventListener("touchstart", stopBubble);
+        viewport.removeEventListener("touchmove", stopBubble);
+      }
       viewport?.removeEventListener("scroll", handleScroll);
       resizeObserver.disconnect();
       terminal.dispose();
