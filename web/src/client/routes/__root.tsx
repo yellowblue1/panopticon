@@ -31,7 +31,7 @@ function AppShell() {
   useSessionsStream();
 
   return (
-    <div className="font-sans bg-bg-primary text-text-primary min-h-screen flex flex-col text-base leading-relaxed">
+    <div className="font-sans bg-bg-primary text-text-primary min-h-dvh flex flex-col text-base leading-relaxed">
       <div className="max-w-[1400px] mx-auto p-6 max-md:p-4 w-full flex-1 flex flex-col">
         <header className="flex justify-between items-center mb-6 pb-4 border-b border-border-default max-md:flex-wrap max-md:gap-3">
           <div className="flex items-center gap-6">
@@ -67,7 +67,7 @@ function AppShell() {
 
 function RootErrorBoundary({ error, reset }: ErrorComponentProps) {
   return (
-    <div className="font-sans bg-bg-primary text-text-primary min-h-screen flex items-center justify-center">
+    <div className="font-sans bg-bg-primary text-text-primary min-h-dvh flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-2xl font-bold text-accent-red mb-4">Something went wrong</h1>
         <p className="text-text-muted mb-4">

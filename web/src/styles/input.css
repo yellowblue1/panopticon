@@ -638,7 +638,6 @@ body {
   }
 
   .pane-viewer {
-    max-height: calc(100vh - 260px);
     max-height: calc(100dvh - 260px);
     min-height: 150px;
     @apply rounded-none border-x-0;
