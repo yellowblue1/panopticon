@@ -284,6 +284,150 @@ body {
   }
 }
 
+/* ============================================
+   Session Tabs
+   ============================================ */
+
+.session-tabs {
+  @apply flex gap-1 mb-4;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.tab-button {
+  @apply flex items-center gap-1.5 bg-transparent border-none rounded-t-md cursor-pointer transition-all text-text-muted text-sm;
+  padding: 10px 16px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-button:hover:not(:disabled) {
+  @apply text-text-secondary;
+  border-bottom-color: var(--color-border-muted);
+}
+
+.tab-button.active {
+  @apply text-accent-blue;
+  border-bottom-color: var(--color-accent-blue);
+}
+
+.tab-button:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+.tab-button svg {
+  @apply w-4 h-4;
+}
+
+/* ============================================
+   Plan Viewer
+   ============================================ */
+
+.plan-viewer {
+  @apply bg-bg-primary border border-border-default rounded-lg overflow-hidden;
+}
+
+.plan-header {
+  @apply px-5 py-3 border-b border-border-default bg-bg-secondary;
+}
+
+.plan-slug {
+  @apply text-sm font-mono text-text-muted;
+}
+
+.plan-content {
+  @apply px-6 py-5 text-text-primary leading-relaxed;
+  max-width: 900px;
+}
+
+.plan-content h1 {
+  @apply text-2xl font-semibold mt-6 mb-4 pb-2 border-b border-border-muted text-text-primary;
+}
+
+.plan-content h1:first-child {
+  @apply mt-0;
+}
+
+.plan-content h2 {
+  @apply text-xl font-semibold mt-5 mb-3 pb-1.5 border-b border-border-muted text-text-primary;
+}
+
+.plan-content h3 {
+  @apply text-lg font-semibold mt-4 mb-2 text-text-primary;
+}
+
+.plan-content h4 {
+  @apply text-base font-semibold mt-3 mb-2 text-text-primary;
+}
+
+.plan-content p {
+  @apply mb-4;
+}
+
+.plan-content a {
+  @apply text-accent-blue no-underline;
+}
+
+.plan-content a:hover {
+  @apply underline;
+}
+
+.plan-content code {
+  @apply bg-bg-tertiary rounded px-1.5 py-0.5 font-mono text-accent-purple;
+  font-size: 0.85em;
+}
+
+.plan-content pre {
+  @apply bg-bg-secondary border border-border-default rounded-lg overflow-x-auto my-4;
+  padding: 1rem;
+}
+
+.plan-content pre code {
+  @apply bg-transparent p-0 text-text-primary;
+  font-size: 0.875rem;
+}
+
+.plan-content ul,
+.plan-content ol {
+  @apply my-2 pl-6;
+}
+
+.plan-content ol {
+  list-style-type: decimal;
+}
+
+.plan-content li {
+  @apply my-1;
+}
+
+.plan-content blockquote {
+  @apply my-4 pl-4 text-text-muted;
+  border-left: 4px solid var(--color-border-default);
+}
+
+.plan-content table {
+  @apply w-full border-collapse my-4;
+}
+
+.plan-content th {
+  @apply text-left py-2 px-3 bg-bg-secondary text-text-secondary font-medium text-sm border-b border-border-default;
+}
+
+.plan-content td {
+  @apply py-2 px-3 border-b border-border-muted text-sm;
+}
+
+.plan-content hr {
+  @apply my-6 border-border-muted;
+}
+
+.plan-content input[type="checkbox"] {
+  @apply mr-2;
+}
+
+/* Plan indicator on session row */
+.plan-indicator {
+  @apply text-accent-blue;
+}
+
 /* Send keys input bar */
 .send-keys-bar {
   @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;
@@ -430,5 +574,21 @@ body {
 
   .switch-action-btn {
     display: none;
+  }
+
+  .plan-content {
+    @apply px-4 py-3 text-sm;
+  }
+
+  .plan-content h1 {
+    @apply text-xl;
+  }
+
+  .plan-content h2 {
+    @apply text-lg;
+  }
+
+  .plan-content pre code {
+    font-size: 0.75rem;
   }
 }

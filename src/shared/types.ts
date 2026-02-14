@@ -95,3 +95,15 @@ export interface PaneActionsResponse {
   action: PaneAction;
   timestamp: number;
 }
+
+// Plan viewer types
+export interface PlanResponse {
+  pane_id: string;
+  plan: { slug: string; content: string } | null;
+  timestamp: number;
+}
+
+export interface PlansAvailabilityResponse {
+  plans: Record<string, boolean>;
+  timestamp: number;
+}
