@@ -127,7 +127,10 @@ export function TerminalViewer({
     <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
       <div
         ref={scrollContainerRef}
-        className={cn("flex-1 min-h-0 overflow-y-auto", isMobile && fitWidth && "overflow-x-auto")}
+        className={cn(
+          "absolute inset-0 overflow-y-auto",
+          fitWidth ? "overflow-x-auto" : "overflow-x-hidden",
+        )}
       >
         {processedHtml != null ? (
           <pre className="terminal-content" dangerouslySetInnerHTML={{ __html: processedHtml }} />
