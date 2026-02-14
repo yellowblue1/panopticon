@@ -12,7 +12,7 @@ interface SendKeysInputProps {
 
 export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const [text, setText] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const sendKeys = useSendKeys();
   const { action, isDetecting, detect, clear } = useActionDetection(paneId);
@@ -36,6 +36,14 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       vv.removeEventListener("scroll", update);
     };
   }, []);
+
+  // Auto-resize textarea to fit content (up to ~5 lines)
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [text]);
 
   const handleInputFocus = () => {
     const scroll = () => inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -94,7 +102,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     handleSend(text);
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend(text);
@@ -200,15 +208,15 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       />
 
       {/* Input row */}
-      <form onSubmit={handleFormSubmit} className="flex items-center gap-2">
-        <input
+      <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
+        <textarea
           ref={inputRef}
-          type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}
           enterKeyHint="send"
+          rows={1}
           placeholder={
             action.type === "freeform"
               ? action.placeholder
@@ -221,7 +229,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
             "flex-1 bg-bg-secondary border border-border-default rounded-lg px-3 py-2",
             "text-text-primary placeholder:text-text-muted font-mono text-sm",
             "focus:outline-none focus:border-accent-blue transition-colors",
-            "min-h-[44px]",
+            "min-h-[44px] max-h-[120px] resize-none overflow-y-auto",
           )}
         />
         <button
