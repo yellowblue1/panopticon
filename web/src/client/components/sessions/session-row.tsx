@@ -1,6 +1,6 @@
 import type { SessionResponse } from "@shared/types";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightToLine, SquareTerminal } from "lucide-react";
+import { ArrowRightToLine, FileText, SquareTerminal } from "lucide-react";
 import { useSwitchClient } from "@/hooks/use-switch-client";
 import { cn } from "@/lib/cn";
 import { AgentTypeIcon } from "../ui/agent-type-icon";
@@ -9,10 +9,11 @@ import { StatusBadge } from "../ui/badge";
 interface SessionRowProps {
   session: SessionResponse;
   isRead: boolean;
+  hasPlan: boolean;
   onMarkAsRead: (paneId: string) => void;
 }
 
-export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
+export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRowProps) {
   const switchClient = useSwitchClient();
 
   const handleSwitch = () => {
@@ -62,6 +63,21 @@ export function SessionRow({ session, isRead, onMarkAsRead }: SessionRowProps) {
       </td>
       <td className="col-actions">
         <div className="action-group">
+          {hasPlan ? (
+            <Link
+              to="/sessions/$paneId"
+              params={{ paneId: session.pane_id }}
+              search={{ tab: "plan" }}
+              className="action-btn plan-indicator"
+              title="View plan"
+            >
+              <FileText size={20} />
+            </Link>
+          ) : (
+            <span className="action-btn plan-placeholder">
+              <FileText size={20} />
+            </span>
+          )}
           <Link
             to="/sessions/$paneId"
             params={{ paneId: session.pane_id }}

@@ -126,6 +126,14 @@ export class SessionManager {
   }
 
   /**
+   * Get the working directory for a session by pane ID.
+   * Returns the cwd from internal state without exposing the full SessionState.
+   */
+  getSessionCwd(paneId: string): string | null {
+    return this.sessions.get(paneId)?.cwd ?? null;
+  }
+
+  /**
    * Get a single session by pane ID
    */
   getSession(paneId: string): SessionResponse | null {

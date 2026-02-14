@@ -12,3 +12,9 @@ export const actionKeys = {
   all: ["actions"] as const,
   detect: (paneId: string) => [...actionKeys.all, "detect", paneId] as const,
 };
+
+export const planKeys = {
+  all: ["plans"] as const,
+  detail: (paneId: string) => [...planKeys.all, "detail", paneId] as const,
+  availability: () => [...planKeys.all, "availability"] as const,
+};

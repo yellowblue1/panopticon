@@ -17,6 +17,8 @@ import type {
   PaneActionsResponse,
   PaneContentFull,
   PaneContentResponse,
+  PlanResponse,
+  PlansAvailabilityResponse,
   SendKeysResponse,
   SessionResponse,
   SwitchClientResponse,
@@ -47,6 +49,10 @@ export interface AppDeps {
   // SSE callbacks (pane content)
   onPaneContentSseConnect?: (paneId: string, client: SseClient) => void;
   onPaneContentSseDisconnect?: (paneId: string, client: SseClient) => void;
+
+  // Plan viewer
+  getPlan?: (paneId: string) => { slug: string; content: string } | null;
+  getPlansAvailability?: () => Record<string, boolean>;
 }
 
 /**
@@ -95,6 +101,15 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         sessions: deps.getSessions(),
         timestamp: Date.now(),
       });
+    })
+
+    // GET /api/sessions/plans (batch availability — must be before :pane_id routes)
+    .get("/api/sessions/plans", (c) => {
+      const plans = deps.getPlansAvailability?.() ?? {};
+      return c.json({
+        plans,
+        timestamp: Date.now(),
+      } satisfies PlansAvailabilityResponse);
     })
 
     // POST /api/sessions/:pane_id/send-keys
@@ -215,6 +230,17 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         action,
         timestamp: Date.now(),
       } satisfies PaneActionsResponse);
+    })
+
+    // GET /api/sessions/:pane_id/plan
+    .get("/api/sessions/:pane_id/plan", (c) => {
+      const paneId = c.req.param("pane_id");
+      const plan = deps.getPlan?.(paneId) ?? null;
+      return c.json({
+        pane_id: paneId,
+        plan,
+        timestamp: Date.now(),
+      } satisfies PlanResponse);
     })
 
     // GET /api/auth/status

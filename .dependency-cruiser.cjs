@@ -60,6 +60,42 @@ module.exports = {
       from: { path: "^src/session/" },
       to: { path: "^src/terminal/infrastructure/" },
     },
+    {
+      name: "no-plan-depends-on-session",
+      severity: "error",
+      from: { path: "^src/plan/" },
+      to: { path: "^src/session/" },
+    },
+    {
+      name: "no-plan-depends-on-terminal",
+      severity: "error",
+      from: { path: "^src/plan/" },
+      to: { path: "^src/terminal/" },
+    },
+    {
+      name: "no-plan-depends-on-intelligence",
+      severity: "error",
+      from: { path: "^src/plan/" },
+      to: { path: "^src/intelligence/" },
+    },
+    {
+      name: "no-session-depends-on-plan",
+      severity: "error",
+      from: { path: "^src/session/" },
+      to: { path: "^src/plan/" },
+    },
+    {
+      name: "no-terminal-depends-on-plan",
+      severity: "error",
+      from: { path: "^src/terminal/" },
+      to: { path: "^src/plan/" },
+    },
+    {
+      name: "no-intelligence-depends-on-plan",
+      severity: "error",
+      from: { path: "^src/intelligence/" },
+      to: { path: "^src/plan/" },
+    },
 
     // ═══ SHARED KERNEL PROTECTION ═══
 
@@ -68,7 +104,7 @@ module.exports = {
       comment: "Shared kernel must not depend on any bounded context",
       severity: "error",
       from: { path: "^src/shared/" },
-      to: { path: "^src/(terminal|session|intelligence)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan)/" },
     },
 
     // ═══ CLIENT ISOLATION ═══
@@ -78,7 +114,7 @@ module.exports = {
       comment: "React client must not import server-side code",
       severity: "error",
       from: { path: "^web/src/client/" },
-      to: { path: "^src/(terminal|session|intelligence)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan)/" },
     },
   ],
 

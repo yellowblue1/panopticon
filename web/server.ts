@@ -7,6 +7,12 @@ import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
 import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
+import {
+  findSlugForCwd,
+  planFileExists,
+  readPlanContent,
+} from "../src/plan/application/discover-plan";
+import { createPlanDiscoveryDeps } from "../src/plan/infrastructure/file-operations";
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
@@ -104,6 +110,10 @@ function makeFullPayload(paneId: string, content: string, seq: number): PaneCont
 // Session manager with tmux polling
 const sessionManager = new SessionManager(sessionManagerDeps);
 
+// Plan discovery (slug cache: cwd → slug, stable per session lifetime)
+const planDeps = createPlanDiscoveryDeps();
+const slugCache = new Map<string, string | null>();
+
 function serializeSessionsData(): string {
   return JSON.stringify({
     sessions: sessionManager.getSessions(),
@@ -127,6 +137,16 @@ function broadcastUpdate() {
 // Broadcast when session state changes
 sessionManager.onChange(() => {
   broadcastUpdate();
+
+  // Clean stale slug cache entries for removed sessions
+  const activeCwds = new Set<string>();
+  for (const session of sessionManager.getSessions()) {
+    const cwd = sessionManager.getSessionCwd(session.pane_id);
+    if (cwd) activeCwds.add(cwd);
+  }
+  for (const cwd of slugCache.keys()) {
+    if (!activeCwds.has(cwd)) slugCache.delete(cwd);
+  }
 });
 
 // Debounced pane content push via SSE (with diff optimization)
@@ -238,6 +258,41 @@ const app = createApp(
     geminiBackend,
     isAiAvailable: geminiBackend !== null,
     getGeminiAuthError: hasAuthError,
+    getPlan: (paneId) => {
+      const cwd = sessionManager.getSessionCwd(paneId);
+      if (!cwd) return null;
+
+      // Reuse slug cache to avoid re-reading JSONL files
+      if (!slugCache.has(cwd)) {
+        slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
+      }
+      const slug = slugCache.get(cwd);
+      if (!slug) return null;
+
+      const content = readPlanContent(slug, planDeps);
+      if (!content) return null;
+      return { slug, content };
+    },
+    getPlansAvailability: () => {
+      const result: Record<string, boolean> = {};
+      for (const session of sessionManager.getSessions()) {
+        const cwd = sessionManager.getSessionCwd(session.pane_id);
+        if (!cwd) {
+          result[session.pane_id] = false;
+          continue;
+        }
+        if (!slugCache.has(cwd)) {
+          slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
+        }
+        const slug = slugCache.get(cwd);
+        if (!slug) {
+          result[session.pane_id] = false;
+          continue;
+        }
+        result[session.pane_id] = planFileExists(slug, planDeps);
+      }
+      return result;
+    },
     onSseConnect: (client) => {
       clients.add(client);
     },
