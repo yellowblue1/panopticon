@@ -63,7 +63,7 @@ export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRo
       </td>
       <td className="col-actions">
         <div className="action-group">
-          {hasPlan && (
+          {hasPlan ? (
             <Link
               to="/sessions/$paneId"
               params={{ paneId: session.pane_id }}
@@ -73,6 +73,10 @@ export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRo
             >
               <FileText size={20} />
             </Link>
+          ) : (
+            <span className="action-btn plan-placeholder">
+              <FileText size={20} />
+            </span>
           )}
           <Link
             to="/sessions/$paneId"

@@ -432,6 +432,10 @@ body {
   @apply text-accent-blue;
 }
 
+.plan-placeholder {
+  visibility: hidden;
+}
+
 /* Send keys input bar */
 .send-keys-bar {
   @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;
@@ -576,7 +580,8 @@ body {
     @apply rounded-none border-x-0;
   }
 
-  .switch-action-btn {
+  .switch-action-btn,
+  .plan-placeholder {
     display: none;
   }
 
