@@ -10,6 +10,7 @@ Monitoring dashboard for Claude Code and Codex sessions running in tmux. Auto-di
 - **Action detection** — identifies what type of input the agent expects (yes/no, choices, free-text, or none)
 - **Live dashboard** — Server-Sent Events push updates to the React UI in real time
 - **Terminal viewer** — xterm.js renders full ANSI output; send keystrokes directly from the browser
+- **Remote access** — reach the dashboard from any device via Tailscale
 
 ## Quick Start
 
@@ -39,7 +40,7 @@ gcloud auth login --update-adc
 bun run web/server.ts
 ```
 
-Panopticon auto-detects your GCP project from `gcloud config`. To target a specific project, set the environment explicitly:
+Panopticon auto-detects your GCP project from `gcloud config`. To target a specific project, set the environment explicitly (the same variables work with `bunx`):
 
 ```bash
 GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT="your-project-id" bun run web/server.ts
