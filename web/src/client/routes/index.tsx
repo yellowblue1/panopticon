@@ -23,7 +23,7 @@ function DashboardPage() {
 
   return (
     <>
-      <title>Claude Monitoring</title>
+      <title>Panopticon</title>
       <WarningBanner authStatus={authStatus} />
       <SessionTable sessions={sessions} />
     </>
