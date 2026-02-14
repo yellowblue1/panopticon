@@ -594,6 +594,12 @@ body {
     pointer-events: none;
   }
 
+  /* Mobile fit-width: let .xterm expand to content width inside the
+     horizontally-scrollable container (overflow-x:auto on containerRef). */
+  .pane-viewer--fit-width .xterm {
+    min-width: fit-content;
+  }
+
   .switch-action-btn,
   .plan-placeholder {
     display: none;
