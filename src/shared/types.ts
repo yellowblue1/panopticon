@@ -107,3 +107,14 @@ export interface PlansAvailabilityResponse {
   plans: Record<string, boolean>;
   timestamp: number;
 }
+
+// Slash command configuration types
+export interface SlashCommand {
+  command: string;
+  description: string;
+}
+
+export interface SlashCommandsResponse {
+  commands: SlashCommand[];
+  timestamp: number;
+}

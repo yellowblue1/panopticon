@@ -18,3 +18,8 @@ export const planKeys = {
   detail: (paneId: string) => [...planKeys.all, "detail", paneId] as const,
   availability: () => [...planKeys.all, "availability"] as const,
 };
+
+export const settingsKeys = {
+  all: ["settings"] as const,
+  slashCommands: () => [...settingsKeys.all, "slash-commands"] as const,
+};

@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it, mock } from "bun:test";
+import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import type { SessionResponse } from "../src/shared/types";
 import { type AppDeps, createApp, type SseClient } from "./server-app";
 
@@ -25,6 +26,8 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     serializeSessionsData: () => "{}",
     onPaneContentSseConnect: () => {},
     onPaneContentSseDisconnect: () => {},
+    getSlashCommands: () => DEFAULT_SLASH_COMMANDS,
+    setSlashCommands: (commands) => commands,
     ...overrides,
   };
 }
@@ -538,6 +541,107 @@ describe("Hono API endpoints", () => {
 
       expect(text).toContain(`data: ${initialData}`);
       expect(text).toContain("\n\n");
+    });
+  });
+});
+
+describe("Settings API endpoints", () => {
+  describe("GET /api/settings/slash-commands", () => {
+    it("returns commands list with timestamp", async () => {
+      const deps = createMockDeps();
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
+      expect(data.timestamp).toBeGreaterThan(0);
+    });
+
+    it("returns empty array when getSlashCommands not provided", async () => {
+      const deps = createMockDeps({ getSlashCommands: undefined });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands");
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.commands).toEqual([]);
+    });
+  });
+
+  describe("PUT /api/settings/slash-commands", () => {
+    it("updates and returns new command list", async () => {
+      const setSlashCommandsSpy = mock(
+        (commands: { command: string; description: string }[]) => commands,
+      );
+      const deps = createMockDeps({ setSlashCommands: setSlashCommandsSpy });
+      const app = createApp(deps);
+
+      const newCommands = [{ command: "/test", description: "Test command" }];
+      const res = await app.request("/api/settings/slash-commands", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commands: newCommands }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.commands).toEqual(newCommands);
+      expect(data.timestamp).toBeGreaterThan(0);
+      expect(setSlashCommandsSpy).toHaveBeenCalledWith(newCommands);
+    });
+
+    it("returns 400 when commands array is missing", async () => {
+      const deps = createMockDeps();
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when body is not valid JSON", async () => {
+      const deps = createMockDeps();
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands", {
+        method: "PUT",
+        body: "not json",
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when commands contain invalid items", async () => {
+      const deps = createMockDeps();
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commands: [{ command: 123 }] }),
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 501 when setSlashCommands not provided", async () => {
+      const deps = createMockDeps({ setSlashCommands: undefined });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/settings/slash-commands", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commands: [{ command: "/test", description: "Test" }] }),
+      });
+
+      expect(res.status).toBe(501);
     });
   });
 });

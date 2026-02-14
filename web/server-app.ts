@@ -21,6 +21,8 @@ import type {
   PlansAvailabilityResponse,
   SendKeysResponse,
   SessionResponse,
+  SlashCommand,
+  SlashCommandsResponse,
   SwitchClientResponse,
 } from "../src/shared/types";
 
@@ -53,6 +55,10 @@ export interface AppDeps {
   // Plan viewer
   getPlan?: (paneId: string) => { slug: string; content: string } | null;
   getPlansAvailability?: () => Record<string, boolean>;
+
+  // Settings: slash commands
+  getSlashCommands?: () => SlashCommand[];
+  setSlashCommands?: (commands: SlashCommand[]) => SlashCommand[];
 }
 
 /**
@@ -250,6 +256,39 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         gemini_auth_error: deps.getGeminiAuthError?.() ?? false,
         gemini_backend: deps.geminiBackend ?? null,
       } satisfies AuthStatusResponse);
+    })
+
+    // GET /api/settings/slash-commands
+    .get("/api/settings/slash-commands", (c) => {
+      const commands = deps.getSlashCommands?.() ?? [];
+      return c.json({
+        commands,
+        timestamp: Date.now(),
+      } satisfies SlashCommandsResponse);
+    })
+
+    // PUT /api/settings/slash-commands
+    .put("/api/settings/slash-commands", async (c) => {
+      const body = await c.req.json().catch(() => null);
+      if (!body || !Array.isArray(body.commands)) {
+        return c.json({ error: "Request body must include a 'commands' array" }, 400);
+      }
+      for (const cmd of body.commands) {
+        if (typeof cmd.command !== "string" || typeof cmd.description !== "string") {
+          return c.json(
+            { error: "Each command must have 'command' and 'description' strings" },
+            400,
+          );
+        }
+      }
+      if (!deps.setSlashCommands) {
+        return c.json({ error: "Not available" }, 501);
+      }
+      const commands = deps.setSlashCommands(body.commands);
+      return c.json({
+        commands,
+        timestamp: Date.now(),
+      } satisfies SlashCommandsResponse);
     })
 
     // Favicon routes

@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { serveStatic } from "hono/bun";
 import { detectPaneActions } from "../src/intelligence/application/detect-actions";
@@ -16,8 +17,9 @@ import { createPlanDiscoveryDeps } from "../src/plan/infrastructure/file-operati
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
+import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
-import type { PaneContentDiff, PaneContentFull } from "../src/shared/types";
+import type { PaneContentDiff, PaneContentFull, SlashCommand } from "../src/shared/types";
 import {
   buildTmuxTarget,
   getMonitoredProcesses,
@@ -51,6 +53,41 @@ const PORT = process.env.PORT
     ? Number.parseInt(process.env.DEV_PORT, 10) + 1
     : DEFAULT_PORT;
 const HOST = process.env.HOST ?? DEFAULT_HOST;
+
+// ═══ Slash commands config ═══
+
+const CONFIG_DIR = join(homedir(), ".config", "panopticon");
+const SLASH_COMMANDS_PATH = join(CONFIG_DIR, "slash-commands.json");
+
+function isValidSlashCommand(item: unknown): item is SlashCommand {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as SlashCommand).command === "string" &&
+    typeof (item as SlashCommand).description === "string"
+  );
+}
+
+function readSlashCommands(): SlashCommand[] {
+  try {
+    if (!existsSync(SLASH_COMMANDS_PATH)) {
+      return DEFAULT_SLASH_COMMANDS;
+    }
+    const raw = readFileSync(SLASH_COMMANDS_PATH, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every(isValidSlashCommand)) {
+      return parsed;
+    }
+    return DEFAULT_SLASH_COMMANDS;
+  } catch {
+    return DEFAULT_SLASH_COMMANDS;
+  }
+}
+
+function writeSlashCommands(commands: SlashCommand[]): void {
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  writeFileSync(SLASH_COMMANDS_PATH, JSON.stringify(commands, null, 2), "utf-8");
+}
 
 // ═══ Wire dependencies ═══
 
@@ -312,6 +349,11 @@ const app = createApp(
         result[session.pane_id] = planFileExists(slug, planDeps);
       }
       return result;
+    },
+    getSlashCommands: readSlashCommands,
+    setSlashCommands: (commands) => {
+      writeSlashCommands(commands);
+      return commands;
     },
     onSseConnect: (client) => {
       clients.add(client);

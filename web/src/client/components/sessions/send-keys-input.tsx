@@ -1,3 +1,4 @@
+import { DEFAULT_SLASH_COMMANDS } from "@shared/default-slash-commands";
 import type { PaneAction } from "@shared/types";
 import { Send } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
@@ -5,6 +6,7 @@ import { toast } from "sonner";
 import { useActionDetection } from "@/hooks/use-action-detection";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSendKeys } from "@/hooks/use-send-keys";
+import { useSlashCommands } from "@/hooks/use-slash-commands";
 import { cn } from "@/lib/cn";
 import { CommandPalette } from "./command-palette";
 
@@ -20,6 +22,8 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const sendKeys = useSendKeys();
   const { action, isDetecting, detect, clear } = useActionDetection(paneId);
   const isMobile = useMediaQuery("(max-width: 639px)");
+  const { data: slashCommandsData } = useSlashCommands();
+  const slashCommands = slashCommandsData?.commands ?? DEFAULT_SLASH_COMMANDS;
 
   const hasText = text.trim().length > 0;
 
@@ -262,6 +266,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         onClose={() => setIsPaletteOpen(false)}
         onExecute={handleSlashCommand}
         isPending={sendKeys.isPending}
+        commands={slashCommands}
       />
 
       {/* Dynamic AI-detected actions */}

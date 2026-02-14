@@ -1,27 +1,8 @@
+import type { SlashCommand } from "@shared/types";
 import { Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/cn";
-
-interface SlashCommand {
-  command: string;
-  description: string;
-}
-
-const SLASH_COMMANDS: SlashCommand[] = [
-  { command: "/compact", description: "Compact conversation context" },
-  { command: "/clear", description: "Clear conversation history" },
-  { command: "/cost", description: "Show token usage and costs" },
-  { command: "/doctor", description: "Check Claude Code health" },
-  { command: "/help", description: "Show available commands" },
-  { command: "/init", description: "Initialize CLAUDE.md in project" },
-  { command: "/login", description: "Switch Anthropic accounts" },
-  { command: "/logout", description: "Sign out from Anthropic" },
-  { command: "/memory", description: "Edit CLAUDE.md memory files" },
-  { command: "/model", description: "Switch AI model" },
-  { command: "/permissions", description: "View or update tool permissions" },
-  { command: "/review", description: "Review a pull request" },
-];
 
 // --- Fuzzy matching (fzf-style) ---
 
@@ -136,9 +117,16 @@ interface CommandPaletteProps {
   onClose: () => void;
   onExecute: (command: string) => void;
   isPending: boolean;
+  commands: SlashCommand[];
 }
 
-export function CommandPalette({ isOpen, onClose, onExecute, isPending }: CommandPaletteProps) {
+export function CommandPalette({
+  isOpen,
+  onClose,
+  onExecute,
+  isPending,
+  commands,
+}: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -167,12 +155,14 @@ export function CommandPalette({ isOpen, onClose, onExecute, isPending }: Comman
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
-  // Fuzzy filter + sort by score
+  // Fuzzy filter + sort: alphabetical when no query, by score when searching
   const scoredCommands: ScoredCommand[] = !query
-    ? SLASH_COMMANDS.map((cmd) => ({ command: cmd, score: 0, commandIndices: [] }))
-    : (
-        SLASH_COMMANDS.map((cmd) => scoreCommand(query, cmd)).filter(Boolean) as ScoredCommand[]
-      ).sort((a, b) => b.score - a.score);
+    ? [...commands]
+        .sort((a, b) => a.command.localeCompare(b.command))
+        .map((cmd) => ({ command: cmd, score: 0, commandIndices: [] }))
+    : (commands.map((cmd) => scoreCommand(query, cmd)).filter(Boolean) as ScoredCommand[]).sort(
+        (a, b) => b.score - a.score,
+      );
 
   // Reset selection when filter changes
   useEffect(() => {
