@@ -6,6 +6,7 @@ import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
 import { TerminalViewer } from "@/components/sessions/terminal-viewer";
 import { StatusBadge } from "@/components/ui/badge";
+import { useDeletePlan } from "@/hooks/use-delete-plan";
 import { usePaneContent } from "@/hooks/use-pane-content";
 import { usePlan } from "@/hooks/use-plan";
 import { useSessionsQuery } from "@/hooks/use-sessions";
@@ -29,6 +30,7 @@ function SessionDetailPage() {
   const { data: paneData, isLoading: paneLoading, error: paneError } = usePaneContent(paneId);
   const { data: planData } = usePlan(paneId);
   const { data: sessionsData } = useSessionsQuery();
+  const deletePlanMutation = useDeletePlan();
 
   const session = sessionsData?.sessions.find((s) => s.pane_id === paneId);
   const hasPlan = planData?.plan != null;
@@ -37,6 +39,13 @@ function SessionDetailPage() {
     { id: "terminal" as const, label: "Terminal", icon: <SquareTerminal size={16} /> },
     ...(hasPlan ? [{ id: "plan" as const, label: "Plan", icon: <FileText size={16} /> }] : []),
   ];
+
+  // Switch to terminal tab when plan becomes unavailable (e.g. after deletion)
+  useEffect(() => {
+    if (activeTab === "plan" && !hasPlan) {
+      setActiveTab("terminal");
+    }
+  }, [activeTab, hasPlan]);
 
   // Toggle vertical-expand class on <html> to hide root header via CSS
   useEffect(() => {
@@ -135,7 +144,12 @@ function SessionDetailPage() {
       )}
 
       {activeTab === "plan" && !isExpanded && hasPlan && planData?.plan && (
-        <PlanViewer content={planData.plan.content} slug={planData.plan.slug} />
+        <PlanViewer
+          content={planData.plan.content}
+          slug={planData.plan.slug}
+          onDelete={() => deletePlanMutation.mutate({ paneId })}
+          isDeleting={deletePlanMutation.isPending}
+        />
       )}
     </>
   );

@@ -83,3 +83,13 @@ export function planFileExists(slug: string, deps: PlanDiscoveryDeps): boolean {
   const planPath = join(deps.homeDir(), ".claude", "plans", `${slug}.md`);
   return deps.fileExists(planPath);
 }
+
+/**
+ * Delete the plan file for the given slug.
+ * Returns true if the file was successfully deleted, false otherwise.
+ */
+export function deletePlan(slug: string, deps: PlanDiscoveryDeps): boolean {
+  const planPath = join(deps.homeDir(), ".claude", "plans", `${slug}.md`);
+  if (!deps.fileExists(planPath)) return false;
+  return deps.deleteFile(planPath);
+}

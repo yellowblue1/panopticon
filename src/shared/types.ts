@@ -109,6 +109,11 @@ export interface PlansAvailabilityResponse {
   timestamp: number;
 }
 
+export interface DeletePlanResponse {
+  success: boolean;
+  error?: string;
+}
+
 // Slash command configuration types
 export interface SlashCommand {
   command: string;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { PlanDiscoveryDeps } from "../domain/ports";
 import {
+  deletePlan,
   discoverPlan,
   escapeCwd,
   findSlugForCwd,
@@ -15,6 +16,7 @@ function createMockDeps(overrides: Partial<PlanDiscoveryDeps> = {}): PlanDiscove
     listDir: () => [],
     getFileMtime: () => 0,
     homeDir: () => "/home/test",
+    deleteFile: () => false,
     ...overrides,
   };
 }
@@ -194,5 +196,30 @@ describe("planFileExists", () => {
   it("returns false when plan file does not exist", () => {
     const deps = createMockDeps({ fileExists: () => false });
     expect(planFileExists("no-slug", deps)).toBe(false);
+  });
+});
+
+describe("deletePlan", () => {
+  it("returns true when plan file is deleted successfully", () => {
+    const deps = createMockDeps({
+      fileExists: (path) => path === "/home/test/.claude/plans/my-slug.md",
+      deleteFile: (path) => path === "/home/test/.claude/plans/my-slug.md",
+    });
+    expect(deletePlan("my-slug", deps)).toBe(true);
+  });
+
+  it("returns false when plan file does not exist", () => {
+    const deps = createMockDeps({
+      fileExists: () => false,
+    });
+    expect(deletePlan("nonexistent", deps)).toBe(false);
+  });
+
+  it("returns false when deleteFile fails", () => {
+    const deps = createMockDeps({
+      fileExists: () => true,
+      deleteFile: () => false,
+    });
+    expect(deletePlan("my-slug", deps)).toBe(false);
   });
 });
