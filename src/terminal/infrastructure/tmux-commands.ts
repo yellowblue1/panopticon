@@ -152,15 +152,21 @@ export function getProjectName(cwd: string, exec: ExecFn = defaultExec): string 
 
 /**
  * Get the GitHub repository HTTPS URL from the git remote origin.
- * Converts SSH URLs (git@github.com:owner/repo.git) to HTTPS format.
- * Returns null for non-GitHub repos or when git is unavailable.
+ * Handles multiple SSH URL formats and HTTPS. Returns null for
+ * non-GitHub repos or when git is unavailable.
  */
 export function getGitRemoteUrl(cwd: string, exec: ExecFn = defaultExec): string | null {
   try {
     const remoteUrl = exec(`git -C ${shellEscape(cwd)} remote get-url origin`);
 
-    // SSH format: git@github.com:owner/repo.git
-    const sshMatch = remoteUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
+    // SCP format: git@github.com:owner/repo.git
+    const scpMatch = remoteUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
+    if (scpMatch) {
+      return `https://github.com/${scpMatch[1]}`;
+    }
+
+    // SSH protocol format: ssh://git@github.com/owner/repo.git
+    const sshMatch = remoteUrl.match(/ssh:\/\/git@github\.com\/(.+?)(?:\.git)?$/);
     if (sshMatch) {
       return `https://github.com/${sshMatch[1]}`;
     }

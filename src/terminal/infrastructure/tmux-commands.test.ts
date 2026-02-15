@@ -175,8 +175,13 @@ describe("getGitBranch", () => {
 });
 
 describe("getGitRemoteUrl", () => {
-  it("converts SSH remote URL to GitHub HTTPS URL", () => {
+  it("converts SCP-style SSH remote URL to GitHub HTTPS URL", () => {
     const exec = () => "git@github.com:user/my-repo.git";
+    expect(getGitRemoteUrl("/some/path", exec)).toBe("https://github.com/user/my-repo");
+  });
+
+  it("converts ssh:// protocol URL to GitHub HTTPS URL", () => {
+    const exec = () => "ssh://git@github.com/user/my-repo.git";
     expect(getGitRemoteUrl("/some/path", exec)).toBe("https://github.com/user/my-repo");
   });
 
