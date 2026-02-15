@@ -76,6 +76,7 @@ export async function extractKnowledge(messages: ConversationMessage[]): Promise
     contents: prompt,
     config: {
       responseMimeType: "application/json",
+      httpOptions: { timeout: 120_000 },
     },
   });
 
@@ -85,5 +86,10 @@ export async function extractKnowledge(messages: ConversationMessage[]): Promise
     return [];
   }
 
-  return JSON.parse(text) as KnowledgeEntry[];
+  try {
+    return JSON.parse(text) as KnowledgeEntry[];
+  } catch {
+    console.error("Failed to parse Gemini response as JSON:", text.slice(0, 500));
+    return [];
+  }
 }

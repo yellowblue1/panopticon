@@ -61,18 +61,22 @@ export async function extractConversation(jsonlPath: string): Promise<Conversati
   const messages: ConversationMessage[] = [];
 
   for (const line of lines) {
-    const entry: JournalEntry = JSON.parse(line);
+    try {
+      const entry: JournalEntry = JSON.parse(line);
 
-    if (entry.type !== "user" && entry.type !== "assistant") continue;
-    if (!entry.message?.content) continue;
+      if (entry.type !== "user" && entry.type !== "assistant") continue;
+      if (!entry.message?.content) continue;
 
-    const content = extractTextFromContent(entry.message.content);
-    if (!content.trim()) continue;
+      const content = extractTextFromContent(entry.message.content);
+      if (!content.trim()) continue;
 
-    messages.push({
-      role: entry.message.role,
-      content,
-    });
+      messages.push({
+        role: entry.message.role,
+        content,
+      });
+    } catch {
+      console.error(`Skipping malformed line: ${line.slice(0, 100)}...`);
+    }
   }
 
   return messages;
