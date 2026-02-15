@@ -99,6 +99,7 @@ function writeSlashCommands(commands: SlashCommand[]): void {
 const builtinCommandProvider = new BuiltinCommandProvider({
   fetchText: async (url) => {
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     return res.text();
   },
   readFileSync: (path) => readFileSync(path, "utf-8"),

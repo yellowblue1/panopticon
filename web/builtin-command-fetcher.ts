@@ -141,6 +141,7 @@ export class BuiltinCommandProvider {
     this.timer = setInterval(() => {
       this.refresh();
     }, REFRESH_INTERVAL_MS);
+    this.timer.unref();
   }
 
   async refresh(): Promise<void> {
