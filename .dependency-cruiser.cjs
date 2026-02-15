@@ -96,6 +96,54 @@ module.exports = {
       from: { path: "^src/intelligence/" },
       to: { path: "^src/plan/" },
     },
+    {
+      name: "no-task-depends-on-session",
+      severity: "error",
+      from: { path: "^src/task/" },
+      to: { path: "^src/session/" },
+    },
+    {
+      name: "no-task-depends-on-terminal",
+      severity: "error",
+      from: { path: "^src/task/" },
+      to: { path: "^src/terminal/" },
+    },
+    {
+      name: "no-task-depends-on-intelligence",
+      severity: "error",
+      from: { path: "^src/task/" },
+      to: { path: "^src/intelligence/" },
+    },
+    {
+      name: "no-task-depends-on-plan",
+      severity: "error",
+      from: { path: "^src/task/" },
+      to: { path: "^src/plan/" },
+    },
+    {
+      name: "no-session-depends-on-task",
+      severity: "error",
+      from: { path: "^src/session/" },
+      to: { path: "^src/task/" },
+    },
+    {
+      name: "no-terminal-depends-on-task",
+      severity: "error",
+      from: { path: "^src/terminal/" },
+      to: { path: "^src/task/" },
+    },
+    {
+      name: "no-intelligence-depends-on-task",
+      severity: "error",
+      from: { path: "^src/intelligence/" },
+      to: { path: "^src/task/" },
+    },
+    {
+      name: "no-plan-depends-on-task",
+      severity: "error",
+      from: { path: "^src/plan/" },
+      to: { path: "^src/task/" },
+    },
 
     // ═══ SHARED KERNEL PROTECTION ═══
 
@@ -104,7 +152,7 @@ module.exports = {
       comment: "Shared kernel must not depend on any bounded context",
       severity: "error",
       from: { path: "^src/shared/" },
-      to: { path: "^src/(terminal|session|intelligence|plan)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan|task)/" },
     },
 
     // ═══ CLIENT ISOLATION ═══
@@ -114,7 +162,7 @@ module.exports = {
       comment: "React client must not import server-side code",
       severity: "error",
       from: { path: "^web/src/client/" },
-      to: { path: "^src/(terminal|session|intelligence|plan)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan|task)/" },
     },
   ],
 

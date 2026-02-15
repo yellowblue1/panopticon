@@ -26,6 +26,11 @@ import type {
   SlashCommand,
   SlashCommandsResponse,
   SwitchClientResponse,
+  TaskDeleteResponse,
+  TaskMutationResponse,
+  TaskResponse,
+  TaskStatus,
+  TasksApiResponse,
 } from "../src/shared/types";
 
 /**
@@ -64,6 +69,28 @@ export interface AppDeps {
   setSlashCommands?: (commands: SlashCommand[]) => SlashCommand[];
   discoverSlashCommands?: () => SlashCommand[];
   getBuiltinCommands?: () => SlashCommand[] | null;
+
+  // Task board
+  getTasks?: () => TaskResponse[];
+  createTask?: (input: {
+    title: string;
+    description?: string;
+    status?: TaskStatus;
+  }) => TaskResponse;
+  updateTask?: (
+    id: string,
+    input: {
+      title?: string;
+      description?: string;
+      status?: TaskStatus;
+      order?: number;
+    },
+  ) => TaskResponse | null;
+  deleteTask?: (id: string) => boolean;
+  reorderTasks?: (taskIds: string[], status: TaskStatus) => TaskResponse[];
+  onTaskSseConnect?: (client: SseClient) => void;
+  onTaskSseDisconnect?: (client: SseClient) => void;
+  serializeTasksData?: () => string;
 }
 
 /**
@@ -341,6 +368,124 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         commands,
         timestamp: Date.now(),
       } satisfies SlashCommandsResponse);
+    })
+
+    // GET /api/tasks
+    .get("/api/tasks", (_c) => {
+      const tasks = deps.getTasks?.() ?? [];
+      return _c.json({
+        tasks,
+        timestamp: Date.now(),
+      } satisfies TasksApiResponse);
+    })
+
+    // GET /api/tasks/stream (SSE — must be before :id routes)
+    .get("/api/tasks/stream", (_c) => {
+      let client: SseClient;
+
+      const stream = new ReadableStream({
+        start(controller) {
+          client = { controller };
+          deps.onTaskSseConnect?.(client);
+
+          const data = deps.serializeTasksData?.() ?? "{}";
+          controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+        },
+        cancel() {
+          deps.onTaskSseDisconnect?.(client);
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    })
+
+    // PUT /api/tasks/reorder (must be before :id routes)
+    .put("/api/tasks/reorder", async (c) => {
+      const body = await c.req.json().catch(() => null);
+      if (!body || !Array.isArray(body.taskIds) || typeof body.status !== "string") {
+        return c.json(
+          { error: "Request body must include 'taskIds' array and 'status' string" },
+          400,
+        );
+      }
+      if (!deps.reorderTasks) {
+        return c.json({ error: "Not available" }, 501);
+      }
+      const tasks = deps.reorderTasks(body.taskIds, body.status);
+      return c.json({
+        tasks,
+        timestamp: Date.now(),
+      } satisfies TasksApiResponse);
+    })
+
+    // POST /api/tasks
+    .post("/api/tasks", async (c) => {
+      const body = await c.req.json().catch(() => null);
+      if (!body || typeof body.title !== "string" || body.title.trim().length === 0) {
+        return c.json({ error: "Request body must include a non-empty 'title' string" }, 400);
+      }
+      if (!deps.createTask) {
+        return c.json({ error: "Not available" }, 501);
+      }
+      const task = deps.createTask({
+        title: body.title.trim(),
+        description: body.description,
+        status: body.status,
+      });
+      return c.json(
+        {
+          task,
+          timestamp: Date.now(),
+        } satisfies TaskMutationResponse,
+        201,
+      );
+    })
+
+    // PUT /api/tasks/:id
+    .put("/api/tasks/:id", async (c) => {
+      const body = await c.req.json().catch(() => null);
+      if (!body) {
+        return c.json({ error: "Request body is required" }, 400);
+      }
+      if (!deps.updateTask) {
+        return c.json({ error: "Not available" }, 501);
+      }
+      const id = c.req.param("id");
+      const task = deps.updateTask(id, {
+        title: body.title,
+        description: body.description,
+        status: body.status,
+        order: body.order,
+      });
+      if (!task) {
+        return c.json({ error: "Task not found" }, 404);
+      }
+      return c.json({
+        task,
+        timestamp: Date.now(),
+      } satisfies TaskMutationResponse);
+    })
+
+    // DELETE /api/tasks/:id
+    .delete("/api/tasks/:id", (c) => {
+      if (!deps.deleteTask) {
+        return c.json({ error: "Not available" }, 501);
+      }
+      const id = c.req.param("id");
+      const success = deps.deleteTask(id);
+      if (!success) {
+        return c.json({ error: "Task not found" }, 404);
+      }
+      return c.json({
+        success: true,
+        timestamp: Date.now(),
+      } satisfies TaskDeleteResponse);
     })
 
     // Favicon routes

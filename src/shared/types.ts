@@ -124,3 +124,31 @@ export interface SlashCommandsResponse {
   commands: SlashCommand[];
   timestamp: number;
 }
+
+// Task board types
+export type TaskStatus = "todo" | "in_progress" | "done";
+
+export interface TaskResponse {
+  id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TasksApiResponse {
+  tasks: TaskResponse[];
+  timestamp: number;
+}
+
+export interface TaskMutationResponse {
+  task: TaskResponse;
+  timestamp: number;
+}
+
+export interface TaskDeleteResponse {
+  success: boolean;
+  timestamp: number;
+}

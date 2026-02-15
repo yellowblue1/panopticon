@@ -22,6 +22,14 @@ import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
 import type { PaneContentDiff, PaneContentFull, SlashCommand } from "../src/shared/types";
 import {
+  createTask as createTaskFn,
+  deleteTask as deleteTaskFn,
+  getAllTasks,
+  reorderTasks as reorderTasksFn,
+  updateTask as updateTaskFn,
+} from "../src/task/application/task-manager";
+import { createTaskStorageDeps } from "../src/task/infrastructure/file-storage";
+import {
   buildTmuxTarget,
   getMonitoredProcesses,
   matchProcessesToPanes,
@@ -167,7 +175,43 @@ setInterval(() => {
       clients.delete(client);
     }
   }
+  for (const client of taskClients) {
+    try {
+      client.controller.enqueue(heartbeatMessage);
+    } catch {
+      taskClients.delete(client);
+    }
+  }
 }, SSE_HEARTBEAT_INTERVAL_MS);
+
+// ═══ Task board ═══
+
+const taskStorageDeps = createTaskStorageDeps();
+const taskClients: Set<SseClient> = new Set();
+
+function serializeTasksData(): string {
+  return JSON.stringify({
+    tasks: getAllTasks(taskStorageDeps),
+    timestamp: Date.now(),
+  });
+}
+
+function broadcastTaskUpdate() {
+  const data = serializeTasksData();
+  const message = `data: ${data}\n\n`;
+
+  for (const client of taskClients) {
+    try {
+      client.controller.enqueue(encoder.encode(message));
+    } catch {
+      taskClients.delete(client);
+    }
+  }
+}
+
+taskStorageDeps.watchFile(() => {
+  broadcastTaskUpdate();
+});
 
 // SSE clients (pane content — per-pane)
 const paneContentClients = new Map<string, Set<SseClient>>();
@@ -401,6 +445,34 @@ const app = createApp(
       }
       return discoverAllSlashCommands(cwds);
     },
+    getTasks: () => getAllTasks(taskStorageDeps),
+    createTask: (input) => {
+      const task = createTaskFn(input, taskStorageDeps);
+      broadcastTaskUpdate();
+      return task;
+    },
+    updateTask: (id, input) => {
+      const task = updateTaskFn(id, input, taskStorageDeps);
+      if (task) broadcastTaskUpdate();
+      return task;
+    },
+    deleteTask: (id) => {
+      const result = deleteTaskFn(id, taskStorageDeps);
+      if (result) broadcastTaskUpdate();
+      return result;
+    },
+    reorderTasks: (taskIds, status) => {
+      const tasks = reorderTasksFn(taskIds, status, taskStorageDeps);
+      broadcastTaskUpdate();
+      return tasks;
+    },
+    onTaskSseConnect: (client) => {
+      taskClients.add(client);
+    },
+    onTaskSseDisconnect: (client) => {
+      taskClients.delete(client);
+    },
+    serializeTasksData,
     onSseConnect: (client) => {
       clients.add(client);
     },

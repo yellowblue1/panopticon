@@ -56,6 +56,12 @@ function AppShell() {
                 Sessions
               </Link>
               <Link
+                to="/tasks"
+                className="hover:text-text-primary transition-colors [&.active]:text-accent-blue"
+              >
+                Tasks
+              </Link>
+              <Link
                 to="/settings"
                 className="hover:text-text-primary transition-colors [&.active]:text-accent-blue"
               >

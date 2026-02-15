@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsPaneIdRouteImport } from './routes/sessions/$paneId'
 
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -32,35 +38,46 @@ const SessionsPaneIdRoute = SessionsPaneIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
+  '/tasks': typeof TasksRoute
   '/sessions/$paneId': typeof SessionsPaneIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
+  '/tasks': typeof TasksRoute
   '/sessions/$paneId': typeof SessionsPaneIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
+  '/tasks': typeof TasksRoute
   '/sessions/$paneId': typeof SessionsPaneIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/sessions/$paneId'
+  fullPaths: '/' | '/settings' | '/tasks' | '/sessions/$paneId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/sessions/$paneId'
-  id: '__root__' | '/' | '/settings' | '/sessions/$paneId'
+  to: '/' | '/settings' | '/tasks' | '/sessions/$paneId'
+  id: '__root__' | '/' | '/settings' | '/tasks' | '/sessions/$paneId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SettingsRoute: typeof SettingsRoute
+  TasksRoute: typeof TasksRoute
   SessionsPaneIdRoute: typeof SessionsPaneIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SettingsRoute: SettingsRoute,
+  TasksRoute: TasksRoute,
   SessionsPaneIdRoute: SessionsPaneIdRoute,
 }
 export const routeTree = rootRouteImport
