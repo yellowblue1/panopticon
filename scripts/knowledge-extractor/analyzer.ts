@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ConversationMessage } from "./extractor";
 
-export interface KnowledgeEntry {
+interface KnowledgeEntry {
   title: string;
   symptom: string;
   root_cause: string;
@@ -87,7 +87,12 @@ export async function extractKnowledge(messages: ConversationMessage[]): Promise
   }
 
   try {
-    return JSON.parse(text) as KnowledgeEntry[];
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+      console.error("Expected JSON array from Gemini, got:", typeof parsed);
+      return [];
+    }
+    return parsed as KnowledgeEntry[];
   } catch {
     console.error("Failed to parse Gemini response as JSON:", text.slice(0, 500));
     return [];
