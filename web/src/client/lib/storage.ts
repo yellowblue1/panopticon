@@ -106,14 +106,3 @@ export async function markAllSnapshotsAsRead(paneIds: string[]): Promise<void> {
     tx.onerror = () => reject(tx.error);
   });
 }
-
-export async function setReadStatus(sessionId: string, isRead: boolean): Promise<void> {
-  const existing = await getSessionSnapshot(sessionId);
-  await setSessionSnapshot({
-    paneId: sessionId,
-    isRead,
-    lastSeenAt: isRead ? Date.now() : (existing?.lastSeenAt ?? 0),
-    contentHash: existing?.contentHash ?? "",
-    lastStatus: existing?.lastStatus ?? "",
-  });
-}

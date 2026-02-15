@@ -1,14 +1,14 @@
-import { useReadStatus } from "@/hooks/use-read-status";
-import { useSessionsQuery } from "@/hooks/use-sessions";
+import { useMemo } from "react";
+import { useReadStatusContext } from "@/contexts/read-status-context";
 
 export function useUnreadCount(): number {
-  const { data } = useSessionsQuery();
-  const paneIds = data?.sessions.map((s) => s.pane_id) ?? [];
-  const { readStatuses } = useReadStatus(paneIds);
+  const { snapshots } = useReadStatusContext();
 
-  let count = 0;
-  for (const isRead of readStatuses.values()) {
-    if (!isRead) count++;
-  }
-  return count;
+  return useMemo(() => {
+    let count = 0;
+    for (const snapshot of snapshots.values()) {
+      if (!snapshot.isRead) count++;
+    }
+    return count;
+  }, [snapshots]);
 }

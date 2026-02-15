@@ -2,10 +2,10 @@ import type { SessionsApiResponse } from "@shared/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
+import { useReadStatusContext } from "@/contexts/read-status-context";
 import { hashContent } from "@/lib/hash-content";
 import { clearNotificationTracking, showBrowserNotification } from "@/lib/notifications";
 import { authKeys, sessionKeys } from "@/lib/query-keys";
-import { setReadStatus } from "@/lib/storage";
 import { fetchSessions } from "./use-sessions";
 
 const POLL_INTERVAL_MS = 5000;
@@ -25,6 +25,7 @@ interface PreviousSessionState {
 export function useSessionsStream(): void {
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
+  const { markAsUnread } = useReadStatusContext();
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,7 +49,7 @@ export function useSessionsStream(): void {
             currentSummaryHash !== "" && currentSummaryHash !== prevState.summaryHash;
 
           if (statusChanged || summaryChanged) {
-            await setReadStatus(session.pane_id, false);
+            await markAsUnread(session.pane_id);
           }
         }
 
@@ -77,7 +78,7 @@ export function useSessionsStream(): void {
       // Invalidate auth status to pick up runtime auth error changes
       queryClient.invalidateQueries({ queryKey: authKeys.status() });
     },
-    [queryClient],
+    [queryClient, markAsUnread],
   );
 
   const pollSessions = useCallback(async () => {
