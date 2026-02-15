@@ -9,6 +9,7 @@ export interface SessionResponse {
   pane_id: string;
   project_name: string;
   git_branch: string | null;
+  github_repo_url: string | null;
   status: SessionStatus;
   summary: string | null;
   tmux_target: string;

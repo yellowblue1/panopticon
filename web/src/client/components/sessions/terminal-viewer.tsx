@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeftRight, ChevronsDown, ChevronsUp } from "lucide-reac
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
+import { linkifyHtml } from "@/lib/linkify-html";
 import {
   type CharWidthInfo,
   filterHorizontalBorders,
@@ -14,6 +15,7 @@ interface TerminalViewerProps {
   className?: string;
   isExpanded?: boolean;
   onExpandToggle?: () => void;
+  githubRepoUrl?: string | null;
 }
 
 /** Pixel tolerance for "at bottom" detection in the scroll container. */
@@ -74,6 +76,7 @@ export function TerminalViewer({
   className,
   isExpanded,
   onExpandToggle,
+  githubRepoUrl,
 }: TerminalViewerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showButton, setShowButton] = useState(false);
@@ -159,7 +162,17 @@ export function TerminalViewer({
     if (!fitWidth) {
       processed = filterHorizontalBorders(effectiveContent, cols, charWidths);
     }
-    processedHtml = converter.toHtml(processed);
+    const html = converter.toHtml(processed);
+    // URLs are linkified everywhere; PR #N references only on the last
+    // line (the status bar) to avoid false positives in scrollback history.
+    const lastNl = html.lastIndexOf("\n");
+    if (lastNl !== -1) {
+      const head = html.slice(0, lastNl);
+      const tail = html.slice(lastNl + 1);
+      processedHtml = `${linkifyHtml(head)}\n${linkifyHtml(tail, githubRepoUrl)}`;
+    } else {
+      processedHtml = linkifyHtml(html, githubRepoUrl);
+    }
   }
 
   const handleScrollToBottom = () => {
@@ -173,6 +186,17 @@ export function TerminalViewer({
     }
   };
 
+  // Handle clicks on linkified URLs via event delegation.
+  // Links rendered via dangerouslySetInnerHTML may not reliably trigger
+  // default navigation in all browsers, so we explicitly open them.
+  const handleTerminalClick = (e: React.MouseEvent) => {
+    const anchor = (e.target as HTMLElement).closest("a.terminal-link");
+    if (anchor instanceof HTMLAnchorElement) {
+      e.preventDefault();
+      window.open(anchor.href, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
       <div
@@ -182,9 +206,14 @@ export function TerminalViewer({
           fitWidth ? "overflow-x-auto" : "overflow-x-hidden",
         )}
       >
-        {/* Safe: fancy-ansi escapes all text via escape-html; source is server-controlled tmux output */}
+        {/* Safe: fancy-ansi escapes all text via escape-html; linkifyHtml only injects <a> tags from URL patterns in escaped text; source is server-controlled tmux output */}
         {processedHtml != null ? (
-          <pre className="terminal-content" dangerouslySetInnerHTML={{ __html: processedHtml }} />
+          // biome-ignore lint/a11y/useKeyWithClickEvents: links inside are natively keyboard-accessible
+          <pre
+            className="terminal-content"
+            dangerouslySetInnerHTML={{ __html: processedHtml }}
+            onClick={handleTerminalClick}
+          />
         ) : null}
       </div>
 

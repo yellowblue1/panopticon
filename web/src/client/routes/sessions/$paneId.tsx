@@ -126,6 +126,7 @@ function SessionDetailPage() {
               className={cn("pane-viewer", isExpanded && "pane-viewer--expanded")}
               isExpanded={isExpanded}
               onExpandToggle={() => setIsExpanded((prev) => !prev)}
+              githubRepoUrl={session?.github_repo_url}
             />
           )}
 
