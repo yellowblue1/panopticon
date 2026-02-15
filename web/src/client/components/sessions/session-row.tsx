@@ -3,18 +3,27 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRightToLine, FileText, SquareTerminal } from "lucide-react";
 import { useSwitchClient } from "@/hooks/use-switch-client";
 import { cn } from "@/lib/cn";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 import { AgentTypeIcon } from "../ui/agent-type-icon";
 import { StatusBadge } from "../ui/badge";
 
 interface SessionRowProps {
   session: SessionResponse;
   isRead: boolean;
+  lastSeenAt: number;
   hasPlan: boolean;
   onMarkAsRead: (paneId: string) => void;
   groupRole?: "orchestrator" | "worktree-child";
 }
 
-export function SessionRow({ session, isRead, hasPlan, onMarkAsRead, groupRole }: SessionRowProps) {
+export function SessionRow({
+  session,
+  isRead,
+  lastSeenAt,
+  hasPlan,
+  onMarkAsRead,
+  groupRole,
+}: SessionRowProps) {
   const switchClient = useSwitchClient();
 
   const handleSwitch = () => {
@@ -49,7 +58,12 @@ export function SessionRow({ session, isRead, hasPlan, onMarkAsRead, groupRole }
             </span>
           )}
           <AgentTypeIcon agentType={session.agent_type} />
-          <span className="project-name">{session.project_name}</span>
+          <div className="flex flex-col">
+            <span className="project-name">{session.project_name}</span>
+            {lastSeenAt > 0 && (
+              <span className="last-seen">Seen {formatRelativeTime(lastSeenAt)}</span>
+            )}
+          </div>
           <span className="status-badge-mobile">
             <StatusBadge variant={session.status} />
           </span>

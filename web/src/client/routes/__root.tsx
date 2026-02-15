@@ -3,6 +3,7 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { Toaster } from "@/components/ui/sonner";
+import { UnreadBadge } from "@/components/ui/unread-badge";
 import { ConnectionProvider } from "@/contexts/connection-context";
 import { useSessionsStream } from "@/hooks/use-sessions-stream";
 import { queryClient } from "@/lib/query-client";
@@ -51,9 +52,10 @@ function AppShell() {
             <nav className="flex items-center gap-4 text-sm text-text-muted">
               <Link
                 to="/"
-                className="hover:text-text-primary transition-colors [&.active]:text-accent-blue"
+                className="hover:text-text-primary transition-colors [&.active]:text-accent-blue inline-flex items-center gap-1"
               >
                 Sessions
+                <UnreadBadge />
               </Link>
               <Link
                 to="/settings"

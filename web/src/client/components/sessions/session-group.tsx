@@ -4,17 +4,19 @@ import { SessionRow } from "./session-row";
 interface SessionGroupProps {
   group: SessionGroupType;
   readStatuses: Map<string, boolean>;
+  lastSeenMap: Map<string, number>;
   plans: Record<string, boolean> | undefined;
   onMarkAsRead: (paneId: string) => void;
 }
 
-export function SessionGroup({ group, readStatuses, plans, onMarkAsRead }: SessionGroupProps) {
+export function SessionGroup({ group, readStatuses, lastSeenMap, plans, onMarkAsRead }: SessionGroupProps) {
   return (
     <>
       {group.orchestrator ? (
         <SessionRow
           session={group.orchestrator}
           isRead={readStatuses.get(group.orchestrator.pane_id) ?? false}
+          lastSeenAt={lastSeenMap.get(group.orchestrator.pane_id) ?? 0}
           hasPlan={plans?.[group.orchestrator.pane_id] ?? false}
           onMarkAsRead={onMarkAsRead}
           groupRole="orchestrator"
@@ -33,6 +35,7 @@ export function SessionGroup({ group, readStatuses, plans, onMarkAsRead }: Sessi
           key={child.pane_id}
           session={child}
           isRead={readStatuses.get(child.pane_id) ?? false}
+          lastSeenAt={lastSeenMap.get(child.pane_id) ?? 0}
           hasPlan={plans?.[child.pane_id] ?? false}
           onMarkAsRead={onMarkAsRead}
           groupRole="worktree-child"

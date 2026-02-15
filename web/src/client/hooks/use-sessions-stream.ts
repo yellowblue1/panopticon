@@ -2,6 +2,7 @@ import type { SessionsApiResponse } from "@shared/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
+import { hashContent } from "@/lib/hash-content";
 import { clearNotificationTracking, showBrowserNotification } from "@/lib/notifications";
 import { authKeys, sessionKeys } from "@/lib/query-keys";
 import { setReadStatus } from "@/lib/storage";
@@ -16,6 +17,11 @@ const RECONNECT_TIMEOUT_MS = 30000;
 const SSE_STALENESS_THRESHOLD_MS = 45_000;
 const STALENESS_CHECK_INTERVAL_MS = 15_000;
 
+interface PreviousSessionState {
+  status: string;
+  summaryHash: string;
+}
+
 export function useSessionsStream(): void {
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
@@ -24,32 +30,45 @@ export function useSessionsStream(): void {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stalenessCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageRef = useRef<number>(Date.now());
-  const previousStatusesRef = useRef(new Map<string, string>());
+  const previousStatesRef = useRef(new Map<string, PreviousSessionState>());
 
   const handleSessionsUpdate = useCallback(
     async (data: SessionsApiResponse) => {
-      const previousStatuses = previousStatusesRef.current;
+      const previousStates = previousStatesRef.current;
       const currentPaneIds = new Set<string>();
 
       for (const session of data.sessions) {
         currentPaneIds.add(session.pane_id);
-        const prevStatus = previousStatuses.get(session.pane_id);
+        const prevState = previousStates.get(session.pane_id);
+        const currentSummaryHash = hashContent(session.summary ?? "");
 
-        if (session.status === "waiting" && prevStatus !== "waiting") {
-          showBrowserNotification(session);
-          await setReadStatus(session.pane_id, false);
+        if (prevState) {
+          const statusChanged = session.status !== prevState.status;
+          const summaryChanged =
+            currentSummaryHash !== "" && currentSummaryHash !== prevState.summaryHash;
+
+          if (statusChanged || summaryChanged) {
+            await setReadStatus(session.pane_id, false);
+          }
         }
 
-        if (session.status === "busy" && prevStatus === "waiting") {
+        if (session.status === "waiting" && prevState?.status !== "waiting") {
+          showBrowserNotification(session);
+        }
+
+        if (session.status === "busy" && prevState?.status === "waiting") {
           clearNotificationTracking(session.pane_id);
         }
 
-        previousStatuses.set(session.pane_id, session.status);
+        previousStates.set(session.pane_id, {
+          status: session.status,
+          summaryHash: currentSummaryHash,
+        });
       }
 
-      for (const paneId of previousStatuses.keys()) {
+      for (const paneId of previousStates.keys()) {
         if (!currentPaneIds.has(paneId)) {
-          previousStatuses.delete(paneId);
+          previousStates.delete(paneId);
           clearNotificationTracking(paneId);
         }
       }
