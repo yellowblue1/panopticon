@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { SlashCommand } from "../src/shared/types";
@@ -8,8 +8,76 @@ function listMdFiles(dir: string): string[] {
   return readdirSync(dir).filter((f) => f.endsWith(".md"));
 }
 
-function toSlashCommand(name: string, source: "global" | "project"): SlashCommand {
+function toSlashCommand(
+  name: string,
+  source: "global" | "project" | "plugin",
+  pluginName?: string,
+): SlashCommand {
+  if (source === "plugin" && pluginName) {
+    return { command: `/${pluginName}:${name}`, description: `Plugin command (${pluginName})` };
+  }
   return { command: `/${name}`, description: `Custom command (${source})` };
+}
+
+interface PluginEntry {
+  installPath: string;
+}
+
+interface InstalledPlugins {
+  plugins: Record<string, PluginEntry[]>;
+}
+
+function parsePluginName(key: string): string {
+  const atIndex = key.indexOf("@");
+  return atIndex === -1 ? key : key.slice(0, atIndex);
+}
+
+function isInstalledPlugins(value: unknown): value is InstalledPlugins {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.plugins !== "object" || obj.plugins === null) return false;
+  return true;
+}
+
+/**
+ * Discover slash commands from installed Claude Code plugins.
+ *
+ * Reads ~/.claude/plugins/installed_plugins.json and scans each plugin's
+ * installPath + commands/ directory for .md files. Commands are namespaced
+ * as /{pluginName}:{commandName}.
+ */
+export function discoverPluginCommands(homeDir?: string): SlashCommand[] {
+  const home = homeDir ?? homedir();
+  const pluginsFile = join(home, ".claude", "plugins", "installed_plugins.json");
+
+  if (!existsSync(pluginsFile)) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(pluginsFile, "utf-8"));
+  } catch {
+    return [];
+  }
+
+  if (!isInstalledPlugins(parsed)) return [];
+
+  const commands: SlashCommand[] = [];
+
+  for (const [key, entries] of Object.entries(parsed.plugins)) {
+    if (!Array.isArray(entries) || entries.length === 0) continue;
+    const entry = entries[0];
+    if (typeof entry?.installPath !== "string") continue;
+
+    const pluginName = parsePluginName(key);
+    const commandsDir = join(entry.installPath, "commands");
+
+    for (const file of listMdFiles(commandsDir)) {
+      const name = basename(file, ".md");
+      commands.push(toSlashCommand(name, "plugin", pluginName));
+    }
+  }
+
+  return commands.sort((a, b) => a.command.localeCompare(b.command));
 }
 
 /**
@@ -74,6 +142,13 @@ export function discoverAllSlashCommands(cwds: string[], homeDir?: string): Slas
     const name = basename(file, ".md");
     if (!seen.has(name)) {
       seen.set(name, toSlashCommand(name, "global"));
+    }
+  }
+
+  for (const cmd of discoverPluginCommands(home)) {
+    const name = cmd.command.slice(1);
+    if (!seen.has(name)) {
+      seen.set(name, cmd);
     }
   }
 
