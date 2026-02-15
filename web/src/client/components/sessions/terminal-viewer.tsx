@@ -156,10 +156,9 @@ export function TerminalViewer({
   const contentWidth = effectiveContent != null ? maxContentWidth(effectiveContent) : 0;
   const contentOverflows = effectiveContent != null && contentWidth > cols;
 
-  // Only linkify the tail of the terminal output (the visible/current area).
-  // Historical scrollback (up to 500 lines) is left as plain text to reduce
-  // visual clutter from URLs that scrolled by in earlier output.
-  const LINKIFY_TAIL_LINES = 30;
+  // Only linkify the last line of the terminal output (the status bar).
+  // Historical scrollback is left as plain text to reduce visual clutter.
+  const LINKIFY_TAIL_LINES = 1;
 
   let processedHtml: string | null = null;
   if (effectiveContent != null) {
