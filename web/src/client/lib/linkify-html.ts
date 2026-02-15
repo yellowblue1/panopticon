@@ -5,7 +5,10 @@
  * - Text is escaped via escape-html (&amp; for &, &lt; for <, etc.)
  * - Only <span style="..."> tags exist (from fancy-ansi)
  *
- * Strategy: split by HTML tags, linkify only text segments, rejoin.
+ * Strategy:
+ * 1. Split by HTML tags, linkify URLs in text segments only, rejoin.
+ * 2. Linkify PR references across the full HTML (they may span multiple
+ *    <span> elements due to ANSI color codes).
  */
 
 /** Matches <span ...> and </span> tags from fancy-ansi output */
@@ -21,15 +24,21 @@ const TAG_RE = /(<[^>]+>)/;
  */
 const URL_RE = /https?:\/\/(?:[^\s<>"'&\\]|&amp;(?![a-z]+;))+/g;
 
-/** Matches PR references like "PR #57" */
-const PR_REF_RE = /\bPR\s*#(\d+)\b/g;
+/**
+ * Matches PR references like "PR #57" across <span> tag boundaries.
+ * ANSI color codes cause fancy-ansi to split "PR #57" into separate <span>
+ * elements (e.g. <span style="...">PR</span><span style="..."> </span>
+ * <span style="...">#57</span>), so the regex allows <span>/<\/span> tags
+ * and whitespace between "PR", "#", and the number.
+ */
+const TAG_FILLER = "(?:\\s|<\\/?span(?:\\s[^>]*)?>)*";
+const PR_CROSS_TAG_RE = new RegExp(`\\bPR(?:${TAG_FILLER})#(?:${TAG_FILLER})(\\d+)\\b`, "g");
 
 /** Characters to strip from end of matched URL */
 const TRAILING_PUNCT_RE = /[.,;:!?)}\]>]+$/;
 
-function linkifyText(text: string, githubRepoUrl: string | null | undefined): string {
-  // Linkify HTTP(S) URLs
-  let result = text.replace(URL_RE, (match) => {
+function linkifyUrls(text: string): string {
+  return text.replace(URL_RE, (match) => {
     // Strip trailing punctuation that's likely not part of the URL
     const trailingMatch = match.match(TRAILING_PUNCT_RE);
     const trailing = trailingMatch ? trailingMatch[0] : "";
@@ -41,29 +50,41 @@ function linkifyText(text: string, githubRepoUrl: string | null | undefined): st
     const href = url.replaceAll("&amp;", "&");
     return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="terminal-link">${url}</a>${trailing}`;
   });
+}
 
-  // Linkify PR references (only if GitHub repo URL is available)
-  if (githubRepoUrl) {
-    const baseUrl = githubRepoUrl.replace(/\/$/, "");
-    result = result.replace(PR_REF_RE, (match, prNumber) => {
-      const href = `${baseUrl}/pull/${prNumber}`;
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="terminal-link">${match}</a>`;
-    });
-  }
+function linkifyPrReferences(html: string, githubRepoUrl: string): string {
+  const baseUrl = githubRepoUrl.replace(/\/$/, "");
 
-  return result;
+  return html.replace(PR_CROSS_TAG_RE, (match, prNumber, offset) => {
+    // Skip if match is inside an already-linkified <a> tag
+    const before = html.slice(0, offset);
+    const lastAOpen = before.lastIndexOf("<a ");
+    if (lastAOpen !== -1 && before.lastIndexOf("</a>") < lastAOpen) {
+      return match;
+    }
+
+    const href = `${baseUrl}/pull/${prNumber}`;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="terminal-link">${match}</a>`;
+  });
 }
 
 export function linkifyHtml(html: string, githubRepoUrl?: string | null): string {
-  // Split into tag and text segments
+  // Step 1: Split into tag and text segments, linkify URLs in text only
   const parts = html.split(TAG_RE);
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     // Skip HTML tags and empty segments
     if (!part || part.startsWith("<")) continue;
-    parts[i] = linkifyText(part, githubRepoUrl);
+    parts[i] = linkifyUrls(part);
   }
 
-  return parts.join("");
+  let result = parts.join("");
+
+  // Step 2: Linkify PR references across the full HTML (cross-tag aware)
+  if (githubRepoUrl) {
+    result = linkifyPrReferences(result, githubRepoUrl);
+  }
+
+  return result;
 }

@@ -142,6 +142,25 @@ describe("linkifyHtml", () => {
       const result = linkifyHtml(input, "https://github.com/user/repo/");
       expect(result).toContain('href="https://github.com/user/repo/pull/5"');
     });
+
+    it("linkifies PR #N split across multiple span elements (cross-tag)", () => {
+      // Real-world case: ANSI color codes cause fancy-ansi to split "PR #59"
+      // into separate <span> elements with different styles
+      const input =
+        '<span style="color:rgb(255,204,0);">PR</span>' +
+        '<span style="color:rgb(153,153,153);"> </span>' +
+        '<span style="color:rgb(153,153,153);text-decoration:underline;">#59</span>';
+      const result = linkifyHtml(input, repoUrl);
+      expect(result).toContain('href="https://github.com/user/repo/pull/59"');
+      expect(result).toContain('class="terminal-link"');
+    });
+
+    it("linkifies PR #N split across two spans (PR and #N)", () => {
+      const input =
+        '<span style="color:yellow;">PR #</span>' + '<span style="color:green;">42</span>';
+      const result = linkifyHtml(input, repoUrl);
+      expect(result).toContain('href="https://github.com/user/repo/pull/42"');
+    });
   });
 
   describe("combined URL and PR linkification", () => {

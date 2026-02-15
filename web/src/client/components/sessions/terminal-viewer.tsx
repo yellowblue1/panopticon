@@ -198,13 +198,11 @@ export function TerminalViewer({
       >
         {/* Safe: fancy-ansi escapes all text via escape-html; linkifyHtml only injects <a> tags from URL patterns in escaped text; source is server-controlled tmux output */}
         {processedHtml != null ? (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: links inside are natively keyboard-accessible
           <pre
             className="terminal-content"
             dangerouslySetInnerHTML={{ __html: processedHtml }}
             onClick={handleTerminalClick}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleTerminalClick(e as unknown as React.MouseEvent);
-            }}
           />
         ) : null}
       </div>
