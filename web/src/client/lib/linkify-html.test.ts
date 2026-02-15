@@ -84,6 +84,14 @@ describe("linkifyHtml", () => {
       expect(result).not.toContain("\\&quot;</a>");
     });
 
+    it("does not include double-encoded &amp;quot; in URL match", () => {
+      // Double-encoded: &amp;quot; appears when code containing &quot; is displayed
+      const input = "https://example.com&amp;quot;rest";
+      const result = linkifyHtml(input);
+      expect(result).toContain('href="https://example.com"');
+      expect(result).toContain("</a>&amp;quot;rest");
+    });
+
     it("does not modify text without URLs", () => {
       const input = "No URLs here, just text.";
       expect(linkifyHtml(input)).toBe(input);
