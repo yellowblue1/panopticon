@@ -66,6 +66,24 @@ describe("linkifyHtml", () => {
       expect(result).toContain('href="http://example.com"');
     });
 
+    it("does not include HTML entities like &quot; in URL match", () => {
+      // Terminal code output: "https://example.com" → escape-html → &quot;https://example.com&quot;
+      const input = "&quot;https://example.com&quot;";
+      const result = linkifyHtml(input);
+      expect(result).toContain('href="https://example.com"');
+      // The &quot; should NOT be part of the link
+      expect(result).toBe(
+        '&quot;<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="terminal-link">https://example.com</a>&quot;',
+      );
+    });
+
+    it("does not include backslash-escaped quotes in URL match", () => {
+      const input = "\\&quot;https://example.com\\&quot;";
+      const result = linkifyHtml(input);
+      expect(result).toContain('href="https://example.com"');
+      expect(result).not.toContain("\\&quot;</a>");
+    });
+
     it("does not modify text without URLs", () => {
       const input = "No URLs here, just text.";
       expect(linkifyHtml(input)).toBe(input);

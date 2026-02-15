@@ -11,8 +11,13 @@
 /** Matches <span ...> and </span> tags from fancy-ansi output */
 const TAG_RE = /(<[^>]+>)/;
 
-/** Matches http(s) URLs in HTML-escaped text, allowing &amp; entities */
-const URL_RE = /https?:\/\/(?:[^\s<>"']|&amp;)+/g;
+/**
+ * Matches http(s) URLs in HTML-escaped text.
+ * Excludes & from the general character class so that HTML entities like
+ * &quot; &lt; &gt; properly terminate URL matching. Only &amp; (escaped &)
+ * is allowed within URLs for query parameters.
+ */
+const URL_RE = /https?:\/\/(?:[^\s<>"'&\\]|&amp;)+/g;
 
 /** Matches PR references like "PR #57" */
 const PR_REF_RE = /\bPR\s*#(\d+)\b/g;
