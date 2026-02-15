@@ -11,6 +11,9 @@ type ContentBlock =
 
 interface JournalEntry {
   type: string;
+  sessionId?: string;
+  gitBranch?: string;
+  cwd?: string;
   message?: {
     role: "user" | "assistant";
     content: string | ContentBlock[];
@@ -20,6 +23,17 @@ interface JournalEntry {
 export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+export interface SessionMetadata {
+  sessionId: string;
+  gitBranch: string;
+  projectPath: string;
+}
+
+interface ExtractionResult {
+  messages: ConversationMessage[];
+  metadata: SessionMetadata;
 }
 
 function hasSubstantiveText(content: string | ContentBlock[]): boolean {
@@ -59,11 +73,50 @@ function extractTextFromContent(content: string | ContentBlock[]): string {
   return parts.join("\n");
 }
 
-export async function extractConversation(jsonlPath: string): Promise<ConversationMessage[]> {
+function extractMetadata(lines: string[]): SessionMetadata {
+  for (const line of lines) {
+    try {
+      const entry: JournalEntry = JSON.parse(line);
+      if (entry.sessionId && entry.cwd) {
+        return {
+          sessionId: entry.sessionId,
+          gitBranch: entry.gitBranch ?? "unknown",
+          projectPath: entry.cwd,
+        };
+      }
+    } catch {
+      // skip malformed lines
+    }
+  }
+  return { sessionId: "unknown", gitBranch: "unknown", projectPath: "unknown" };
+}
+
+function mergeConsecutiveMessages(messages: ConversationMessage[]): ConversationMessage[] {
+  if (messages.length === 0) return [];
+
+  const merged: ConversationMessage[] = [{ ...messages[0] }];
+
+  for (let i = 1; i < messages.length; i++) {
+    const prev = merged[merged.length - 1];
+    const curr = messages[i];
+
+    if (curr.role === prev.role) {
+      prev.content += `\n\n${curr.content}`;
+    } else {
+      merged.push({ ...curr });
+    }
+  }
+
+  return merged;
+}
+
+export async function extractConversation(jsonlPath: string): Promise<ExtractionResult> {
   const text = await Bun.file(jsonlPath).text();
   const lines = text.split("\n").filter((line) => line.trim());
 
-  const messages: ConversationMessage[] = [];
+  const metadata = extractMetadata(lines);
+
+  const raw: ConversationMessage[] = [];
 
   for (const line of lines) {
     try {
@@ -78,7 +131,7 @@ export async function extractConversation(jsonlPath: string): Promise<Conversati
       const content = extractTextFromContent(entry.message.content);
       if (!content.trim()) continue;
 
-      messages.push({
+      raw.push({
         role: entry.message.role,
         content,
       });
@@ -87,5 +140,9 @@ export async function extractConversation(jsonlPath: string): Promise<Conversati
     }
   }
 
-  return messages;
+  console.error(`Raw messages (before merge): ${raw.length}`);
+  const messages = mergeConsecutiveMessages(raw);
+  console.error(`Merged messages: ${messages.length}`);
+
+  return { messages, metadata };
 }

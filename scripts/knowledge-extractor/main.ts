@@ -10,8 +10,7 @@ async function main() {
     process.exit(1);
   }
 
-  const file = Bun.file(jsonlPath);
-  if (!(await file.exists())) {
+  if (!(await Bun.file(jsonlPath).exists())) {
     console.error(`File not found: ${jsonlPath}`);
     process.exit(1);
   }
@@ -24,8 +23,11 @@ async function main() {
   console.error(`Using Gemini backend: ${backend}`);
 
   console.error("Extracting conversation...");
-  const messages = await extractConversation(jsonlPath);
-  console.error(`Extracted ${messages.length} messages`);
+  const { messages, metadata } = await extractConversation(jsonlPath);
+  console.error(`Session: ${metadata.sessionId}`);
+  console.error(`Branch: ${metadata.gitBranch}`);
+  console.error(`Project: ${metadata.projectPath}`);
+  console.error(`Messages: ${messages.length}`);
 
   if (messages.length === 0) {
     console.error("No conversation messages found");
@@ -34,7 +36,7 @@ async function main() {
   }
 
   console.error("Analyzing with Gemini...");
-  const knowledge = await extractKnowledge(messages);
+  const knowledge = await extractKnowledge(messages, metadata);
   console.error(`Extracted ${knowledge.length} knowledge entries`);
 
   console.log(JSON.stringify(knowledge, null, 2));
