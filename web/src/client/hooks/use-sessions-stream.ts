@@ -2,6 +2,7 @@ import type { SessionsApiResponse } from "@shared/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
+import { useNotifications } from "@/contexts/notification-context";
 import { clearNotificationTracking, showBrowserNotification } from "@/lib/notifications";
 import { authKeys, sessionKeys } from "@/lib/query-keys";
 import { setReadStatus } from "@/lib/storage";
@@ -19,6 +20,7 @@ const STALENESS_CHECK_INTERVAL_MS = 15_000;
 export function useSessionsStream(): void {
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
+  const { addNotification } = useNotifications();
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,6 +40,11 @@ export function useSessionsStream(): void {
         if (session.status === "waiting" && prevStatus !== "waiting") {
           showBrowserNotification(session);
           await setReadStatus(session.pane_id, false);
+          addNotification({
+            paneId: session.pane_id,
+            projectName: session.project_name,
+            summary: session.summary,
+          });
         }
 
         if (session.status === "busy" && prevStatus === "waiting") {
@@ -58,7 +65,7 @@ export function useSessionsStream(): void {
       // Invalidate auth status to pick up runtime auth error changes
       queryClient.invalidateQueries({ queryKey: authKeys.status() });
     },
-    [queryClient],
+    [queryClient, addNotification],
   );
 
   const pollSessions = useCallback(async () => {

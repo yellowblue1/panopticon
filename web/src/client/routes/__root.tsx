@@ -2,8 +2,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { ConnectionIndicator } from "@/components/ui/connection-indicator";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import { Toaster } from "@/components/ui/sonner";
 import { ConnectionProvider } from "@/contexts/connection-context";
+import { NotificationProvider } from "@/contexts/notification-context";
 import { useSessionsStream } from "@/hooks/use-sessions-stream";
 import { queryClient } from "@/lib/query-client";
 
@@ -17,8 +19,10 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ConnectionProvider>
-        <AppShell />
-        <Toaster />
+        <NotificationProvider>
+          <AppShell />
+          <Toaster />
+        </NotificationProvider>
       </ConnectionProvider>
     </QueryClientProvider>
   );
@@ -63,7 +67,10 @@ function AppShell() {
               </Link>
             </nav>
           </div>
-          <ConnectionIndicator />
+          <div className="flex items-center gap-4">
+            <NotificationBell />
+            <ConnectionIndicator />
+          </div>
         </header>
         <main className="flex-1 flex flex-col">
           <Outlet />
