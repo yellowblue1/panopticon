@@ -82,18 +82,6 @@ export async function setSessionSnapshot(snapshot: SessionSnapshot): Promise<voi
   });
 }
 
-export async function getAllSnapshots(): Promise<SessionSnapshot[]> {
-  const database = db;
-  if (!database) return [];
-  return new Promise((resolve) => {
-    const tx = database.transaction(SNAPSHOT_STORE, "readonly");
-    const store = tx.objectStore(SNAPSHOT_STORE);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve([]);
-  });
-}
-
 export async function markAllSnapshotsAsRead(paneIds: string[]): Promise<void> {
   const database = db;
   if (!database) return;
@@ -117,12 +105,6 @@ export async function markAllSnapshotsAsRead(paneIds: string[]): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-}
-
-// Backward-compatible wrappers used by use-sessions-stream.ts
-export async function getReadStatus(sessionId: string): Promise<boolean> {
-  const snapshot = await getSessionSnapshot(sessionId);
-  return snapshot?.isRead ?? false;
 }
 
 export async function setReadStatus(sessionId: string, isRead: boolean): Promise<void> {
