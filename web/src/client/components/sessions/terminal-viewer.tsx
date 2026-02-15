@@ -185,7 +185,7 @@ export function TerminalViewer({
           fitWidth ? "overflow-x-auto" : "overflow-x-hidden",
         )}
       >
-        {/* Safe: fancy-ansi escapes all text via escape-html; source is server-controlled tmux output */}
+        {/* Safe: fancy-ansi escapes all text via escape-html; linkifyHtml only injects <a> tags from URL patterns in escaped text; source is server-controlled tmux output */}
         {processedHtml != null ? (
           <pre className="terminal-content" dangerouslySetInnerHTML={{ __html: processedHtml }} />
         ) : null}

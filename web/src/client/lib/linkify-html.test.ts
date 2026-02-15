@@ -126,6 +126,16 @@ describe("linkifyHtml", () => {
       expect(result).toContain('href="https://github.com/user/repo/pull/57"');
     });
 
+    it("does not double-linkify a GitHub PR URL", () => {
+      const input = "See https://github.com/user/repo/pull/57 for details";
+      const result = linkifyHtml(input, "https://github.com/user/repo");
+      // URL linkification wraps the full URL; PR regex should not match inside the <a> tag
+      expect(result).toContain('href="https://github.com/user/repo/pull/57"');
+      // Should only have one <a> tag, not nested
+      const anchorCount = (result.match(/<a /g) || []).length;
+      expect(anchorCount).toBe(1);
+    });
+
     it("linkifies content with mixed spans and text", () => {
       const input =
         '<span style="color: var(--ansi-green);">Created PR #42</span> at https://example.com';

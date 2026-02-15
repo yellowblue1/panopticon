@@ -18,7 +18,7 @@ const URL_RE = /https?:\/\/(?:[^\s<>"']|&amp;)+/g;
 const PR_REF_RE = /\bPR\s*#(\d+)\b/g;
 
 /** Characters to strip from end of matched URL */
-const TRAILING_PUNCT_RE = /(?:&amp;|[.,;:!?)}\]>])+$/;
+const TRAILING_PUNCT_RE = /[.,;:!?)}\]>]+$/;
 
 function linkifyText(text: string, githubRepoUrl: string | null | undefined): string {
   // Linkify HTTP(S) URLs
