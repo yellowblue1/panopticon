@@ -3,6 +3,7 @@ import {
   capturePaneContent,
   getAllTmuxPanes,
   getGitBranch,
+  getGitRemoteUrl,
   getProcessCwd,
   getProcessStartTime,
   getProcessTable,
@@ -170,6 +171,35 @@ describe("getGitBranch", () => {
       throw new Error("not a git repo");
     };
     expect(getGitBranch("/some/path", exec)).toBeNull();
+  });
+});
+
+describe("getGitRemoteUrl", () => {
+  it("converts SSH remote URL to GitHub HTTPS URL", () => {
+    const exec = () => "git@github.com:user/my-repo.git";
+    expect(getGitRemoteUrl("/some/path", exec)).toBe("https://github.com/user/my-repo");
+  });
+
+  it("normalizes HTTPS remote URL", () => {
+    const exec = () => "https://github.com/user/my-repo.git";
+    expect(getGitRemoteUrl("/some/path", exec)).toBe("https://github.com/user/my-repo");
+  });
+
+  it("handles HTTPS URL without .git suffix", () => {
+    const exec = () => "https://github.com/user/my-repo";
+    expect(getGitRemoteUrl("/some/path", exec)).toBe("https://github.com/user/my-repo");
+  });
+
+  it("returns null for non-GitHub remote", () => {
+    const exec = () => "git@gitlab.com:user/my-repo.git";
+    expect(getGitRemoteUrl("/some/path", exec)).toBeNull();
+  });
+
+  it("returns null on failure", () => {
+    const exec = () => {
+      throw new Error("not a git repo");
+    };
+    expect(getGitRemoteUrl("/some/path", exec)).toBeNull();
   });
 });
 

@@ -151,6 +151,33 @@ export function getProjectName(cwd: string, exec: ExecFn = defaultExec): string 
 }
 
 /**
+ * Get the GitHub repository HTTPS URL from the git remote origin.
+ * Converts SSH URLs (git@github.com:owner/repo.git) to HTTPS format.
+ * Returns null for non-GitHub repos or when git is unavailable.
+ */
+export function getGitRemoteUrl(cwd: string, exec: ExecFn = defaultExec): string | null {
+  try {
+    const remoteUrl = exec(`git -C ${shellEscape(cwd)} remote get-url origin`);
+
+    // SSH format: git@github.com:owner/repo.git
+    const sshMatch = remoteUrl.match(/git@github\.com:(.+?)(?:\.git)?$/);
+    if (sshMatch) {
+      return `https://github.com/${sshMatch[1]}`;
+    }
+
+    // HTTPS format: https://github.com/owner/repo.git
+    const httpsMatch = remoteUrl.match(/^(https?:\/\/github\.com\/.+?)(?:\.git)?$/);
+    if (httpsMatch) {
+      return httpsMatch[1];
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get current git branch
  */
 export function getGitBranch(cwd: string, exec: ExecFn = defaultExec): string | null {

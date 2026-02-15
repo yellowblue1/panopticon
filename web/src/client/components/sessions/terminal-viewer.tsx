@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeftRight, ChevronsDown, ChevronsUp } from "lucide-reac
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
+import { linkifyHtml } from "@/lib/linkify-html";
 import {
   type CharWidthInfo,
   filterHorizontalBorders,
@@ -14,6 +15,7 @@ interface TerminalViewerProps {
   className?: string;
   isExpanded?: boolean;
   onExpandToggle?: () => void;
+  githubRepoUrl?: string | null;
 }
 
 /** Pixel tolerance for "at bottom" detection in the scroll container. */
@@ -74,6 +76,7 @@ export function TerminalViewer({
   className,
   isExpanded,
   onExpandToggle,
+  githubRepoUrl,
 }: TerminalViewerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showButton, setShowButton] = useState(false);
@@ -159,7 +162,7 @@ export function TerminalViewer({
     if (!fitWidth) {
       processed = filterHorizontalBorders(effectiveContent, cols, charWidths);
     }
-    processedHtml = converter.toHtml(processed);
+    processedHtml = linkifyHtml(converter.toHtml(processed), githubRepoUrl);
   }
 
   const handleScrollToBottom = () => {

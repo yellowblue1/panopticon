@@ -59,6 +59,7 @@ function createMockDeps(overrides: Partial<SessionManagerDeps> = {}): {
     getProcessStartTime: () => "2023-11-14T22:13:20.000Z",
     getProjectName: () => "my-project",
     getGitBranch: () => "main",
+    getGitRemoteUrl: () => "https://github.com/user/my-project",
     buildTmuxTarget: (pane) => `${pane.session_name}:${pane.window_index}.${pane.pane_index}`,
     matchProcessesToPanes: (processes, panes, _processTable) => {
       const paneByPid = new Map<number, TmuxPane>();

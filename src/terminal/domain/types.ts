@@ -9,6 +9,7 @@ export interface SessionState {
   cwd: string;
   project_name: string;
   git_branch: string | null;
+  github_repo_url: string | null;
   status: "busy" | "waiting";
   summary: string | null;
   tmux_target: string;

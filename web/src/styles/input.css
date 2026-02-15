@@ -315,6 +315,20 @@ body {
   -webkit-user-select: text;
 }
 
+/* Terminal link styles */
+.terminal-content a.terminal-link {
+  color: var(--color-accent-blue);
+  text-decoration: underline;
+  text-decoration-color: rgba(88, 166, 255, 0.4);
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.terminal-content a.terminal-link:hover {
+  text-decoration-color: var(--color-accent-blue);
+}
+
 /* Fit-width: disable wrapping so content extends to its natural width */
 .pane-viewer--fit-width .terminal-content {
   white-space: pre;
