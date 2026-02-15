@@ -22,6 +22,11 @@ export interface ConversationMessage {
   content: string;
 }
 
+function hasSubstantiveText(content: string | ContentBlock[]): boolean {
+  if (typeof content === "string") return content.trim().length > 0;
+  return content.some((block) => block.type === "text" && block.text.trim().length > 0);
+}
+
 function extractTextFromContent(content: string | ContentBlock[]): string {
   if (typeof content === "string") return content;
 
@@ -66,6 +71,9 @@ export async function extractConversation(jsonlPath: string): Promise<Conversati
 
       if (entry.type !== "user" && entry.type !== "assistant") continue;
       if (!entry.message?.content) continue;
+
+      // Skip messages with no substantive text (e.g. assistant messages with only tool calls)
+      if (!hasSubstantiveText(entry.message.content)) continue;
 
       const content = extractTextFromContent(entry.message.content);
       if (!content.trim()) continue;
