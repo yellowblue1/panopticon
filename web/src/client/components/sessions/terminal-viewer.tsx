@@ -156,13 +156,26 @@ export function TerminalViewer({
   const contentWidth = effectiveContent != null ? maxContentWidth(effectiveContent) : 0;
   const contentOverflows = effectiveContent != null && contentWidth > cols;
 
+  // Only linkify the tail of the terminal output (the visible/current area).
+  // Historical scrollback (up to 500 lines) is left as plain text to reduce
+  // visual clutter from URLs that scrolled by in earlier output.
+  const LINKIFY_TAIL_LINES = 30;
+
   let processedHtml: string | null = null;
   if (effectiveContent != null) {
     let processed = effectiveContent;
     if (!fitWidth) {
       processed = filterHorizontalBorders(effectiveContent, cols, charWidths);
     }
-    processedHtml = linkifyHtml(converter.toHtml(processed), githubRepoUrl);
+    const html = converter.toHtml(processed);
+    const lines = html.split("\n");
+    if (lines.length > LINKIFY_TAIL_LINES) {
+      const head = lines.slice(0, -LINKIFY_TAIL_LINES).join("\n");
+      const tail = lines.slice(-LINKIFY_TAIL_LINES).join("\n");
+      processedHtml = `${head}\n${linkifyHtml(tail, githubRepoUrl)}`;
+    } else {
+      processedHtml = linkifyHtml(html, githubRepoUrl);
+    }
   }
 
   const handleScrollToBottom = () => {
