@@ -176,6 +176,17 @@ export function TerminalViewer({
     }
   };
 
+  // Handle clicks on linkified URLs via event delegation.
+  // Links rendered via dangerouslySetInnerHTML may not reliably trigger
+  // default navigation in all browsers, so we explicitly open them.
+  const handleTerminalClick = (e: React.MouseEvent) => {
+    const anchor = (e.target as HTMLElement).closest("a.terminal-link");
+    if (anchor instanceof HTMLAnchorElement) {
+      e.preventDefault();
+      window.open(anchor.href, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
       <div
@@ -187,7 +198,14 @@ export function TerminalViewer({
       >
         {/* Safe: fancy-ansi escapes all text via escape-html; linkifyHtml only injects <a> tags from URL patterns in escaped text; source is server-controlled tmux output */}
         {processedHtml != null ? (
-          <pre className="terminal-content" dangerouslySetInnerHTML={{ __html: processedHtml }} />
+          <pre
+            className="terminal-content"
+            dangerouslySetInnerHTML={{ __html: processedHtml }}
+            onClick={handleTerminalClick}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleTerminalClick(e as unknown as React.MouseEvent);
+            }}
+          />
         ) : null}
       </div>
 
