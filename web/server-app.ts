@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import type {
   AuthStatusResponse,
   DeletePlanResponse,
@@ -61,6 +62,8 @@ export interface AppDeps {
   // Settings: slash commands
   getSlashCommands?: () => SlashCommand[];
   setSlashCommands?: (commands: SlashCommand[]) => SlashCommand[];
+  discoverSlashCommands?: () => SlashCommand[];
+  getBuiltinCommands?: () => SlashCommand[] | null;
 }
 
 /**
@@ -283,9 +286,35 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
     // GET /api/settings/slash-commands
     .get("/api/settings/slash-commands", (c) => {
-      const commands = deps.getSlashCommands?.() ?? [];
+      const configured = deps.getSlashCommands?.() ?? [];
+      const discovered = deps.discoverSlashCommands?.() ?? [];
+      const builtin = deps.getBuiltinCommands?.() ?? DEFAULT_SLASH_COMMANDS;
+
+      // Priority: configured > discovered > builtin (fetched or hardcoded defaults)
+      const seen = new Set<string>();
+      const merged: SlashCommand[] = [];
+
+      for (const cmd of configured) {
+        if (!seen.has(cmd.command)) {
+          seen.add(cmd.command);
+          merged.push(cmd);
+        }
+      }
+      for (const cmd of discovered) {
+        if (!seen.has(cmd.command)) {
+          seen.add(cmd.command);
+          merged.push(cmd);
+        }
+      }
+      for (const cmd of builtin) {
+        if (!seen.has(cmd.command)) {
+          seen.add(cmd.command);
+          merged.push(cmd);
+        }
+      }
+
       return c.json({
-        commands,
+        commands: merged,
         timestamp: Date.now(),
       } satisfies SlashCommandsResponse);
     })
