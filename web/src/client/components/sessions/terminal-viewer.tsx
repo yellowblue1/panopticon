@@ -156,10 +156,6 @@ export function TerminalViewer({
   const contentWidth = effectiveContent != null ? maxContentWidth(effectiveContent) : 0;
   const contentOverflows = effectiveContent != null && contentWidth > cols;
 
-  // Only linkify the last line of the terminal output (the status bar).
-  // Historical scrollback is left as plain text to reduce visual clutter.
-  const LINKIFY_TAIL_LINES = 1;
-
   let processedHtml: string | null = null;
   if (effectiveContent != null) {
     let processed = effectiveContent;
@@ -167,11 +163,13 @@ export function TerminalViewer({
       processed = filterHorizontalBorders(effectiveContent, cols, charWidths);
     }
     const html = converter.toHtml(processed);
-    const lines = html.split("\n");
-    if (lines.length > LINKIFY_TAIL_LINES) {
-      const head = lines.slice(0, -LINKIFY_TAIL_LINES).join("\n");
-      const tail = lines.slice(-LINKIFY_TAIL_LINES).join("\n");
-      processedHtml = `${head}\n${linkifyHtml(tail, githubRepoUrl)}`;
+    // URLs are linkified everywhere; PR #N references only on the last
+    // line (the status bar) to avoid false positives in scrollback history.
+    const lastNl = html.lastIndexOf("\n");
+    if (lastNl !== -1) {
+      const head = html.slice(0, lastNl);
+      const tail = html.slice(lastNl + 1);
+      processedHtml = `${linkifyHtml(head)}\n${linkifyHtml(tail, githubRepoUrl)}`;
     } else {
       processedHtml = linkifyHtml(html, githubRepoUrl);
     }
