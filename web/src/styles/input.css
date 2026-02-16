@@ -100,6 +100,7 @@ body {
 
 .sessions-table tbody tr {
   @apply transition-colors;
+  border-left: 3px solid var(--color-accent-blue);
 }
 
 .sessions-table tbody tr:hover {
@@ -107,7 +108,12 @@ body {
 }
 
 .sessions-table tbody tr.read {
-  @apply opacity-70;
+  @apply opacity-60;
+  border-left-color: transparent;
+}
+
+.sessions-table tbody tr:not(.read) .project-name {
+  @apply font-semibold;
 }
 
 /* Session grouping — orchestrator / worktree hierarchy */
@@ -221,6 +227,29 @@ body {
 
 .action-btn svg {
   @apply w-5 h-5 shrink-0;
+}
+
+/* Unread badge (nav pill) */
+.unread-badge {
+  @apply inline-flex items-center justify-center rounded-full bg-accent-blue text-bg-primary font-semibold leading-none ml-1.5 px-1;
+  min-width: 18px;
+  height: 18px;
+  font-size: 0.6875rem;
+}
+
+/* Mark all as read button */
+.mark-all-read-btn {
+  @apply flex items-center gap-1.5 bg-transparent border border-border-default rounded-md text-text-muted text-xs cursor-pointer transition-colors;
+  padding: 6px 12px;
+}
+
+.mark-all-read-btn:hover {
+  @apply bg-bg-secondary text-text-primary;
+}
+
+/* Last-seen timestamp */
+.last-seen {
+  @apply text-text-muted text-xs leading-tight;
 }
 
 /* Toast */
@@ -629,6 +658,11 @@ html.vertical-expand [data-app-shell] {
     border-radius: 10px;
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border-default);
+    border-left: 3px solid var(--color-accent-blue);
+  }
+
+  .sessions-table tbody tr.read {
+    border-left-color: transparent;
   }
 
   .sessions-table tbody tr:hover {

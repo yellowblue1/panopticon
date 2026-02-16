@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { useDeletePlan } from "@/hooks/use-delete-plan";
 import { usePaneContent } from "@/hooks/use-pane-content";
 import { usePlan } from "@/hooks/use-plan";
+import { useReadStatus } from "@/hooks/use-read-status";
 import { useSessionsQuery } from "@/hooks/use-sessions";
 import { cn } from "@/lib/cn";
 
@@ -34,6 +35,13 @@ function SessionDetailPage() {
 
   const session = sessionsData?.sessions.find((s) => s.pane_id === paneId);
   const hasPlan = planData?.plan != null;
+  const paneIdArray = [paneId];
+  const { markAsRead } = useReadStatus(paneIdArray);
+
+  // Mark session as read when detail page is opened
+  useEffect(() => {
+    markAsRead(paneId);
+  }, [paneId, markAsRead]);
 
   const tabs = [
     { id: "terminal" as const, label: "Terminal", icon: <SquareTerminal size={16} /> },

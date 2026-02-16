@@ -1,10 +1,11 @@
 import type { SessionsApiResponse } from "@shared/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
+import { useReadStatusContext } from "@/contexts/read-status-context";
+import { hashContent } from "@/lib/hash-content";
 import { clearNotificationTracking, showBrowserNotification } from "@/lib/notifications";
 import { authKeys, sessionKeys } from "@/lib/query-keys";
-import { setReadStatus } from "@/lib/storage";
 import { fetchSessions } from "./use-sessions";
 
 const POLL_INTERVAL_MS = 5000;
@@ -16,68 +17,89 @@ const RECONNECT_TIMEOUT_MS = 30000;
 const SSE_STALENESS_THRESHOLD_MS = 45_000;
 const STALENESS_CHECK_INTERVAL_MS = 15_000;
 
+interface PreviousSessionState {
+  status: string;
+  summaryHash: string;
+}
+
 export function useSessionsStream(): void {
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
+  const { batchMarkAsUnread } = useReadStatusContext();
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stalenessCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageRef = useRef<number>(Date.now());
-  const previousStatusesRef = useRef(new Map<string, string>());
+  const previousStatesRef = useRef(new Map<string, PreviousSessionState>());
 
-  const handleSessionsUpdate = useCallback(
-    async (data: SessionsApiResponse) => {
-      const previousStatuses = previousStatusesRef.current;
-      const currentPaneIds = new Set<string>();
+  const handleSessionsUpdate = async (data: SessionsApiResponse) => {
+    const previousStates = previousStatesRef.current;
+    const currentPaneIds = new Set<string>();
+    const changedPaneIds: string[] = [];
 
-      for (const session of data.sessions) {
-        currentPaneIds.add(session.pane_id);
-        const prevStatus = previousStatuses.get(session.pane_id);
+    for (const session of data.sessions) {
+      currentPaneIds.add(session.pane_id);
+      const prevState = previousStates.get(session.pane_id);
+      const currentSummaryHash = hashContent(session.summary ?? "");
 
-        if (session.status === "waiting" && prevStatus !== "waiting") {
-          showBrowserNotification(session);
-          await setReadStatus(session.pane_id, false);
-        }
+      if (prevState) {
+        const statusChanged = session.status !== prevState.status;
+        const summaryChanged =
+          currentSummaryHash !== "" && currentSummaryHash !== prevState.summaryHash;
 
-        if (session.status === "busy" && prevStatus === "waiting") {
-          clearNotificationTracking(session.pane_id);
-        }
-
-        previousStatuses.set(session.pane_id, session.status);
-      }
-
-      for (const paneId of previousStatuses.keys()) {
-        if (!currentPaneIds.has(paneId)) {
-          previousStatuses.delete(paneId);
-          clearNotificationTracking(paneId);
+        if (statusChanged || summaryChanged) {
+          changedPaneIds.push(session.pane_id);
         }
       }
 
-      queryClient.setQueryData<SessionsApiResponse>(sessionKeys.lists(), data);
-      // Invalidate auth status to pick up runtime auth error changes
-      queryClient.invalidateQueries({ queryKey: authKeys.status() });
-    },
-    [queryClient],
-  );
+      if (session.status === "waiting" && prevState?.status !== "waiting") {
+        showBrowserNotification(session);
+      }
 
-  const pollSessions = useCallback(async () => {
+      if (session.status === "busy" && prevState?.status === "waiting") {
+        clearNotificationTracking(session.pane_id);
+      }
+
+      previousStates.set(session.pane_id, {
+        status: session.status,
+        summaryHash: currentSummaryHash,
+      });
+    }
+
+    for (const paneId of previousStates.keys()) {
+      if (!currentPaneIds.has(paneId)) {
+        previousStates.delete(paneId);
+        clearNotificationTracking(paneId);
+      }
+    }
+
+    if (changedPaneIds.length > 0) {
+      await batchMarkAsUnread(changedPaneIds);
+    }
+
+    queryClient.setQueryData<SessionsApiResponse>(sessionKeys.lists(), data);
+    // Invalidate auth status to pick up runtime auth error changes
+    queryClient.invalidateQueries({ queryKey: authKeys.status() });
+  };
+
+  const pollSessions = async () => {
     try {
       const data = await fetchSessions();
       await handleSessionsUpdate(data);
     } catch {
       // Polling error, will retry on next interval
     }
-  }, [handleSessionsUpdate]);
+  };
 
-  const clearStalenessCheck = useCallback(() => {
+  const clearStalenessCheck = () => {
     if (stalenessCheckRef.current) {
       clearInterval(stalenessCheckRef.current);
       stalenessCheckRef.current = null;
     }
-  }, []);
+  };
 
-  const connectSSE = useCallback(() => {
+  const connectSSE = () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
@@ -140,7 +162,7 @@ export function useSessionsStream(): void {
         }
       }, RECONNECT_TIMEOUT_MS);
     };
-  }, [setStatus, handleSessionsUpdate, pollSessions, clearStalenessCheck]);
+  };
 
   useEffect(() => {
     connectSSE();

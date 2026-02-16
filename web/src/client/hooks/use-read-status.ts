@@ -1,45 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
-import { getReadStatus, initDb, setReadStatus } from "@/lib/storage";
+import { useEffect } from "react";
+import { useReadStatusContext } from "@/contexts/read-status-context";
 
-export function useReadStatus(paneIds: string[]) {
-  const [readStatuses, setReadStatuses] = useState<Map<string, boolean>>(new Map());
-  const [dbReady, setDbReady] = useState(false);
+interface ReadStatusResult {
+  readStatuses: Map<string, boolean>;
+  lastSeenMap: Map<string, number>;
+  markAsRead: (paneId: string) => Promise<void>;
+  markAsUnread: (paneId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+}
+
+export function useReadStatus(paneIds: string[]): ReadStatusResult {
+  const { snapshots, markAsRead, markAsUnread, markAllAsRead, loadSnapshots } =
+    useReadStatusContext();
 
   useEffect(() => {
-    initDb().then(() => {
-      setDbReady(true);
-    });
-  }, []);
+    loadSnapshots(paneIds);
+  }, [paneIds, loadSnapshots]);
 
-  useEffect(() => {
-    if (!dbReady || paneIds.length === 0) return;
+  const readStatuses = new Map<string, boolean>();
+  for (const [id, snapshot] of snapshots) {
+    readStatuses.set(id, snapshot.isRead);
+  }
 
-    Promise.all(paneIds.map((id) => getReadStatus(id))).then((statuses) => {
-      const map = new Map<string, boolean>();
-      for (let i = 0; i < paneIds.length; i++) {
-        map.set(paneIds[i], statuses[i]);
-      }
-      setReadStatuses(map);
-    });
-  }, [dbReady, paneIds]);
+  const lastSeenMap = new Map<string, number>();
+  for (const [id, snapshot] of snapshots) {
+    lastSeenMap.set(id, snapshot.lastSeenAt);
+  }
 
-  const markAsRead = useCallback(async (paneId: string) => {
-    await setReadStatus(paneId, true);
-    setReadStatuses((prev) => {
-      const next = new Map(prev);
-      next.set(paneId, true);
-      return next;
-    });
-  }, []);
+  const boundMarkAllAsRead = () => markAllAsRead(paneIds);
 
-  const markAsUnread = useCallback(async (paneId: string) => {
-    await setReadStatus(paneId, false);
-    setReadStatuses((prev) => {
-      const next = new Map(prev);
-      next.set(paneId, false);
-      return next;
-    });
-  }, []);
-
-  return { readStatuses, markAsRead, markAsUnread };
+  return { readStatuses, lastSeenMap, markAsRead, markAsUnread, markAllAsRead: boundMarkAllAsRead };
 }
