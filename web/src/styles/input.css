@@ -110,6 +110,31 @@ body {
   @apply opacity-70;
 }
 
+/* Session grouping — orchestrator / worktree hierarchy */
+.row-orchestrator {
+  border-left: 3px solid var(--color-accent-blue);
+}
+
+.row-worktree-child {
+  border-left: 3px solid var(--color-border-muted);
+}
+
+.row-worktree-child .col-project {
+  padding-left: 32px;
+}
+
+.worktree-indent {
+  @apply text-text-muted text-sm font-mono select-none;
+}
+
+.orphan-group-header td {
+  @apply py-2 px-[18px] bg-bg-secondary text-text-muted text-sm italic border-b border-border-muted;
+}
+
+.orphan-label {
+  @apply ml-2 text-xs;
+}
+
 /* Column widths — flexible with minimum constraints */
 .col-project {
   width: 20%;
@@ -697,5 +722,30 @@ html.vertical-expand [data-app-shell] {
 
   .plan-content pre code {
     font-size: 0.75rem;
+  }
+
+  /* Session grouping — mobile card adjustments */
+  .sessions-table tbody tr.row-orchestrator {
+    border-left: 3px solid var(--color-accent-blue);
+  }
+
+  .sessions-table tbody tr.row-worktree-child {
+    margin-left: 16px;
+    border-left: 3px solid var(--color-border-muted);
+  }
+
+  .row-worktree-child .col-project {
+    padding-left: 0;
+  }
+
+  .sessions-table tbody tr.orphan-group-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+  }
+
+  .sessions-table tbody tr.orphan-group-header td {
+    padding: 0;
+    border: none;
   }
 }
