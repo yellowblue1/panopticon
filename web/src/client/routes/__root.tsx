@@ -56,6 +56,12 @@ function AppShell() {
                 Sessions
               </Link>
               <Link
+                to="/launcher"
+                className="hover:text-text-primary transition-colors [&.active]:text-accent-blue"
+              >
+                Launcher
+              </Link>
+              <Link
                 to="/settings"
                 className="hover:text-text-primary transition-colors [&.active]:text-accent-blue"
               >

@@ -97,6 +97,56 @@ module.exports = {
       to: { path: "^src/plan/" },
     },
 
+    // Launcher isolation
+    {
+      name: "no-launcher-depends-on-session",
+      severity: "error",
+      from: { path: "^src/launcher/" },
+      to: { path: "^src/session/" },
+    },
+    {
+      name: "no-launcher-depends-on-terminal",
+      severity: "error",
+      from: { path: "^src/launcher/" },
+      to: { path: "^src/terminal/" },
+    },
+    {
+      name: "no-launcher-depends-on-intelligence",
+      severity: "error",
+      from: { path: "^src/launcher/" },
+      to: { path: "^src/intelligence/" },
+    },
+    {
+      name: "no-launcher-depends-on-plan",
+      severity: "error",
+      from: { path: "^src/launcher/" },
+      to: { path: "^src/plan/" },
+    },
+    {
+      name: "no-session-depends-on-launcher",
+      severity: "error",
+      from: { path: "^src/session/" },
+      to: { path: "^src/launcher/" },
+    },
+    {
+      name: "no-terminal-depends-on-launcher",
+      severity: "error",
+      from: { path: "^src/terminal/" },
+      to: { path: "^src/launcher/" },
+    },
+    {
+      name: "no-intelligence-depends-on-launcher",
+      severity: "error",
+      from: { path: "^src/intelligence/" },
+      to: { path: "^src/launcher/" },
+    },
+    {
+      name: "no-plan-depends-on-launcher",
+      severity: "error",
+      from: { path: "^src/plan/" },
+      to: { path: "^src/launcher/" },
+    },
+
     // ═══ SHARED KERNEL PROTECTION ═══
 
     {
@@ -104,7 +154,7 @@ module.exports = {
       comment: "Shared kernel must not depend on any bounded context",
       severity: "error",
       from: { path: "^src/shared/" },
-      to: { path: "^src/(terminal|session|intelligence|plan)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan|launcher)/" },
     },
 
     // ═══ CLIENT ISOLATION ═══
@@ -114,7 +164,7 @@ module.exports = {
       comment: "React client must not import server-side code",
       severity: "error",
       from: { path: "^web/src/client/" },
-      to: { path: "^src/(terminal|session|intelligence|plan)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan|launcher)/" },
     },
   ],
 

@@ -125,3 +125,33 @@ export interface SlashCommandsResponse {
   commands: SlashCommand[];
   timestamp: number;
 }
+
+// Launcher types
+export interface ProjectResponse {
+  name: string;
+  path: string;
+  gitBranch: string | null;
+  gitRemoteUrl: string | null;
+}
+
+export interface ProjectsApiResponse {
+  projects: ProjectResponse[];
+  timestamp: number;
+}
+
+export interface LaunchResponse {
+  success: boolean;
+  sessionName: string;
+  paneId: string | null;
+  error?: string;
+}
+
+export interface LauncherConfigData {
+  scanPaths: string[];
+  useGhq: boolean;
+}
+
+export interface LauncherConfigResponse {
+  config: LauncherConfigData;
+  timestamp: number;
+}
