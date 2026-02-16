@@ -1,29 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import type { LauncherDeps } from "../domain/ports";
+import { createMockLauncherDeps } from "../__tests__";
 import type { LauncherConfig } from "../domain/types";
 import { DEFAULT_LAUNCHER_CONFIG, getLauncherConfig, updateLauncherConfig } from "./manage-config";
-
-function createMockDeps(overrides: Partial<LauncherDeps> = {}): LauncherDeps {
-  return {
-    readDir: () => [],
-    isDirectory: () => true,
-    pathExists: () => true,
-    resolvePath: (p) => p,
-    homeDir: () => "/home/test",
-    getProjectName: (cwd) => cwd.split("/").pop() ?? "unknown",
-    getGitBranch: () => null,
-    getGitRemoteUrl: () => null,
-    ghqRoot: () => null,
-    ghqList: () => [],
-    tmuxNewSession: () => null,
-    tmuxNewWindow: () => null,
-    tmuxListSessionNames: () => [],
-    tmuxSendKeys: () => {},
-    readConfig: () => DEFAULT_LAUNCHER_CONFIG,
-    writeConfig: () => {},
-    ...overrides,
-  };
-}
 
 describe("DEFAULT_LAUNCHER_CONFIG", () => {
   it("has empty scan paths", () => {
@@ -41,13 +19,13 @@ describe("getLauncherConfig", () => {
       scanPaths: ["/home/test/src"],
       useGhq: false,
     };
-    const deps = createMockDeps({ readConfig: () => config });
+    const deps = createMockLauncherDeps({ readConfig: () => config });
 
     expect(getLauncherConfig(deps)).toEqual(config);
   });
 
   it("returns default config when deps returns default", () => {
-    const deps = createMockDeps();
+    const deps = createMockLauncherDeps();
     expect(getLauncherConfig(deps)).toEqual(DEFAULT_LAUNCHER_CONFIG);
   });
 });
@@ -55,7 +33,7 @@ describe("getLauncherConfig", () => {
 describe("updateLauncherConfig", () => {
   it("writes config via deps and returns it", () => {
     let writtenConfig: LauncherConfig | undefined;
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       writeConfig: (config) => {
         writtenConfig = config;
       },

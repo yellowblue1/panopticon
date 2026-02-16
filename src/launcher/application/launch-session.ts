@@ -26,6 +26,10 @@ export function launchSession(config: LaunchConfig, deps: LauncherDeps): LaunchR
     };
   }
 
+  const defaultBranch = deps.getDefaultBranch(config.projectPath);
+  if (defaultBranch) {
+    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch}`);
+  }
   deps.tmuxSendKeys(paneId, config.agentType);
 
   return {

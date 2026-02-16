@@ -63,11 +63,18 @@ export function createLauncherDeps(infraDeps: LauncherInfraDeps): LauncherDeps {
 
     resolvePath: (path) => resolve(path.replace(/^~/, homedir())),
 
-    homeDir: () => homedir(),
-
     getProjectName: infraDeps.getProjectName,
     getGitBranch: infraDeps.getGitBranch,
     getGitRemoteUrl: infraDeps.getGitRemoteUrl,
+
+    getDefaultBranch: (cwd) => {
+      try {
+        const ref = execCommand(`git -C ${shellEscape(cwd)} symbolic-ref refs/remotes/origin/HEAD`);
+        return ref.replace("refs/remotes/origin/", "");
+      } catch {
+        return null;
+      }
+    },
 
     ghqRoot: () => {
       try {
@@ -88,9 +95,11 @@ export function createLauncherDeps(infraDeps: LauncherInfraDeps): LauncherDeps {
 
     tmuxNewSession: (name, cwd) => {
       try {
-        return execCommand(
+        const paneId = execCommand(
           `tmux new-session -d -s ${shellEscape(name)} -c ${shellEscape(cwd)} -PF '#{pane_id}'`,
         );
+        execCommand("sleep 0.5");
+        return paneId;
       } catch {
         return null;
       }
@@ -98,9 +107,11 @@ export function createLauncherDeps(infraDeps: LauncherInfraDeps): LauncherDeps {
 
     tmuxNewWindow: (sessionName, cwd) => {
       try {
-        return execCommand(
+        const paneId = execCommand(
           `tmux new-window -t ${shellEscape(sessionName)} -c ${shellEscape(cwd)} -PF '#{pane_id}'`,
         );
+        execCommand("sleep 0.5");
+        return paneId;
       } catch {
         return null;
       }
@@ -117,7 +128,9 @@ export function createLauncherDeps(infraDeps: LauncherInfraDeps): LauncherDeps {
 
     tmuxSendKeys: (paneId, text) => {
       const target = shellEscape(paneId);
-      execCommand(`tmux send-keys -t ${target} -l ${shellEscape(text)}`);
+      const escaped = shellEscape(text);
+      execCommand(`printf '%s' ${escaped} | tmux load-buffer -b panopticon-launch -`);
+      execCommand(`tmux paste-buffer -b panopticon-launch -t ${target} -d`);
       execCommand(`tmux send-keys -t ${target} Enter`);
     },
 

@@ -1,28 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { LauncherDeps } from "../domain/ports";
+import { createMockLauncherDeps } from "../__tests__";
 import { generateSessionName, launchSession } from "./launch-session";
-
-function createMockDeps(overrides: Partial<LauncherDeps> = {}): LauncherDeps {
-  return {
-    readDir: () => [],
-    isDirectory: () => true,
-    pathExists: () => true,
-    resolvePath: (p) => p,
-    homeDir: () => "/home/test",
-    getProjectName: (cwd) => cwd.split("/").pop() ?? "unknown",
-    getGitBranch: () => null,
-    getGitRemoteUrl: () => null,
-    ghqRoot: () => null,
-    ghqList: () => [],
-    tmuxNewSession: () => "%0",
-    tmuxNewWindow: () => "%1",
-    tmuxListSessionNames: () => [],
-    tmuxSendKeys: () => {},
-    readConfig: () => ({ scanPaths: [], useGhq: true }),
-    writeConfig: () => {},
-    ...overrides,
-  };
-}
 
 describe("generateSessionName", () => {
   it("generates name from directory basename and agent type", () => {
@@ -53,16 +31,16 @@ describe("generateSessionName", () => {
 describe("launchSession", () => {
   it("creates a new tmux session when session name does not exist", () => {
     let createdSession: { name: string; cwd: string } | undefined;
-    let sentKeys: { paneId: string; text: string } | undefined;
+    const sentKeys: { paneId: string; text: string }[] = [];
 
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       tmuxListSessionNames: () => [],
       tmuxNewSession: (name, cwd) => {
         createdSession = { name, cwd };
         return "%0";
       },
       tmuxSendKeys: (paneId, text) => {
-        sentKeys = { paneId, text };
+        sentKeys.push({ paneId, text });
       },
     });
 
@@ -76,13 +54,13 @@ describe("launchSession", () => {
     expect(result.paneId).toBe("%0");
     expect(result.error).toBeUndefined();
     expect(createdSession).toEqual({ name: "app-claude", cwd: "/home/test/src/app" });
-    expect(sentKeys).toEqual({ paneId: "%0", text: "claude" });
+    expect(sentKeys).toEqual([{ paneId: "%0", text: "claude" }]);
   });
 
   it("creates a new window when session name already exists", () => {
     let createdWindow: { session: string; cwd: string } | undefined;
 
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       tmuxListSessionNames: () => ["app-claude"],
       tmuxNewWindow: (session, cwd) => {
         createdWindow = { session, cwd };
@@ -102,11 +80,11 @@ describe("launchSession", () => {
   });
 
   it("sends the correct agent command (codex)", () => {
-    let sentText: string | undefined;
+    const sentTexts: string[] = [];
 
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       tmuxSendKeys: (_paneId, text) => {
-        sentText = text;
+        sentTexts.push(text);
       },
     });
 
@@ -115,11 +93,11 @@ describe("launchSession", () => {
       deps,
     );
 
-    expect(sentText).toBe("codex");
+    expect(sentTexts).toEqual(["codex"]);
   });
 
   it("returns failure when tmux session creation fails", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       tmuxListSessionNames: () => [],
       tmuxNewSession: () => null,
     });
@@ -135,7 +113,7 @@ describe("launchSession", () => {
   });
 
   it("returns failure when tmux window creation fails", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       tmuxListSessionNames: () => ["existing-session"],
       tmuxNewWindow: () => null,
     });
@@ -156,7 +134,7 @@ describe("launchSession", () => {
 
   it("does not send keys when pane creation fails", () => {
     let keysSent = false;
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       tmuxNewSession: () => null,
       tmuxSendKeys: () => {
         keysSent = true;
@@ -169,5 +147,41 @@ describe("launchSession", () => {
     );
 
     expect(keysSent).toBe(false);
+  });
+
+  it("sends git checkout before agent command when default branch is available", () => {
+    const sentTexts: string[] = [];
+
+    const deps = createMockLauncherDeps({
+      getDefaultBranch: () => "main",
+      tmuxSendKeys: (_paneId, text) => {
+        sentTexts.push(text);
+      },
+    });
+
+    launchSession(
+      { projectPath: "/home/test/src/app", agentType: "claude", sessionName: "app-claude" },
+      deps,
+    );
+
+    expect(sentTexts).toEqual(["git checkout main", "claude"]);
+  });
+
+  it("skips git checkout when default branch is not available", () => {
+    const sentTexts: string[] = [];
+
+    const deps = createMockLauncherDeps({
+      getDefaultBranch: () => null,
+      tmuxSendKeys: (_paneId, text) => {
+        sentTexts.push(text);
+      },
+    });
+
+    launchSession(
+      { projectPath: "/home/test/src/app", agentType: "claude", sessionName: "app-claude" },
+      deps,
+    );
+
+    expect(sentTexts).toEqual(["claude"]);
   });
 });

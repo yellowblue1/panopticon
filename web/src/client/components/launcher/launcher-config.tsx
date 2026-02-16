@@ -4,34 +4,43 @@ import { toast } from "sonner";
 import { useLauncherConfig, useUpdateLauncherConfig } from "@/hooks/use-launcher-config";
 import { cn } from "@/lib/cn";
 
+interface ScanPathEntry {
+  id: string;
+  value: string;
+}
+
+function createEntry(value: string): ScanPathEntry {
+  return { id: crypto.randomUUID(), value };
+}
+
 export function LauncherConfig() {
   const { data, isLoading } = useLauncherConfig();
   const updateMutation = useUpdateLauncherConfig();
-  const [scanPaths, setScanPaths] = useState<string[]>([]);
+  const [scanPaths, setScanPaths] = useState<ScanPathEntry[]>([]);
   const [useGhq, setUseGhq] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
   const initialized = useRef(false);
 
   useEffect(() => {
     if (data && "config" in data && !initialized.current) {
-      setScanPaths(data.config.scanPaths);
+      setScanPaths(data.config.scanPaths.map(createEntry));
       setUseGhq(data.config.useGhq);
       initialized.current = true;
     }
   }, [data]);
 
-  const handlePathChange = (index: number, value: string) => {
-    setScanPaths((prev) => prev.map((p, i) => (i === index ? value : p)));
+  const handlePathChange = (id: string, value: string) => {
+    setScanPaths((prev) => prev.map((entry) => (entry.id === id ? { ...entry, value } : entry)));
     setIsDirty(true);
   };
 
   const handleAddPath = () => {
-    setScanPaths((prev) => [...prev, ""]);
+    setScanPaths((prev) => [...prev, createEntry("")]);
     setIsDirty(true);
   };
 
-  const handleRemovePath = (index: number) => {
-    setScanPaths((prev) => prev.filter((_, i) => i !== index));
+  const handleRemovePath = (id: string) => {
+    setScanPaths((prev) => prev.filter((entry) => entry.id !== id));
     setIsDirty(true);
   };
 
@@ -41,9 +50,9 @@ export function LauncherConfig() {
   };
 
   const handleSave = () => {
-    const filtered = scanPaths.filter((p) => p.trim().length > 0);
+    const filtered = scanPaths.filter((entry) => entry.value.trim().length > 0);
     updateMutation.mutate(
-      { scanPaths: filtered, useGhq },
+      { scanPaths: filtered.map((entry) => entry.value), useGhq },
       {
         onSuccess: () => {
           setScanPaths(filtered);
@@ -84,12 +93,12 @@ export function LauncherConfig() {
       </p>
 
       <div className="space-y-2 mb-3">
-        {scanPaths.map((path, index) => (
-          <div key={index} className="flex items-center gap-2">
+        {scanPaths.map((entry) => (
+          <div key={entry.id} className="flex items-center gap-2">
             <input
               type="text"
-              value={path}
-              onChange={(e) => handlePathChange(index, e.target.value)}
+              value={entry.value}
+              onChange={(e) => handlePathChange(entry.id, e.target.value)}
               placeholder="~/src"
               className={cn(
                 "flex-1 bg-bg-primary border border-border-default rounded px-2 py-1.5",
@@ -99,7 +108,7 @@ export function LauncherConfig() {
             />
             <button
               type="button"
-              onClick={() => handleRemovePath(index)}
+              onClick={() => handleRemovePath(entry.id)}
               className={cn(
                 "shrink-0 p-1.5 rounded",
                 "text-text-muted hover:text-red-400 hover:bg-bg-tertiary transition-colors",

@@ -76,7 +76,7 @@ export interface AppDeps {
   launchSession?: (config: {
     projectPath: string;
     agentType: AgentType;
-    sessionName: string;
+    sessionName?: string;
   }) => LaunchResponse;
   getLauncherConfig?: () => LauncherConfigData;
   setLauncherConfig?: (config: LauncherConfigData) => LauncherConfigData;
@@ -409,8 +409,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       const result = deps.launchSession({
         projectPath: body.projectPath,
         agentType: body.agentType as AgentType,
-        sessionName:
-          sessionName ?? `${body.projectPath.split("/").pop() ?? "session"}-${body.agentType}`,
+        sessionName,
       });
 
       return c.json(result satisfies LaunchResponse, result.success ? 200 : 500);

@@ -1,37 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import type { LauncherDeps } from "../domain/ports";
+import { createMockLauncherDeps } from "../__tests__";
 import { discoverProjects } from "./discover-projects";
-
-function createMockDeps(overrides: Partial<LauncherDeps> = {}): LauncherDeps {
-  return {
-    readDir: () => [],
-    isDirectory: () => true,
-    pathExists: () => true,
-    resolvePath: (p) => p.replace("~", "/home/test"),
-    homeDir: () => "/home/test",
-    getProjectName: (cwd) => cwd.split("/").pop() ?? "unknown",
-    getGitBranch: () => null,
-    getGitRemoteUrl: () => null,
-    ghqRoot: () => null,
-    ghqList: () => [],
-    tmuxNewSession: () => null,
-    tmuxNewWindow: () => null,
-    tmuxListSessionNames: () => [],
-    tmuxSendKeys: () => {},
-    readConfig: () => ({ scanPaths: [], useGhq: true }),
-    writeConfig: () => {},
-    ...overrides,
-  };
-}
 
 describe("discoverProjects", () => {
   it("returns empty array when no scan paths configured", () => {
-    const deps = createMockDeps();
+    const deps = createMockLauncherDeps();
     expect(discoverProjects(deps)).toEqual([]);
   });
 
   it("scans configured paths and returns subdirectories as projects", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: ["/home/test/src"], useGhq: false }),
       readDir: (path) => (path === "/home/test/src" ? ["project-a", "project-b"] : []),
       isDirectory: () => true,
@@ -57,7 +35,7 @@ describe("discoverProjects", () => {
   });
 
   it("skips non-directory entries", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: ["/home/test/src"], useGhq: false }),
       readDir: () => ["project", "README.md"],
       isDirectory: (path) => !path.endsWith("README.md"),
@@ -69,7 +47,7 @@ describe("discoverProjects", () => {
   });
 
   it("skips scan paths that do not exist", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({
         scanPaths: ["/nonexistent", "/home/test/src"],
         useGhq: false,
@@ -84,7 +62,7 @@ describe("discoverProjects", () => {
   });
 
   it("skips scan paths that are not directories", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: ["/home/test/file.txt"], useGhq: false }),
       pathExists: () => true,
       isDirectory: (path) => path !== "/home/test/file.txt",
@@ -96,7 +74,7 @@ describe("discoverProjects", () => {
 
   it("resolves tilde in scan paths", () => {
     const resolvedPaths: string[] = [];
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: ["~/src"], useGhq: false }),
       resolvePath: (p) => {
         const resolved = p.replace("~", "/home/test");
@@ -111,7 +89,7 @@ describe("discoverProjects", () => {
   });
 
   it("includes ghq projects when useGhq is true", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: [], useGhq: true }),
       ghqRoot: () => "/home/test/ghq",
       ghqList: () => ["github.com/user/repo-a", "github.com/user/repo-b"],
@@ -129,7 +107,7 @@ describe("discoverProjects", () => {
   });
 
   it("skips ghq when useGhq is false", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: [], useGhq: false }),
       ghqRoot: () => "/home/test/ghq",
       ghqList: () => ["github.com/user/repo"],
@@ -140,7 +118,7 @@ describe("discoverProjects", () => {
   });
 
   it("handles ghq not installed gracefully (ghqRoot returns null)", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: [], useGhq: true }),
       ghqRoot: () => null,
       ghqList: () => [],
@@ -151,7 +129,7 @@ describe("discoverProjects", () => {
   });
 
   it("deduplicates projects from scan paths and ghq", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({
         scanPaths: ["/home/test/src"],
         useGhq: true,
@@ -168,7 +146,7 @@ describe("discoverProjects", () => {
   });
 
   it("deduplicates across multiple scan paths", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({
         scanPaths: ["/home/test/src", "/home/test/src"],
         useGhq: false,
@@ -181,7 +159,7 @@ describe("discoverProjects", () => {
   });
 
   it("returns projects sorted by name", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({ scanPaths: ["/home/test/src"], useGhq: false }),
       readDir: () => ["zebra", "alpha", "middle"],
     });
@@ -191,7 +169,7 @@ describe("discoverProjects", () => {
   });
 
   it("combines scan paths and ghq results, both sorted", () => {
-    const deps = createMockDeps({
+    const deps = createMockLauncherDeps({
       readConfig: () => ({
         scanPaths: ["/home/test/src"],
         useGhq: true,

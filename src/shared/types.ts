@@ -138,12 +138,6 @@ export interface ProjectsApiResponse {
   timestamp: number;
 }
 
-export interface LaunchRequest {
-  projectPath: string;
-  agentType: AgentType;
-  sessionName?: string;
-}
-
 export interface LaunchResponse {
   success: boolean;
   sessionName: string;

@@ -9,7 +9,7 @@ import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-stat
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
 import { discoverProjects } from "../src/launcher/application/discover-projects";
-import { launchSession } from "../src/launcher/application/launch-session";
+import { generateSessionName, launchSession } from "../src/launcher/application/launch-session";
 import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/application/manage-config";
 import { createLauncherDeps } from "../src/launcher/infrastructure/fs-operations";
 import {
@@ -412,7 +412,9 @@ const app = createApp(
         gitRemoteUrl: p.gitRemoteUrl,
       })),
     launchSession: (config) => {
-      const result = launchSession(config, launcherDeps);
+      const sessionName =
+        config.sessionName ?? generateSessionName(config.projectPath, config.agentType);
+      const result = launchSession({ ...config, sessionName }, launcherDeps);
       return {
         success: result.success,
         sessionName: result.sessionName,
