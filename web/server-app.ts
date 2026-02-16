@@ -14,6 +14,8 @@ import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import type {
   AgentType,
   AuthStatusResponse,
+  BrowseEntry,
+  BrowsePathResponse,
   DeletePlanResponse,
   GeminiBackend,
   LauncherConfigData,
@@ -80,6 +82,7 @@ export interface AppDeps {
   }) => LaunchResponse;
   getLauncherConfig?: () => LauncherConfigData;
   setLauncherConfig?: (config: LauncherConfigData) => LauncherConfigData;
+  browsePath?: (path: string) => { entries: BrowseEntry[]; basePath: string };
 }
 
 /**
@@ -457,6 +460,32 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         config,
         timestamp: Date.now(),
       } satisfies LauncherConfigResponse);
+    })
+
+    // GET /api/launcher/browse
+    .get("/api/launcher/browse", (c) => {
+      if (!deps.browsePath) {
+        return c.json(
+          { entries: [], basePath: "", timestamp: Date.now() } satisfies BrowsePathResponse,
+          501,
+        );
+      }
+
+      const path = c.req.query("path") ?? "";
+      if (path.length === 0) {
+        return c.json({
+          entries: [],
+          basePath: "",
+          timestamp: Date.now(),
+        } satisfies BrowsePathResponse);
+      }
+
+      const result = deps.browsePath(path);
+      return c.json({
+        entries: result.entries,
+        basePath: result.basePath,
+        timestamp: Date.now(),
+      } satisfies BrowsePathResponse);
     })
 
     // Favicon routes

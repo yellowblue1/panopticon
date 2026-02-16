@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLauncherConfig, useUpdateLauncherConfig } from "@/hooks/use-launcher-config";
 import { cn } from "@/lib/cn";
+import { PathAutocompleteInput } from "./path-autocomplete-input";
 
 interface ScanPathEntry {
   id: string;
@@ -95,16 +96,10 @@ export function LauncherConfig() {
       <div className="space-y-2 mb-3">
         {scanPaths.map((entry) => (
           <div key={entry.id} className="flex items-center gap-2">
-            <input
-              type="text"
+            <PathAutocompleteInput
               value={entry.value}
-              onChange={(e) => handlePathChange(entry.id, e.target.value)}
+              onChange={(v) => handlePathChange(entry.id, v)}
               placeholder="~/src"
-              className={cn(
-                "flex-1 bg-bg-primary border border-border-default rounded px-2 py-1.5",
-                "text-sm font-mono text-text-primary placeholder:text-text-muted",
-                "focus:outline-none focus:border-accent-blue transition-colors",
-              )}
             />
             <button
               type="button"
