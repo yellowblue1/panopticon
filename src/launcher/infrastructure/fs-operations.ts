@@ -32,7 +32,7 @@ function isValidLauncherConfig(data: unknown): data is LauncherConfig {
   );
 }
 
-export interface LauncherInfraDeps {
+interface LauncherInfraDeps {
   getProjectName: (cwd: string) => string;
   getGitBranch: (cwd: string) => string | null;
   getGitRemoteUrl: (cwd: string) => string | null;
