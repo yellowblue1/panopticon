@@ -2,6 +2,8 @@ import type { SessionResponse } from "@shared/types";
 import { useMemo } from "react";
 import { usePlansAvailability } from "@/hooks/use-plans-availability";
 import { useReadStatus } from "@/hooks/use-read-status";
+import { groupSessions } from "@/lib/group-sessions";
+import { SessionGroup } from "./session-group";
 import { SessionRow } from "./session-row";
 
 interface SessionTableProps {
@@ -24,6 +26,8 @@ export function SessionTable({ sessions }: SessionTableProps) {
     );
   }
 
+  const { groups, ungrouped } = groupSessions(sessions);
+
   return (
     <table className="sessions-table">
       <thead>
@@ -36,7 +40,16 @@ export function SessionTable({ sessions }: SessionTableProps) {
         </tr>
       </thead>
       <tbody>
-        {sessions.map((session) => (
+        {groups.map((group) => (
+          <SessionGroup
+            key={group.orchestrator?.pane_id ?? `orphan-${group.children[0]?.pane_id}`}
+            group={group}
+            readStatuses={readStatuses}
+            plans={plansData?.plans}
+            onMarkAsRead={markAsRead}
+          />
+        ))}
+        {ungrouped.map((session) => (
           <SessionRow
             key={session.pane_id}
             session={session}

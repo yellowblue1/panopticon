@@ -11,9 +11,10 @@ interface SessionRowProps {
   isRead: boolean;
   hasPlan: boolean;
   onMarkAsRead: (paneId: string) => void;
+  groupRole?: "orchestrator" | "worktree-child";
 }
 
-export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRowProps) {
+export function SessionRow({ session, isRead, hasPlan, onMarkAsRead, groupRole }: SessionRowProps) {
   const switchClient = useSwitchClient();
 
   const handleSwitch = () => {
@@ -32,9 +33,21 @@ export function SessionRow({ session, isRead, hasPlan, onMarkAsRead }: SessionRo
   const statusClass = session.status === "busy" ? "row-busy" : "row-waiting";
 
   return (
-    <tr className={cn(statusClass, isRead && "read")}>
+    <tr
+      className={cn(
+        statusClass,
+        isRead && "read",
+        groupRole === "orchestrator" && "row-orchestrator",
+        groupRole === "worktree-child" && "row-worktree-child",
+      )}
+    >
       <td className="col-project">
         <div className="flex items-center gap-2">
+          {groupRole === "worktree-child" && (
+            <span className="worktree-indent" aria-hidden="true">
+              └
+            </span>
+          )}
           <AgentTypeIcon agentType={session.agent_type} />
           <span className="project-name">{session.project_name}</span>
           <span className="status-badge-mobile">

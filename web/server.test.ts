@@ -41,6 +41,7 @@ const sampleSession: SessionResponse = {
   summary: null,
   tmux_target: "main:0.0",
   last_activity: new Date().toISOString(),
+  cwd: "/home/user/my-project",
 };
 
 describe("Hono API endpoints", () => {

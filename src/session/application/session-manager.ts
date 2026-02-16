@@ -123,6 +123,7 @@ export class SessionManager {
       tmux_target: s.tmux_target,
       last_activity: s.last_activity,
       agent_type: s.agent_type,
+      cwd: s.cwd,
     }));
   }
 
@@ -151,6 +152,7 @@ export class SessionManager {
       tmux_target: state.tmux_target,
       last_activity: state.last_activity,
       agent_type: state.agent_type,
+      cwd: state.cwd,
     };
   }
 
