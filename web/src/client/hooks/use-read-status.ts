@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useReadStatusContext } from "@/contexts/read-status-context";
 
 interface ReadStatusResult {
@@ -17,23 +17,17 @@ export function useReadStatus(paneIds: string[]): ReadStatusResult {
     loadSnapshots(paneIds);
   }, [paneIds, loadSnapshots]);
 
-  const readStatuses = useMemo(() => {
-    const map = new Map<string, boolean>();
-    for (const [id, snapshot] of snapshots) {
-      map.set(id, snapshot.isRead);
-    }
-    return map;
-  }, [snapshots]);
+  const readStatuses = new Map<string, boolean>();
+  for (const [id, snapshot] of snapshots) {
+    readStatuses.set(id, snapshot.isRead);
+  }
 
-  const lastSeenMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const [id, snapshot] of snapshots) {
-      map.set(id, snapshot.lastSeenAt);
-    }
-    return map;
-  }, [snapshots]);
+  const lastSeenMap = new Map<string, number>();
+  for (const [id, snapshot] of snapshots) {
+    lastSeenMap.set(id, snapshot.lastSeenAt);
+  }
 
-  const boundMarkAllAsRead = useMemo(() => () => markAllAsRead(paneIds), [markAllAsRead, paneIds]);
+  const boundMarkAllAsRead = () => markAllAsRead(paneIds);
 
   return { readStatuses, lastSeenMap, markAsRead, markAsUnread, markAllAsRead: boundMarkAllAsRead };
 }

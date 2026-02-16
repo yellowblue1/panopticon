@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FileText, SquareTerminal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PlanViewer } from "@/components/sessions/plan-viewer";
 import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
@@ -35,7 +35,7 @@ function SessionDetailPage() {
 
   const session = sessionsData?.sessions.find((s) => s.pane_id === paneId);
   const hasPlan = planData?.plan != null;
-  const paneIdArray = useMemo(() => [paneId], [paneId]);
+  const paneIdArray = [paneId];
   const { markAsRead } = useReadStatus(paneIdArray);
 
   // Mark session as read when detail page is opened

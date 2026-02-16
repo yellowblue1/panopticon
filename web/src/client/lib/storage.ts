@@ -7,8 +7,6 @@ export interface SessionSnapshot {
   paneId: string;
   isRead: boolean;
   lastSeenAt: number;
-  contentHash: string;
-  lastStatus: string;
 }
 
 let db: IDBDatabase | null = null;
@@ -46,12 +44,11 @@ export async function initDb(): Promise<IDBDatabase> {
                 paneId: cursor.key as string,
                 isRead: true,
                 lastSeenAt: Date.now(),
-                contentHash: "",
-                lastStatus: "",
               } satisfies SessionSnapshot);
               cursor.continue();
             }
           };
+          database.deleteObjectStore(LEGACY_STORE);
         }
       }
     };
@@ -82,6 +79,28 @@ export async function setSessionSnapshot(snapshot: SessionSnapshot): Promise<voi
   });
 }
 
+export async function batchMarkSnapshotsAsUnread(paneIds: string[]): Promise<void> {
+  const database = db;
+  if (!database || paneIds.length === 0) return;
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(SNAPSHOT_STORE, "readwrite");
+    const store = tx.objectStore(SNAPSHOT_STORE);
+    for (const paneId of paneIds) {
+      const getReq = store.get(paneId);
+      getReq.onsuccess = () => {
+        const existing: SessionSnapshot | undefined = getReq.result;
+        store.put({
+          paneId,
+          isRead: false,
+          lastSeenAt: existing?.lastSeenAt ?? 0,
+        } satisfies SessionSnapshot);
+      };
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function markAllSnapshotsAsRead(paneIds: string[]): Promise<void> {
   const database = db;
   if (!database) return;
@@ -90,17 +109,11 @@ export async function markAllSnapshotsAsRead(paneIds: string[]): Promise<void> {
     const store = tx.objectStore(SNAPSHOT_STORE);
     const now = Date.now();
     for (const paneId of paneIds) {
-      const getReq = store.get(paneId);
-      getReq.onsuccess = () => {
-        const existing: SessionSnapshot | undefined = getReq.result;
-        store.put({
-          paneId,
-          isRead: true,
-          lastSeenAt: now,
-          contentHash: existing?.contentHash ?? "",
-          lastStatus: existing?.lastStatus ?? "",
-        } satisfies SessionSnapshot);
-      };
+      store.put({
+        paneId,
+        isRead: true,
+        lastSeenAt: now,
+      } satisfies SessionSnapshot);
     }
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);

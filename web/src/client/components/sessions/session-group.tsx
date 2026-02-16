@@ -9,7 +9,13 @@ interface SessionGroupProps {
   onMarkAsRead: (paneId: string) => void;
 }
 
-export function SessionGroup({ group, readStatuses, lastSeenMap, plans, onMarkAsRead }: SessionGroupProps) {
+export function SessionGroup({
+  group,
+  readStatuses,
+  lastSeenMap,
+  plans,
+  onMarkAsRead,
+}: SessionGroupProps) {
   return (
     <>
       {group.orchestrator ? (

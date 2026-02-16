@@ -1,14 +1,7 @@
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import type { SessionSnapshot } from "@/lib/storage";
 import {
+  batchMarkSnapshotsAsUnread,
   getSessionSnapshot,
   initDb,
   markAllSnapshotsAsRead,
@@ -19,6 +12,7 @@ interface ReadStatusContextValue {
   snapshots: Map<string, SessionSnapshot>;
   markAsRead: (paneId: string) => Promise<void>;
   markAsUnread: (paneId: string) => Promise<void>;
+  batchMarkAsUnread: (paneIds: string[]) => Promise<void>;
   markAllAsRead: (paneIds: string[]) => Promise<void>;
   loadSnapshots: (paneIds: string[]) => Promise<void>;
 }
@@ -35,100 +29,103 @@ export function ReadStatusProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const loadSnapshots = useCallback(
-    async (paneIds: string[]) => {
-      if (!dbReady || paneIds.length === 0) return;
+  const loadSnapshots = async (paneIds: string[]) => {
+    if (!dbReady || paneIds.length === 0) return;
 
-      const results = await Promise.all(paneIds.map((id) => getSessionSnapshot(id)));
-      setSnapshots((prev) => {
-        const next = new Map(prev);
-        for (let i = 0; i < paneIds.length; i++) {
-          const snapshot = results[i];
-          if (snapshot) {
-            next.set(paneIds[i], snapshot);
-          }
-        }
-        return next;
-      });
-    },
-    [dbReady],
-  );
-
-  const markAsRead = useCallback(async (paneId: string) => {
-    const now = Date.now();
+    const results = await Promise.all(paneIds.map((id) => getSessionSnapshot(id)));
     setSnapshots((prev) => {
       const next = new Map(prev);
-      const existing = prev.get(paneId);
-      next.set(paneId, {
+      for (let i = 0; i < paneIds.length; i++) {
+        const snapshot = results[i];
+        if (snapshot) {
+          next.set(paneIds[i], snapshot);
+        }
+      }
+      return next;
+    });
+  };
+
+  const markAsRead = async (paneId: string) => {
+    const now = Date.now();
+    let snapshotToWrite: SessionSnapshot | undefined;
+    setSnapshots((prev) => {
+      const next = new Map(prev);
+      const snapshot: SessionSnapshot = {
         paneId,
         isRead: true,
         lastSeenAt: now,
-        contentHash: existing?.contentHash ?? "",
-        lastStatus: existing?.lastStatus ?? "",
-      });
+      };
+      next.set(paneId, snapshot);
+      snapshotToWrite = snapshot;
       return next;
     });
-    const existing = await getSessionSnapshot(paneId);
-    await setSessionSnapshot({
-      paneId,
-      isRead: true,
-      lastSeenAt: now,
-      contentHash: existing?.contentHash ?? "",
-      lastStatus: existing?.lastStatus ?? "",
-    });
-  }, []);
+    if (snapshotToWrite) {
+      await setSessionSnapshot(snapshotToWrite);
+    }
+  };
 
-  const markAsUnread = useCallback(async (paneId: string) => {
+  const markAsUnread = async (paneId: string) => {
+    let snapshotToWrite: SessionSnapshot | undefined;
     setSnapshots((prev) => {
       const next = new Map(prev);
       const existing = prev.get(paneId);
-      next.set(paneId, {
+      const snapshot: SessionSnapshot = {
         paneId,
         isRead: false,
         lastSeenAt: existing?.lastSeenAt ?? 0,
-        contentHash: existing?.contentHash ?? "",
-        lastStatus: existing?.lastStatus ?? "",
-      });
+      };
+      next.set(paneId, snapshot);
+      snapshotToWrite = snapshot;
       return next;
     });
-    const existing = await getSessionSnapshot(paneId);
-    await setSessionSnapshot({
-      paneId,
-      isRead: false,
-      lastSeenAt: existing?.lastSeenAt ?? 0,
-      contentHash: existing?.contentHash ?? "",
-      lastStatus: existing?.lastStatus ?? "",
+    if (snapshotToWrite) {
+      await setSessionSnapshot(snapshotToWrite);
+    }
+  };
+
+  const batchMarkAsUnread = async (paneIds: string[]) => {
+    if (paneIds.length === 0) return;
+    setSnapshots((prev) => {
+      const next = new Map(prev);
+      for (const paneId of paneIds) {
+        const existing = prev.get(paneId);
+        next.set(paneId, {
+          paneId,
+          isRead: false,
+          lastSeenAt: existing?.lastSeenAt ?? 0,
+        });
+      }
+      return next;
     });
-  }, []);
+    await batchMarkSnapshotsAsUnread(paneIds);
+  };
 
-  const markAllAsRead = useCallback(
-    async (paneIds: string[]) => {
-      const now = Date.now();
-      setSnapshots((prev) => {
-        const next = new Map(prev);
-        const allIds = [...new Set([...prev.keys(), ...paneIds])];
-        for (const id of allIds) {
-          const existing = prev.get(id);
-          next.set(id, {
-            paneId: id,
-            isRead: true,
-            lastSeenAt: now,
-            contentHash: existing?.contentHash ?? "",
-            lastStatus: existing?.lastStatus ?? "",
-          });
-        }
-        return next;
-      });
-      const allIds = [...new Set([...snapshots.keys(), ...paneIds])];
-      await markAllSnapshotsAsRead(allIds);
-    },
-    [snapshots],
-  );
+  const markAllAsRead = async (paneIds: string[]) => {
+    const now = Date.now();
+    let allIds: string[] = [];
+    setSnapshots((prev) => {
+      const next = new Map(prev);
+      allIds = [...new Set([...prev.keys(), ...paneIds])];
+      for (const id of allIds) {
+        next.set(id, {
+          paneId: id,
+          isRead: true,
+          lastSeenAt: now,
+        });
+      }
+      return next;
+    });
+    await markAllSnapshotsAsRead(allIds);
+  };
 
-  const value = useMemo(
-    () => ({ snapshots, markAsRead, markAsUnread, markAllAsRead, loadSnapshots }),
-    [snapshots, markAsRead, markAsUnread, markAllAsRead, loadSnapshots],
-  );
+  const value = {
+    snapshots,
+    markAsRead,
+    markAsUnread,
+    batchMarkAsUnread,
+    markAllAsRead,
+    loadSnapshots,
+  };
 
   return <ReadStatusContext.Provider value={value}>{children}</ReadStatusContext.Provider>;
 }

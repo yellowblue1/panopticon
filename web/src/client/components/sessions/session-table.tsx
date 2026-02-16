@@ -1,8 +1,8 @@
 import type { SessionResponse } from "@shared/types";
 import { CheckCheck } from "lucide-react";
-import { useMemo } from "react";
 import { usePlansAvailability } from "@/hooks/use-plans-availability";
 import { useReadStatus } from "@/hooks/use-read-status";
+import { useUnreadCount } from "@/hooks/use-unread-count";
 import { groupSessions } from "@/lib/group-sessions";
 import { SessionGroup } from "./session-group";
 import { SessionRow } from "./session-row";
@@ -12,9 +12,10 @@ interface SessionTableProps {
 }
 
 export function SessionTable({ sessions }: SessionTableProps) {
-  const paneIds = useMemo(() => sessions.map((s) => s.pane_id), [sessions]);
+  const paneIds = sessions.map((s) => s.pane_id);
   const { readStatuses, lastSeenMap, markAsRead, markAllAsRead } = useReadStatus(paneIds);
   const { data: plansData } = usePlansAvailability();
+  const unreadCount = useUnreadCount(paneIds);
 
   if (sessions.length === 0) {
     return (
@@ -25,15 +26,6 @@ export function SessionTable({ sessions }: SessionTableProps) {
         </p>
       </div>
     );
-  }
-
-  let unreadCount = 0;
-  for (const isRead of readStatuses.values()) {
-    if (!isRead) unreadCount++;
-  }
-  // Sessions without a snapshot are also unread
-  for (const id of paneIds) {
-    if (!readStatuses.has(id)) unreadCount++;
   }
 
   const { groups, ungrouped } = groupSessions(sessions);
@@ -61,7 +53,9 @@ export function SessionTable({ sessions }: SessionTableProps) {
         <tbody>
           {groups.map((group) => (
             <SessionGroup
-              key={group.orchestrator?.pane_id ?? `orphan-${group.children[0]?.pane_id ?? "unknown"}`}
+              key={
+                group.orchestrator?.pane_id ?? `orphan-${group.children[0]?.pane_id ?? "unknown"}`
+              }
               group={group}
               readStatuses={readStatuses}
               lastSeenMap={lastSeenMap}
