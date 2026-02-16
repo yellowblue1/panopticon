@@ -21,6 +21,7 @@ export function SessionGroup({ group, readStatuses, plans, onMarkAsRead }: Sessi
         />
       ) : (
         <tr className="orphan-group-header">
+          {/* colSpan matches the 5 table columns: Project, Branch, Status, Summary, Actions */}
           <td colSpan={5}>
             <span className="project-name">{group.children[0]?.project_name}</span>
             <span className="orphan-label">orchestrator not running</span>

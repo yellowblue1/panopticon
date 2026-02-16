@@ -27,6 +27,14 @@ export function detectWorktreeBase(cwd: string): string | null {
   return cwd.slice(0, idx);
 }
 
+function getGroupMaxActivity(g: SessionGroup): string {
+  let max = g.orchestrator?.last_activity ?? "";
+  for (const c of g.children) {
+    if (c.last_activity > max) max = c.last_activity;
+  }
+  return max;
+}
+
 /**
  * Group sessions by orchestrator/worktree relationship.
  *
@@ -86,9 +94,7 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   }
 
   groups.sort((a, b) => {
-    const aTime = a.orchestrator?.last_activity ?? a.children[0]?.last_activity ?? "";
-    const bTime = b.orchestrator?.last_activity ?? b.children[0]?.last_activity ?? "";
-    return bTime.localeCompare(aTime);
+    return getGroupMaxActivity(b).localeCompare(getGroupMaxActivity(a));
   });
 
   const ungrouped: SessionResponse[] = [];

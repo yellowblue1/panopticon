@@ -42,7 +42,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
       <tbody>
         {groups.map((group) => (
           <SessionGroup
-            key={group.orchestrator?.pane_id ?? `orphan-${group.children[0]?.pane_id}`}
+            key={group.orchestrator?.pane_id ?? `orphan-${group.children[0]?.pane_id ?? "unknown"}`}
             group={group}
             readStatuses={readStatuses}
             plans={plansData?.plans}

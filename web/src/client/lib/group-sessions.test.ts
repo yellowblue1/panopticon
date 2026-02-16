@@ -53,6 +53,10 @@ describe("detectWorktreeBase", () => {
   it("returns null for path containing 'worktrees' not as suffix pattern", () => {
     expect(detectWorktreeBase("/home/user/worktrees/something")).toBeNull();
   });
+
+  it("returns null for path ending with -worktrees without branch", () => {
+    expect(detectWorktreeBase("/home/user/myproject-worktrees")).toBeNull();
+  });
 });
 
 describe("groupSessions", () => {
@@ -215,7 +219,7 @@ describe("groupSessions", () => {
     expect(group.children[1].pane_id).toBe("%1");
   });
 
-  it("sorts groups by most recent activity", () => {
+  it("sorts groups by max activity across all members, not just orchestrator", () => {
     const sessions = [
       makeSession({
         pane_id: "%0",
@@ -227,7 +231,7 @@ describe("groupSessions", () => {
         pane_id: "%1",
         cwd: "/home/user/old-project-worktrees/feat",
         project_name: "old-project",
-        last_activity: "2026-02-16T00:02:00.000Z",
+        last_activity: "2026-02-16T00:06:00.000Z",
       }),
       makeSession({
         pane_id: "%2",
@@ -245,7 +249,8 @@ describe("groupSessions", () => {
 
     const result = groupSessions(sessions);
     expect(result.groups).toHaveLength(2);
-    expect(result.groups[0].orchestrator?.project_name).toBe("new-project");
-    expect(result.groups[1].orchestrator?.project_name).toBe("old-project");
+    // old-project child has the latest activity (00:06), so old-project group comes first
+    expect(result.groups[0].orchestrator?.project_name).toBe("old-project");
+    expect(result.groups[1].orchestrator?.project_name).toBe("new-project");
   });
 });
