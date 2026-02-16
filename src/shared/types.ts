@@ -156,6 +156,7 @@ export interface LauncherConfigResponse {
   timestamp: number;
 }
 
+
 export interface BrowseEntry {
   name: string;
   path: string;
@@ -165,4 +166,11 @@ export interface BrowsePathResponse {
   entries: BrowseEntry[];
   basePath: string;
   timestamp: number;
+}
+
+// Send message (text + file upload) types
+export interface SendMessageResponse {
+  success: boolean;
+  error?: string;
+  uploadedFiles?: Array<{ originalName: string; savedPath: string }>;
 }
