@@ -77,6 +77,53 @@ describe("groupSessions", () => {
     expect(result.ungrouped).toHaveLength(2);
   });
 
+  it("keeps all sessions with the same cwd as ungrouped", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%0",
+        cwd: "/home/user/myproject",
+        last_activity: "2026-02-16T00:02:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/myproject",
+        last_activity: "2026-02-16T00:01:00.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.groups).toHaveLength(0);
+    expect(result.ungrouped).toHaveLength(2);
+    expect(result.ungrouped.map((s) => s.pane_id)).toEqual(expect.arrayContaining(["%0", "%1"]));
+  });
+
+  it("uses one session as orchestrator and keeps duplicates ungrouped", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%0",
+        cwd: "/home/user/myproject",
+        last_activity: "2026-02-16T00:03:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/myproject",
+        last_activity: "2026-02-16T00:02:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%2",
+        cwd: "/home/user/myproject-worktrees/feat-auth",
+        last_activity: "2026-02-16T00:01:00.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].orchestrator?.pane_id).toBe("%0");
+    expect(result.groups[0].children).toHaveLength(1);
+    expect(result.ungrouped).toHaveLength(1);
+    expect(result.ungrouped[0].pane_id).toBe("%1");
+  });
+
   it("groups orchestrator with its worktree children", () => {
     const orchestrator = makeSession({
       pane_id: "%0",

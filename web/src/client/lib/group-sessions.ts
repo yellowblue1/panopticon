@@ -44,7 +44,7 @@ function getGroupMaxActivity(g: SessionGroup): string {
  * 4. Remaining non-worktree sessions go to ungrouped
  */
 export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
-  const orchestratorByCwd = new Map<string, SessionResponse>();
+  const orchestratorByCwd = new Map<string, SessionResponse[]>();
   const worktreeSessions: Array<{ session: SessionResponse; baseCwd: string }> = [];
 
   for (const session of sessions) {
@@ -52,7 +52,12 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     if (base !== null) {
       worktreeSessions.push({ session, baseCwd: base });
     } else {
-      orchestratorByCwd.set(session.cwd, session);
+      const existing = orchestratorByCwd.get(session.cwd);
+      if (existing) {
+        existing.push(session);
+      } else {
+        orchestratorByCwd.set(session.cwd, [session]);
+      }
     }
   }
 
@@ -61,7 +66,8 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   const usedOrchestratorCwds = new Set<string>();
 
   for (const { session, baseCwd } of worktreeSessions) {
-    const orchestrator = orchestratorByCwd.get(baseCwd);
+    const candidates = orchestratorByCwd.get(baseCwd);
+    const orchestrator = candidates?.[0];
 
     if (orchestrator && orchestrator.project_name === session.project_name) {
       usedOrchestratorCwds.add(baseCwd);
@@ -98,9 +104,16 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   });
 
   const ungrouped: SessionResponse[] = [];
-  for (const [cwd, session] of orchestratorByCwd) {
-    if (!usedOrchestratorCwds.has(cwd)) {
-      ungrouped.push(session);
+  for (const [cwd, sessions] of orchestratorByCwd) {
+    if (usedOrchestratorCwds.has(cwd)) {
+      // First session was used as orchestrator; rest go to ungrouped
+      for (let i = 1; i < sessions.length; i++) {
+        ungrouped.push(sessions[i]);
+      }
+    } else {
+      for (const session of sessions) {
+        ungrouped.push(session);
+      }
     }
   }
 
