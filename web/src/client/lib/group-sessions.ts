@@ -7,7 +7,7 @@ export interface SessionGroup {
   children: SessionResponse[];
 }
 
-export interface GroupedSessions {
+interface GroupedSessions {
   /** Groups containing orchestrator + worktree children */
   groups: SessionGroup[];
   /** Sessions not part of any worktree relationship */
