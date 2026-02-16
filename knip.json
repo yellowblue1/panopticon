@@ -5,7 +5,7 @@
       "entry": [
         "src/shared/types.ts",
         "bin/cli.ts",
-        "scripts/knowledge-extractor/main.ts",
+        "scripts/knowledge-extractor/*.ts",
         "**/*.test.ts",
         "test-setup.ts"
       ],
