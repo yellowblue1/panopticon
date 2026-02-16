@@ -23,3 +23,9 @@ export const settingsKeys = {
   all: ["settings"] as const,
   slashCommands: () => [...settingsKeys.all, "slash-commands"] as const,
 };
+
+export const launcherKeys = {
+  all: ["launcher"] as const,
+  projects: () => [...launcherKeys.all, "projects"] as const,
+  config: () => [...launcherKeys.all, "config"] as const,
+};

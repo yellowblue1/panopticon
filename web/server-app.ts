@@ -12,15 +12,21 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import type {
+  AgentType,
   AuthStatusResponse,
   DeletePlanResponse,
   GeminiBackend,
+  LauncherConfigData,
+  LauncherConfigResponse,
+  LaunchResponse,
   PaneAction,
   PaneActionsResponse,
   PaneContentFull,
   PaneContentResponse,
   PlanResponse,
   PlansAvailabilityResponse,
+  ProjectResponse,
+  ProjectsApiResponse,
   SendKeysResponse,
   SessionResponse,
   SlashCommand,
@@ -64,6 +70,16 @@ export interface AppDeps {
   setSlashCommands?: (commands: SlashCommand[]) => SlashCommand[];
   discoverSlashCommands?: () => SlashCommand[];
   getBuiltinCommands?: () => SlashCommand[] | null;
+
+  // Launcher
+  discoverProjects?: () => ProjectResponse[];
+  launchSession?: (config: {
+    projectPath: string;
+    agentType: AgentType;
+    sessionName: string;
+  }) => LaunchResponse;
+  getLauncherConfig?: () => LauncherConfigData;
+  setLauncherConfig?: (config: LauncherConfigData) => LauncherConfigData;
 }
 
 /**
@@ -341,6 +357,107 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         commands,
         timestamp: Date.now(),
       } satisfies SlashCommandsResponse);
+    })
+
+    // GET /api/launcher/projects
+    .get("/api/launcher/projects", (c) => {
+      const projects = deps.discoverProjects?.() ?? [];
+      return c.json({
+        projects,
+        timestamp: Date.now(),
+      } satisfies ProjectsApiResponse);
+    })
+
+    // POST /api/launcher/launch
+    .post("/api/launcher/launch", async (c) => {
+      if (!deps.launchSession) {
+        return c.json(
+          {
+            success: false,
+            sessionName: "",
+            paneId: null,
+            error: "Not available",
+          } satisfies LaunchResponse,
+          501,
+        );
+      }
+
+      const body = await c.req.json().catch(() => null);
+      if (
+        !body ||
+        typeof body.projectPath !== "string" ||
+        typeof body.agentType !== "string" ||
+        (body.agentType !== "claude" && body.agentType !== "codex")
+      ) {
+        return c.json(
+          {
+            success: false,
+            sessionName: "",
+            paneId: null,
+            error:
+              "Request body must include 'projectPath' (string) and 'agentType' ('claude' | 'codex')",
+          } satisfies LaunchResponse,
+          400,
+        );
+      }
+
+      const sessionName =
+        typeof body.sessionName === "string" && body.sessionName.length > 0
+          ? body.sessionName
+          : undefined;
+
+      const result = deps.launchSession({
+        projectPath: body.projectPath,
+        agentType: body.agentType as AgentType,
+        sessionName:
+          sessionName ?? `${body.projectPath.split("/").pop() ?? "session"}-${body.agentType}`,
+      });
+
+      return c.json(result satisfies LaunchResponse, result.success ? 200 : 500);
+    })
+
+    // GET /api/launcher/config
+    .get("/api/launcher/config", (c) => {
+      const config = deps.getLauncherConfig?.() ?? { scanPaths: [], useGhq: true };
+      return c.json({
+        config,
+        timestamp: Date.now(),
+      } satisfies LauncherConfigResponse);
+    })
+
+    // PUT /api/launcher/config
+    .put("/api/launcher/config", async (c) => {
+      if (!deps.setLauncherConfig) {
+        return c.json({ error: "Not available" }, 501);
+      }
+
+      const body = await c.req.json().catch(() => null);
+      if (
+        !body ||
+        !body.config ||
+        !Array.isArray(body.config.scanPaths) ||
+        typeof body.config.useGhq !== "boolean"
+      ) {
+        return c.json(
+          {
+            error:
+              "Request body must include 'config' with 'scanPaths' (string[]) and 'useGhq' (boolean)",
+          },
+          400,
+        );
+      }
+
+      for (const path of body.config.scanPaths) {
+        if (typeof path !== "string") {
+          return c.json({ error: "Each scanPath must be a string" }, 400);
+        }
+      }
+
+      const config = deps.setLauncherConfig(body.config);
+      return c.json({
+        config,
+        timestamp: Date.now(),
+      } satisfies LauncherConfigResponse);
     })
 
     // Favicon routes

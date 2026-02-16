@@ -8,6 +8,10 @@ import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
 import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
+import { discoverProjects } from "../src/launcher/application/discover-projects";
+import { launchSession } from "../src/launcher/application/launch-session";
+import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/application/manage-config";
+import { createLauncherDeps } from "../src/launcher/infrastructure/fs-operations";
 import {
   deletePlan,
   findSlugForCwd,
@@ -187,6 +191,13 @@ function makeFullPayload(paneId: string, content: string, seq: number): PaneCont
 
 // Session manager with tmux polling
 const sessionManager = new SessionManager(sessionManagerDeps);
+
+// Launcher (project discovery + session launch)
+const launcherDeps = createLauncherDeps({
+  getProjectName,
+  getGitBranch,
+  getGitRemoteUrl,
+});
 
 // Plan discovery (slug cache: cwd → slug, stable per session lifetime)
 const planDeps = createPlanDiscoveryDeps();
@@ -392,6 +403,30 @@ const app = createApp(
     setSlashCommands: (commands) => {
       writeSlashCommands(commands);
       return commands;
+    },
+    discoverProjects: () =>
+      discoverProjects(launcherDeps).map((p) => ({
+        name: p.name,
+        path: p.path,
+        gitBranch: p.gitBranch,
+        gitRemoteUrl: p.gitRemoteUrl,
+      })),
+    launchSession: (config) => {
+      const result = launchSession(config, launcherDeps);
+      return {
+        success: result.success,
+        sessionName: result.sessionName,
+        paneId: result.paneId,
+        error: result.error,
+      };
+    },
+    getLauncherConfig: () => {
+      const config = getLauncherConfig(launcherDeps);
+      return { scanPaths: config.scanPaths, useGhq: config.useGhq };
+    },
+    setLauncherConfig: (config) => {
+      const updated = updateLauncherConfig(config, launcherDeps);
+      return { scanPaths: updated.scanPaths, useGhq: updated.useGhq };
     },
     discoverSlashCommands: () => {
       const cwds: string[] = [];
