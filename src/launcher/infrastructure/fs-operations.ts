@@ -62,6 +62,7 @@ export function createLauncherDeps(infraDeps: LauncherInfraDeps): LauncherDeps {
     pathExists: (path) => existsSync(path),
 
     resolvePath: (path) => resolve(path.replace(/^~/, homedir())),
+    homeDir: () => homedir(),
 
     getProjectName: infraDeps.getProjectName,
     getGitBranch: infraDeps.getGitBranch,

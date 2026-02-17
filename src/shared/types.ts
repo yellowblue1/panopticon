@@ -155,3 +155,14 @@ export interface LauncherConfigResponse {
   config: LauncherConfigData;
   timestamp: number;
 }
+
+export interface BrowseEntry {
+  name: string;
+  path: string;
+}
+
+export interface BrowsePathResponse {
+  entries: BrowseEntry[];
+  basePath: string;
+  timestamp: number;
+}

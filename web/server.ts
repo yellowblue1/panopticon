@@ -8,6 +8,7 @@ import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
 import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
+import { browsePath as browsePathFn } from "../src/launcher/application/browse-path";
 import { discoverProjects } from "../src/launcher/application/discover-projects";
 import { generateSessionName, launchSession } from "../src/launcher/application/launch-session";
 import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/application/manage-config";
@@ -430,6 +431,7 @@ const app = createApp(
       const updated = updateLauncherConfig(config, launcherDeps);
       return { scanPaths: updated.scanPaths, useGhq: updated.useGhq };
     },
+    browsePath: (path) => browsePathFn(path, launcherDeps),
     discoverSlashCommands: () => {
       const cwds: string[] = [];
       for (const session of sessionManager.getSessions()) {

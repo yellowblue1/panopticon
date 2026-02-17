@@ -28,4 +28,5 @@ export const launcherKeys = {
   all: ["launcher"] as const,
   projects: () => [...launcherKeys.all, "projects"] as const,
   config: () => [...launcherKeys.all, "config"] as const,
+  browse: (path: string) => [...launcherKeys.all, "browse", path] as const,
 };

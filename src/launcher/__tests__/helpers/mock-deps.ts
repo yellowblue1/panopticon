@@ -7,6 +7,7 @@ export function createMockLauncherDeps(overrides: Partial<LauncherDeps> = {}): L
     isDirectory: () => true,
     pathExists: () => true,
     resolvePath: (p) => p.replace("~", "/home/test"),
+    homeDir: () => "/home/test",
     getProjectName: (cwd) => cwd.split("/").pop() ?? "unknown",
     getGitBranch: () => null,
     getGitRemoteUrl: () => null,
