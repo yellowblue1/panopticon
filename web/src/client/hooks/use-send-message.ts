@@ -1,3 +1,4 @@
+import type { SendMessageResponse } from "@shared/types";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -5,12 +6,6 @@ interface SendMessageInput {
   paneId: string;
   text: string;
   files: File[];
-}
-
-interface SendMessageResponse {
-  success: boolean;
-  error?: string;
-  uploadedFiles?: Array<{ originalName: string; savedPath: string }>;
 }
 
 export function useSendMessage() {
