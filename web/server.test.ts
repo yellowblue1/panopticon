@@ -6,7 +6,6 @@
  */
 
 import { describe, expect, it, mock } from "bun:test";
-import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import type { SessionResponse } from "../src/shared/types";
 import { type AppDeps, createApp, type SseClient } from "./server-app";
 
@@ -26,8 +25,6 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     serializeSessionsData: () => "{}",
     onPaneContentSseConnect: () => {},
     onPaneContentSseDisconnect: () => {},
-    getSlashCommands: () => DEFAULT_SLASH_COMMANDS,
-    setSlashCommands: (commands) => commands,
     deletePlan: () => true,
     ...overrides,
   };
@@ -704,7 +701,7 @@ describe("Hono API endpoints", () => {
 
 describe("Settings API endpoints", () => {
   describe("GET /api/settings/slash-commands", () => {
-    it("returns commands list with timestamp", async () => {
+    it("returns empty commands when no deps provided", async () => {
       const deps = createMockDeps();
       const app = createApp(deps);
 
@@ -712,28 +709,16 @@ describe("Settings API endpoints", () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
+      expect(data.commands).toEqual([]);
       expect(data.timestamp).toBeGreaterThan(0);
     });
 
-    it("returns empty array when getSlashCommands not provided", async () => {
-      const deps = createMockDeps({ getSlashCommands: undefined });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands");
-
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.commands).toEqual([]);
-    });
-
-    it("includes discovered commands in response", async () => {
+    it("returns discovered commands", async () => {
       const discovered = [
         { command: "/plan", description: "Custom command (project)" },
         { command: "/deploy", description: "Custom command (global)" },
       ];
       const deps = createMockDeps({
-        getSlashCommands: () => [],
         discoverSlashCommands: () => discovered,
       });
       const app = createApp(deps);
@@ -745,48 +730,12 @@ describe("Settings API endpoints", () => {
       expect(data.commands).toEqual(discovered);
     });
 
-    it("configured commands take priority over discovered with same name", async () => {
-      const configured = [{ command: "/review", description: "Review a pull request" }];
-      const discovered = [
-        { command: "/review", description: "Custom command (project)" },
-        { command: "/plan", description: "Custom command (global)" },
-      ];
-      const deps = createMockDeps({
-        getSlashCommands: () => configured,
-        discoverSlashCommands: () => discovered,
-      });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands");
-
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.commands).toEqual([
-        { command: "/review", description: "Review a pull request" },
-        { command: "/plan", description: "Custom command (global)" },
-      ]);
-    });
-
-    it("works without discoverSlashCommands dep (backward-compatible)", async () => {
-      const deps = createMockDeps({
-        discoverSlashCommands: undefined,
-      });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands");
-
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
-    });
-
-    it("uses fetched builtin commands as base layer", async () => {
+    it("returns builtin commands when no discovered", async () => {
       const builtin = [
         { command: "/clear", description: "Clear history" },
         { command: "/plan", description: "Enter plan mode" },
       ];
       const deps = createMockDeps({
-        getSlashCommands: () => [],
         discoverSlashCommands: () => [],
         getBuiltinCommands: () => builtin,
       });
@@ -797,9 +746,8 @@ describe("Settings API endpoints", () => {
       expect(data.commands).toEqual(builtin);
     });
 
-    it("falls back to DEFAULT_SLASH_COMMANDS when getBuiltinCommands returns null", async () => {
+    it("returns empty array when getBuiltinCommands returns null", async () => {
       const deps = createMockDeps({
-        getSlashCommands: () => [],
         discoverSlashCommands: () => [],
         getBuiltinCommands: () => null,
       });
@@ -807,11 +755,10 @@ describe("Settings API endpoints", () => {
 
       const res = await app.request("/api/settings/slash-commands");
       const data = await res.json();
-      expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
+      expect(data.commands).toEqual([]);
     });
 
-    it("configured > discovered > builtin priority with dedup", async () => {
-      const configured = [{ command: "/clear", description: "User clear" }];
+    it("discovered commands take priority over builtin with same name", async () => {
       const discovered = [
         { command: "/clear", description: "Discovered clear" },
         { command: "/deploy", description: "Custom command (project)" },
@@ -822,7 +769,6 @@ describe("Settings API endpoints", () => {
         { command: "/plan", description: "Enter plan mode" },
       ];
       const deps = createMockDeps({
-        getSlashCommands: () => configured,
         discoverSlashCommands: () => discovered,
         getBuiltinCommands: () => builtin,
       });
@@ -831,84 +777,25 @@ describe("Settings API endpoints", () => {
       const res = await app.request("/api/settings/slash-commands");
       const data = await res.json();
       expect(data.commands).toEqual([
-        { command: "/clear", description: "User clear" },
+        { command: "/clear", description: "Discovered clear" },
         { command: "/deploy", description: "Custom command (project)" },
         { command: "/plan", description: "Enter plan mode" },
       ]);
     });
-  });
 
-  describe("PUT /api/settings/slash-commands", () => {
-    it("updates and returns new command list", async () => {
-      const setSlashCommandsSpy = mock(
-        (commands: { command: string; description: string }[]) => commands,
-      );
-      const deps = createMockDeps({ setSlashCommands: setSlashCommandsSpy });
+    it("works without discoverSlashCommands dep", async () => {
+      const builtin = [{ command: "/help", description: "Get help" }];
+      const deps = createMockDeps({
+        discoverSlashCommands: undefined,
+        getBuiltinCommands: () => builtin,
+      });
       const app = createApp(deps);
 
-      const newCommands = [{ command: "/test", description: "Test command" }];
-      const res = await app.request("/api/settings/slash-commands", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commands: newCommands }),
-      });
+      const res = await app.request("/api/settings/slash-commands");
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.commands).toEqual(newCommands);
-      expect(data.timestamp).toBeGreaterThan(0);
-      expect(setSlashCommandsSpy).toHaveBeenCalledWith(newCommands);
-    });
-
-    it("returns 400 when commands array is missing", async () => {
-      const deps = createMockDeps();
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-
-      expect(res.status).toBe(400);
-    });
-
-    it("returns 400 when body is not valid JSON", async () => {
-      const deps = createMockDeps();
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands", {
-        method: "PUT",
-        body: "not json",
-      });
-
-      expect(res.status).toBe(400);
-    });
-
-    it("returns 400 when commands contain invalid items", async () => {
-      const deps = createMockDeps();
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commands: [{ command: 123 }] }),
-      });
-
-      expect(res.status).toBe(400);
-    });
-
-    it("returns 501 when setSlashCommands not provided", async () => {
-      const deps = createMockDeps({ setSlashCommands: undefined });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/settings/slash-commands", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commands: [{ command: "/test", description: "Test" }] }),
-      });
-
-      expect(res.status).toBe(501);
+      expect(data.commands).toEqual(builtin);
     });
   });
 });

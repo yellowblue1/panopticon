@@ -1,5 +1,4 @@
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, MAX_FILES_PER_REQUEST } from "@shared/constants";
-import { DEFAULT_SLASH_COMMANDS } from "@shared/default-slash-commands";
 import type { PaneAction } from "@shared/types";
 import { Camera, FileText, Paperclip, Send, X } from "lucide-react";
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
@@ -29,7 +28,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const { action, isDetecting, detect, clear } = useActionDetection(paneId);
   const isMobile = useMediaQuery("(max-width: 639px)");
   const { data: slashCommandsData } = useSlashCommands();
-  const slashCommands = slashCommandsData?.commands ?? DEFAULT_SLASH_COMMANDS;
+  const slashCommands = slashCommandsData?.commands ?? [];
 
   const hasText = text.trim().length > 0;
   const hasFiles = files.length > 0;
