@@ -10,7 +10,6 @@ import { join } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import type {
   AgentType,
   AuthStatusResponse,
@@ -69,9 +68,7 @@ export interface AppDeps {
   getPlansAvailability?: () => Record<string, boolean>;
   deletePlan?: (paneId: string) => boolean;
 
-  // Settings: slash commands
-  getSlashCommands?: () => SlashCommand[];
-  setSlashCommands?: (commands: SlashCommand[]) => SlashCommand[];
+  // Settings: slash commands (read-only, auto-discovered)
   discoverSlashCommands?: () => SlashCommand[];
   getBuiltinCommands?: () => SlashCommand[] | null;
 
@@ -360,20 +357,13 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
     // GET /api/settings/slash-commands
     .get("/api/settings/slash-commands", (c) => {
-      const configured = deps.getSlashCommands?.() ?? [];
       const discovered = deps.discoverSlashCommands?.() ?? [];
-      const builtin = deps.getBuiltinCommands?.() ?? DEFAULT_SLASH_COMMANDS;
+      const builtin = deps.getBuiltinCommands?.() ?? [];
 
-      // Priority: configured > discovered > builtin (fetched or hardcoded defaults)
+      // Priority: discovered > builtin (discovered wins on duplicates)
       const seen = new Set<string>();
       const merged: SlashCommand[] = [];
 
-      for (const cmd of configured) {
-        if (!seen.has(cmd.command)) {
-          seen.add(cmd.command);
-          merged.push(cmd);
-        }
-      }
       for (const cmd of discovered) {
         if (!seen.has(cmd.command)) {
           seen.add(cmd.command);
@@ -389,30 +379,6 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
       return c.json({
         commands: merged,
-        timestamp: Date.now(),
-      } satisfies SlashCommandsResponse);
-    })
-
-    // PUT /api/settings/slash-commands
-    .put("/api/settings/slash-commands", async (c) => {
-      const body = await c.req.json().catch(() => null);
-      if (!body || !Array.isArray(body.commands)) {
-        return c.json({ error: "Request body must include a 'commands' array" }, 400);
-      }
-      for (const cmd of body.commands) {
-        if (typeof cmd.command !== "string" || typeof cmd.description !== "string") {
-          return c.json(
-            { error: "Each command must have 'command' and 'description' strings" },
-            400,
-          );
-        }
-      }
-      if (!deps.setSlashCommands) {
-        return c.json({ error: "Not available" }, 501);
-      }
-      const commands = deps.setSlashCommands(body.commands);
-      return c.json({
-        commands,
         timestamp: Date.now(),
       } satisfies SlashCommandsResponse);
     })

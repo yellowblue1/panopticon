@@ -66,12 +66,6 @@ function AppShell() {
               >
                 Launcher
               </Link>
-              <Link
-                to="/settings"
-                className="hover:text-text-primary transition-colors [&.active]:text-accent-blue"
-              >
-                Settings
-              </Link>
             </nav>
           </div>
           <ConnectionIndicator />

@@ -156,7 +156,6 @@ export interface LauncherConfigResponse {
   timestamp: number;
 }
 
-
 export interface BrowseEntry {
   name: string;
   path: string;

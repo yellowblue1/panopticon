@@ -23,9 +23,8 @@ import { createPlanDiscoveryDeps } from "../src/plan/infrastructure/file-operati
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
-import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
-import type { PaneContentDiff, PaneContentFull, SlashCommand } from "../src/shared/types";
+import type { PaneContentDiff, PaneContentFull } from "../src/shared/types";
 import { sendMessage } from "../src/terminal/application/send-message";
 import { createFileUploadDeps } from "../src/terminal/infrastructure/file-upload";
 import {
@@ -65,43 +64,9 @@ const PORT = process.env.PORT
     : DEFAULT_PORT;
 const HOST = process.env.HOST ?? DEFAULT_HOST;
 
-// ═══ Slash commands config ═══
-
-const CONFIG_DIR = join(homedir(), ".config", "panopticon");
-const CACHE_DIR = join(homedir(), ".cache", "panopticon");
-const SLASH_COMMANDS_PATH = join(CONFIG_DIR, "slash-commands.json");
-
-function isValidSlashCommand(item: unknown): item is SlashCommand {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    typeof (item as SlashCommand).command === "string" &&
-    typeof (item as SlashCommand).description === "string"
-  );
-}
-
-function readSlashCommands(): SlashCommand[] {
-  try {
-    if (!existsSync(SLASH_COMMANDS_PATH)) {
-      return DEFAULT_SLASH_COMMANDS;
-    }
-    const raw = readFileSync(SLASH_COMMANDS_PATH, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.every(isValidSlashCommand)) {
-      return parsed;
-    }
-    return DEFAULT_SLASH_COMMANDS;
-  } catch {
-    return DEFAULT_SLASH_COMMANDS;
-  }
-}
-
-function writeSlashCommands(commands: SlashCommand[]): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(SLASH_COMMANDS_PATH, JSON.stringify(commands, null, 2), "utf-8");
-}
-
 // ═══ Builtin command fetcher ═══
+
+const CACHE_DIR = join(homedir(), ".cache", "panopticon");
 
 const builtinCommandProvider = new BuiltinCommandProvider({
   fetchText: async (url) => {
@@ -411,11 +376,6 @@ const app = createApp(
       return success;
     },
     getBuiltinCommands: () => builtinCommandProvider.getCommands(),
-    getSlashCommands: readSlashCommands,
-    setSlashCommands: (commands) => {
-      writeSlashCommands(commands);
-      return commands;
-    },
     discoverProjects: () =>
       discoverProjects(launcherDeps).map((p) => ({
         name: p.name,
