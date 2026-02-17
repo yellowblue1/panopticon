@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["src/shared/types.ts", "bin/cli.ts", "**/*.test.ts", "test-setup.ts"],
+      "entry": ["src/shared/types.ts", "**/*.test.ts", "test-setup.ts"],
       "project": ["src/**/*.ts", "bin/**/*.ts"]
     },
     "web": {

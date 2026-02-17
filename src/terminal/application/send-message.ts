@@ -5,7 +5,7 @@ export interface SendMessageDeps {
   saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => UploadedFile | null;
 }
 
-export interface SendMessageInput {
+interface SendMessageInput {
   readonly paneId: string;
   readonly text: string;
   readonly files: ReadonlyArray<{

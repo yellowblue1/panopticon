@@ -33,7 +33,7 @@ export interface FileUploadFsDeps {
   now: () => number;
 }
 
-export interface FileUploadDeps {
+interface FileUploadDeps {
   saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => UploadedFile | null;
   cleanup: () => void;
   getUploadDir: () => string;
