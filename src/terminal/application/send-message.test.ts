@@ -1,16 +1,19 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { UploadedFile } from "../infrastructure/file-upload";
+import type { SaveFileResult } from "../infrastructure/file-upload";
 import { type SendMessageDeps, sendMessage } from "./send-message";
 
 function createMockDeps(overrides: Partial<SendMessageDeps> = {}): SendMessageDeps {
   return {
     sendKeys: mock(() => true),
     saveFile: mock(
-      (_data: ArrayBuffer, originalName: string, mimeType: string): UploadedFile => ({
-        originalName,
-        savedPath: `/tmp/panopticon-uploads/123-abc-${originalName}`,
-        mimeType,
-        size: 100,
+      (_data: ArrayBuffer, originalName: string, mimeType: string): SaveFileResult => ({
+        ok: true,
+        file: {
+          originalName,
+          savedPath: `/tmp/panopticon-uploads/123-abc-${originalName}`,
+          mimeType,
+          size: 100,
+        },
       }),
     ),
     ...overrides,
@@ -84,15 +87,18 @@ describe("sendMessage", () => {
     expect(result.error).toContain("Maximum");
   });
 
-  it("returns error when saveFile fails", () => {
+  it("returns error with reason when saveFile fails", () => {
     const deps = createMockDeps({
-      saveFile: mock(() => null),
+      saveFile: mock(
+        (): SaveFileResult => ({ ok: false, reason: "Unsupported file type: text/javascript" }),
+      ),
     });
-    const files = [{ data: new ArrayBuffer(10), name: "bad.exe", type: "image/png" }];
+    const files = [{ data: new ArrayBuffer(10), name: "bad.exe", type: "text/javascript" }];
     const result = sendMessage({ paneId: "%0", text: "test", files }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Failed to save file");
+    expect(result.error).toContain("Unsupported file type");
     expect(deps.sendKeys).not.toHaveBeenCalled();
   });
 

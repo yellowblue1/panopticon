@@ -1,3 +1,4 @@
+import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, MAX_FILES_PER_REQUEST } from "@shared/constants";
 import { DEFAULT_SLASH_COMMANDS } from "@shared/default-slash-commands";
 import type { PaneAction } from "@shared/types";
 import { Camera, FileText, Paperclip, Send, X } from "lucide-react";
@@ -10,10 +11,6 @@ import { useSendMessage } from "@/hooks/use-send-message";
 import { useSlashCommands } from "@/hooks/use-slash-commands";
 import { cn } from "@/lib/cn";
 import { CommandPalette } from "./command-palette";
-
-const ACCEPTED_TYPES = "image/png,image/jpeg,image/gif,image/webp,application/pdf";
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MAX_FILES = 5;
 
 interface SendKeysInputProps {
   paneId: string;
@@ -105,8 +102,8 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
 
     setFiles((prev) => {
       const combined = [...prev, ...newFiles];
-      if (combined.length > MAX_FILES) {
-        toast.error(`Maximum ${MAX_FILES} files allowed`);
+      if (combined.length > MAX_FILES_PER_REQUEST) {
+        toast.error(`Maximum ${MAX_FILES_PER_REQUEST} files allowed`);
         return prev;
       }
       return combined;
@@ -367,7 +364,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <input
           ref={fileInputRef}
           type="file"
-          accept={ACCEPTED_TYPES}
+          accept={ACCEPTED_FILE_TYPES}
           multiple
           className="hidden"
           onChange={handleFileSelect}

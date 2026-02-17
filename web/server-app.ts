@@ -233,7 +233,6 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
           success: true,
           uploadedFiles: result.uploadedFiles.map((f) => ({
             originalName: f.originalName,
-            savedPath: f.savedPath,
           })),
         } satisfies SendMessageResponse);
       }

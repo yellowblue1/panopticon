@@ -172,5 +172,5 @@ export interface BrowsePathResponse {
 export interface SendMessageResponse {
   success: boolean;
   error?: string;
-  uploadedFiles?: Array<{ originalName: string; savedPath: string }>;
+  uploadedFiles?: Array<{ originalName: string }>;
 }

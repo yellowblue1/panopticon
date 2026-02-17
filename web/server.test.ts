@@ -286,6 +286,7 @@ describe("Hono API endpoints", () => {
       expect(data.success).toBe(true);
       expect(data.uploadedFiles).toHaveLength(1);
       expect(data.uploadedFiles[0].originalName).toBe("test.png");
+      expect(data.uploadedFiles[0]).not.toHaveProperty("savedPath");
     });
 
     it("returns 500 when sendMessage fails", async () => {

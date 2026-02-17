@@ -1,6 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  ALLOWED_MIME_TYPES as ALLOWED_MIME_TYPES_LIST,
+  MAX_FILE_SIZE,
+} from "../../shared/constants";
 
 export interface UploadedFile {
   readonly originalName: string;
@@ -9,15 +13,12 @@ export interface UploadedFile {
   readonly size: number;
 }
 
-const ALLOWED_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-]);
+export type SaveFileResult =
+  | { readonly ok: true; readonly file: UploadedFile }
+  | { readonly ok: false; readonly reason: string };
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_MIME_TYPES: Set<string> = new Set(ALLOWED_MIME_TYPES_LIST);
+
 const CLEANUP_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 const UPLOAD_DIR_NAME = "panopticon-uploads";
 
@@ -34,7 +35,7 @@ export interface FileUploadFsDeps {
 }
 
 interface FileUploadDeps {
-  saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => UploadedFile | null;
+  saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => SaveFileResult;
   cleanup: () => void;
   getUploadDir: () => string;
 }
@@ -71,17 +72,13 @@ export function createFileUploadDeps(
     }
   }
 
-  function saveFile(
-    data: ArrayBuffer,
-    originalName: string,
-    mimeType: string,
-  ): UploadedFile | null {
+  function saveFile(data: ArrayBuffer, originalName: string, mimeType: string): SaveFileResult {
     if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-      return null;
+      return { ok: false, reason: `Unsupported file type: ${mimeType}` };
     }
 
     if (data.byteLength > MAX_FILE_SIZE) {
-      return null;
+      return { ok: false, reason: `File exceeds maximum size of ${MAX_FILE_SIZE} bytes` };
     }
 
     ensureUploadDir();
@@ -90,13 +87,15 @@ export function createFileUploadDeps(
     const filename = `${fsDeps.now()}-${fsDeps.randomHex()}-${sanitized}`;
     const savedPath = join(uploadDir, filename);
 
-    fsDeps.writeFileSync(savedPath, Buffer.from(data));
+    try {
+      fsDeps.writeFileSync(savedPath, Buffer.from(data));
+    } catch {
+      return { ok: false, reason: "Failed to write file to disk" };
+    }
 
     return {
-      originalName,
-      savedPath,
-      mimeType,
-      size: data.byteLength,
+      ok: true,
+      file: { originalName, savedPath, mimeType, size: data.byteLength },
     };
   }
 
@@ -107,10 +106,14 @@ export function createFileUploadDeps(
     const files = fsDeps.readdirSync(uploadDir);
 
     for (const file of files) {
-      const filePath = join(uploadDir, file);
-      const stat = fsDeps.statSync(filePath);
-      if (stat.mtimeMs < cutoff) {
-        fsDeps.unlinkSync(filePath);
+      try {
+        const filePath = join(uploadDir, file);
+        const stat = fsDeps.statSync(filePath);
+        if (stat.mtimeMs < cutoff) {
+          fsDeps.unlinkSync(filePath);
+        }
+      } catch {
+        // File may have been removed between readdir and stat/unlink; skip safely
       }
     }
   }

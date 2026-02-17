@@ -1,8 +1,9 @@
-import type { UploadedFile } from "../infrastructure/file-upload";
+import { MAX_FILES_PER_REQUEST } from "../../shared/constants";
+import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload";
 
 export interface SendMessageDeps {
   sendKeys: (paneId: string, text: string) => boolean;
-  saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => UploadedFile | null;
+  saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => SaveFileResult;
 }
 
 interface SendMessageInput {
@@ -20,8 +21,6 @@ export interface SendMessageResult {
   readonly error?: string;
   readonly uploadedFiles: readonly UploadedFile[];
 }
-
-const MAX_FILES_PER_REQUEST = 5;
 
 export function sendMessage(input: SendMessageInput, deps: SendMessageDeps): SendMessageResult {
   const { paneId, text, files } = input;
@@ -41,15 +40,15 @@ export function sendMessage(input: SendMessageInput, deps: SendMessageDeps): Sen
 
   const savedFiles: UploadedFile[] = [];
   for (const file of files) {
-    const uploaded = deps.saveFile(file.data, file.name, file.type);
-    if (!uploaded) {
+    const result = deps.saveFile(file.data, file.name, file.type);
+    if (!result.ok) {
       return {
         success: false,
-        error: `Failed to save file: ${file.name}`,
+        error: `Failed to save file: ${file.name} (${result.reason})`,
         uploadedFiles: savedFiles,
       };
     }
-    savedFiles.push(uploaded);
+    savedFiles.push(result.file);
   }
 
   const parts: string[] = [];

@@ -25,11 +25,15 @@ describe("createFileUploadDeps", () => {
       const data = new ArrayBuffer(100);
       const result = deps.saveFile(data, "screenshot.png", "image/png");
 
-      expect(result).not.toBeNull();
-      expect(result?.originalName).toBe("screenshot.png");
-      expect(result?.savedPath).toBe("/tmp/panopticon-uploads/1700000000000-abc123-screenshot.png");
-      expect(result?.mimeType).toBe("image/png");
-      expect(result?.size).toBe(100);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.file.originalName).toBe("screenshot.png");
+        expect(result.file.savedPath).toBe(
+          "/tmp/panopticon-uploads/1700000000000-abc123-screenshot.png",
+        );
+        expect(result.file.mimeType).toBe("image/png");
+        expect(result.file.size).toBe(100);
+      }
       expect(fsDeps.writeFileSync).toHaveBeenCalledTimes(1);
     });
 
@@ -40,28 +44,37 @@ describe("createFileUploadDeps", () => {
       const data = new ArrayBuffer(500);
       const result = deps.saveFile(data, "doc.pdf", "application/pdf");
 
-      expect(result).not.toBeNull();
-      expect(result?.mimeType).toBe("application/pdf");
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.file.mimeType).toBe("application/pdf");
+      }
     });
 
-    it("rejects files with invalid MIME type", () => {
+    it("rejects files with invalid MIME type and returns reason", () => {
       const fsDeps = createMockFsDeps();
       const deps = createFileUploadDeps(fsDeps);
 
       const result = deps.saveFile(new ArrayBuffer(100), "script.js", "text/javascript");
 
-      expect(result).toBeNull();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toContain("Unsupported file type");
+        expect(result.reason).toContain("text/javascript");
+      }
       expect(fsDeps.writeFileSync).not.toHaveBeenCalled();
     });
 
-    it("rejects files exceeding 10 MB", () => {
+    it("rejects files exceeding 10 MB and returns reason", () => {
       const fsDeps = createMockFsDeps();
       const deps = createFileUploadDeps(fsDeps);
 
       const largeData = new ArrayBuffer(11 * 1024 * 1024);
       const result = deps.saveFile(largeData, "big.png", "image/png");
 
-      expect(result).toBeNull();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toContain("exceeds maximum size");
+      }
       expect(fsDeps.writeFileSync).not.toHaveBeenCalled();
     });
 
@@ -71,9 +84,11 @@ describe("createFileUploadDeps", () => {
 
       const result = deps.saveFile(new ArrayBuffer(10), "../../etc/passwd", "image/png");
 
-      expect(result).not.toBeNull();
-      expect(result?.savedPath).not.toContain("../");
-      expect(result?.savedPath).toContain("_etc_passwd");
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.file.savedPath).not.toContain("../");
+        expect(result.file.savedPath).toContain("_etc_passwd");
+      }
     });
 
     it("sanitizes filenames with special characters", () => {
@@ -82,10 +97,12 @@ describe("createFileUploadDeps", () => {
 
       const result = deps.saveFile(new ArrayBuffer(10), 'file<name>:"test".png', "image/png");
 
-      expect(result).not.toBeNull();
-      expect(result?.savedPath).not.toContain("<");
-      expect(result?.savedPath).not.toContain(">");
-      expect(result?.savedPath).not.toContain('"');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.file.savedPath).not.toContain("<");
+        expect(result.file.savedPath).not.toContain(">");
+        expect(result.file.savedPath).not.toContain('"');
+      }
     });
 
     it("creates upload directory if it does not exist", () => {
@@ -105,7 +122,23 @@ describe("createFileUploadDeps", () => {
         const fsDeps = createMockFsDeps();
         const deps = createFileUploadDeps(fsDeps);
         const result = deps.saveFile(new ArrayBuffer(10), "file.ext", mime);
-        expect(result).not.toBeNull();
+        expect(result.ok).toBe(true);
+      }
+    });
+
+    it("returns failure reason when writeFileSync throws", () => {
+      const fsDeps = createMockFsDeps({
+        writeFileSync: mock(() => {
+          throw new Error("ENOSPC: disk full");
+        }),
+      });
+      const deps = createFileUploadDeps(fsDeps);
+
+      const result = deps.saveFile(new ArrayBuffer(10), "test.png", "image/png");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toContain("Failed to write file to disk");
       }
     });
   });
@@ -148,6 +181,43 @@ describe("createFileUploadDeps", () => {
       deps.cleanup();
 
       expect(fsDeps.readdirSync).not.toHaveBeenCalled();
+    });
+
+    it("handles file removed between readdir and stat gracefully", () => {
+      const now = 1700000000000;
+      const oldTime = now - 2 * 60 * 60 * 1000;
+      const fsDeps = createMockFsDeps({
+        now: () => now,
+        readdirSync: mock(() => ["vanished-file.png", "still-here.png"]),
+        statSync: mock((path: string) => {
+          if (path.includes("vanished-file")) throw new Error("ENOENT");
+          return { mtimeMs: oldTime };
+        }),
+      });
+      const deps = createFileUploadDeps(fsDeps);
+
+      deps.cleanup();
+
+      expect(fsDeps.unlinkSync).toHaveBeenCalledWith("/tmp/panopticon-uploads/still-here.png");
+      expect(fsDeps.unlinkSync).toHaveBeenCalledTimes(1);
+    });
+
+    it("handles unlinkSync failure gracefully", () => {
+      const now = 1700000000000;
+      const oldTime = now - 2 * 60 * 60 * 1000;
+      const fsDeps = createMockFsDeps({
+        now: () => now,
+        readdirSync: mock(() => ["locked.png", "removable.png"]),
+        statSync: mock(() => ({ mtimeMs: oldTime })),
+        unlinkSync: mock((path: string) => {
+          if (path.includes("locked")) throw new Error("EPERM");
+        }),
+      });
+      const deps = createFileUploadDeps(fsDeps);
+
+      deps.cleanup();
+
+      expect(fsDeps.unlinkSync).toHaveBeenCalledTimes(2);
     });
   });
 
