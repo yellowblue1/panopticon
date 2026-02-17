@@ -1,5 +1,5 @@
 import { FolderOpen } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useBrowsePath } from "@/hooks/use-browse-path";
 import { cn } from "@/lib/cn";
 
@@ -22,6 +22,7 @@ export function PathAutocompleteInput({
   onChange,
   placeholder,
 }: PathAutocompleteInputProps) {
+  const listboxId = useId();
   const [debouncedValue, setDebouncedValue] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -61,7 +62,9 @@ export function PathAutocompleteInput({
 
   const handleSelect = (entryName: string) => {
     const prefix = extractBrowsePrefix(value);
-    onChange(`${prefix}${entryName}/`);
+    const newValue = `${prefix}${entryName}/`;
+    onChange(newValue);
+    setDebouncedValue(newValue);
     setIsOpen(false);
     inputRef.current?.focus();
   };
@@ -110,6 +113,12 @@ export function PathAutocompleteInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        aria-activedescendant={
+          isOpen && entries.length > 0 ? `${listboxId}-option-${selectedIndex}` : undefined
+        }
         className={cn(
           "w-full bg-bg-primary border border-border-default rounded px-2 py-1.5",
           "text-sm font-mono text-text-primary placeholder:text-text-muted",
@@ -119,6 +128,8 @@ export function PathAutocompleteInput({
       {isOpen && entries.length > 0 && (
         <div
           ref={listRef}
+          id={listboxId}
+          role="listbox"
           className={cn(
             "absolute left-0 right-0 top-full mt-1 z-20",
             "bg-bg-secondary border border-border-default rounded-md shadow-lg",
@@ -129,6 +140,9 @@ export function PathAutocompleteInput({
             <button
               key={entry.path}
               type="button"
+              id={`${listboxId}-option-${i}`}
+              role="option"
+              aria-selected={i === selectedIndex}
               onMouseDown={(e) => {
                 e.preventDefault();
                 handleSelect(entry.name);

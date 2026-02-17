@@ -32,6 +32,11 @@ export function browsePath(inputPath: string, deps: LauncherDeps): BrowseResult 
   const raw = deps.resolvePath(browseDir);
   const resolvedDir = raw.length > 1 ? raw.replace(/\/+$/, "") : raw;
 
+  const home = deps.homeDir();
+  if (resolvedDir !== home && !resolvedDir.startsWith(`${home}/`)) {
+    return { entries: [], basePath: resolvedDir };
+  }
+
   if (!deps.pathExists(resolvedDir) || !deps.isDirectory(resolvedDir)) {
     return { entries: [], basePath: resolvedDir };
   }

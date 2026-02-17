@@ -70,7 +70,7 @@ describe("browsePath", () => {
       resolvePath: (p) => p,
       pathExists: () => false,
     });
-    const result = browsePath("/nonexistent/", deps);
+    const result = browsePath("/home/test/nonexistent/", deps);
     expect(result.entries).toEqual([]);
   });
 
@@ -102,19 +102,19 @@ describe("browsePath", () => {
       isDirectory: () => true,
       pathExists: () => true,
     });
-    const result = browsePath("/test/", deps);
+    const result = browsePath("/home/test/projects/", deps);
     expect(result.entries.map((e) => e.name)).toEqual(["alpha", "middle", "zebra"]);
   });
 
-  it("handles root path", () => {
+  it("returns empty entries for paths outside home directory", () => {
     const deps = createMockLauncherDeps({
       resolvePath: (p) => p,
-      readDir: (path) => (path === "/" ? ["usr", "home", "etc"] : []),
+      readDir: () => ["usr", "home", "etc"],
       isDirectory: () => true,
       pathExists: () => true,
     });
     const result = browsePath("/", deps);
-    expect(result.entries).toHaveLength(3);
+    expect(result.entries).toEqual([]);
     expect(result.basePath).toBe("/");
   });
 
@@ -138,5 +138,39 @@ describe("browsePath", () => {
     const result = browsePath("~/src/pa", deps);
     expect(result.entries).toEqual([{ name: "panopticon", path: "/home/test/src/panopticon" }]);
     expect(result.basePath).toBe("/home/test/src");
+  });
+
+  it("returns empty entries for absolute paths outside home directory", () => {
+    const deps = createMockLauncherDeps({
+      resolvePath: (p) => p,
+      readDir: () => ["secret", "data"],
+      isDirectory: () => true,
+      pathExists: () => true,
+    });
+    const result = browsePath("/etc/", deps);
+    expect(result.entries).toEqual([]);
+    expect(result.basePath).toBe("/etc");
+  });
+
+  it("allows browsing paths inside home directory", () => {
+    const deps = createMockLauncherDeps({
+      resolvePath: (p) => p.replace(/^~/, "/home/test"),
+      readDir: () => ["project-a", "project-b"],
+      isDirectory: () => true,
+      pathExists: () => true,
+    });
+    const result = browsePath("~/src/", deps);
+    expect(result.entries).toHaveLength(2);
+  });
+
+  it("rejects path that is a prefix of home but not a descendant", () => {
+    const deps = createMockLauncherDeps({
+      resolvePath: (p) => p,
+      readDir: () => ["data"],
+      isDirectory: () => true,
+      pathExists: () => true,
+    });
+    const result = browsePath("/home/testevil/", deps);
+    expect(result.entries).toEqual([]);
   });
 });

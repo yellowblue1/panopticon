@@ -6,6 +6,7 @@ export interface LauncherDeps {
   isDirectory: (path: string) => boolean;
   pathExists: (path: string) => boolean;
   resolvePath: (path: string) => string;
+  homeDir: () => string;
 
   // Git info (injected from terminal context via composition root)
   getProjectName: (cwd: string) => string;
