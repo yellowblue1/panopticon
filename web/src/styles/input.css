@@ -583,6 +583,32 @@ html.vertical-expand [data-app-shell] {
   visibility: hidden;
 }
 
+/* File attachment preview */
+.file-preview {
+  @apply relative shrink-0 rounded-md overflow-hidden border border-border-default;
+  width: 48px;
+  height: 48px;
+}
+
+.file-preview img {
+  @apply w-full h-full object-cover;
+}
+
+.file-preview-remove {
+  @apply absolute -top-0.5 -right-0.5 bg-bg-tertiary rounded-full p-0.5 text-text-muted cursor-pointer transition-colors;
+}
+
+.file-preview-remove:hover {
+  @apply text-accent-red bg-bg-secondary;
+}
+
+.file-preview-pdf {
+  @apply flex flex-col items-center justify-center bg-bg-secondary text-text-muted p-1;
+  width: 48px;
+  height: 48px;
+  font-size: 0.625rem;
+}
+
 /* Send keys input bar */
 .send-keys-bar {
   @apply sticky bottom-0 bg-bg-primary border-t border-border-default pt-3 pb-3;

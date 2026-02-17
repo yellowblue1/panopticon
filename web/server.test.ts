@@ -201,6 +201,118 @@ describe("Hono API endpoints", () => {
     });
   });
 
+  describe("POST /api/sessions/:pane_id/send-message", () => {
+    it("returns 501 when sendMessage dependency is not provided", async () => {
+      const deps = createMockDeps({ sendMessage: undefined });
+      const app = createApp(deps);
+
+      const formData = new FormData();
+      formData.append("text", "hello");
+      const res = await app.request("/api/sessions/%250/send-message", {
+        method: "POST",
+        body: formData,
+      });
+
+      expect(res.status).toBe(501);
+    });
+
+    it("returns 400 when both text and files are empty", async () => {
+      const deps = createMockDeps({
+        sendMessage: mock(() => ({ success: true, uploadedFiles: [] })),
+      });
+      const app = createApp(deps);
+
+      const formData = new FormData();
+      formData.append("text", "");
+      const res = await app.request("/api/sessions/%250/send-message", {
+        method: "POST",
+        body: formData,
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+    });
+
+    it("returns success for text-only message", async () => {
+      const sendMessageSpy = mock((_paneId: string, _text: string, _files: unknown[]) => ({
+        success: true,
+        uploadedFiles: [],
+      }));
+      const deps = createMockDeps({ sendMessage: sendMessageSpy });
+      const app = createApp(deps);
+
+      const formData = new FormData();
+      formData.append("text", "check this");
+      const res = await app.request("/api/sessions/%250/send-message", {
+        method: "POST",
+        body: formData,
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(sendMessageSpy).toHaveBeenCalled();
+      const [paneId, text] = sendMessageSpy.mock.calls[0];
+      expect(paneId).toBe("%0");
+      expect(text).toBe("check this");
+    });
+
+    it("returns success for message with file", async () => {
+      const sendMessageSpy = mock((_paneId: string, _text: string, _files: unknown[]) => ({
+        success: true,
+        uploadedFiles: [
+          {
+            originalName: "test.png",
+            savedPath: "/tmp/panopticon-uploads/123-test.png",
+            mimeType: "image/png",
+            size: 100,
+          },
+        ],
+      }));
+      const deps = createMockDeps({ sendMessage: sendMessageSpy });
+      const app = createApp(deps);
+
+      const formData = new FormData();
+      formData.append("text", "see image");
+      formData.append("files", new File([new ArrayBuffer(100)], "test.png", { type: "image/png" }));
+      const res = await app.request("/api/sessions/%250/send-message", {
+        method: "POST",
+        body: formData,
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.uploadedFiles).toHaveLength(1);
+      expect(data.uploadedFiles[0].originalName).toBe("test.png");
+      expect(data.uploadedFiles[0]).not.toHaveProperty("savedPath");
+    });
+
+    it("returns 500 when sendMessage fails", async () => {
+      const deps = createMockDeps({
+        sendMessage: mock(() => ({
+          success: false,
+          error: "Failed to send",
+          uploadedFiles: [],
+        })),
+      });
+      const app = createApp(deps);
+
+      const formData = new FormData();
+      formData.append("text", "hello");
+      const res = await app.request("/api/sessions/%250/send-message", {
+        method: "POST",
+        body: formData,
+      });
+
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toBe("Failed to send");
+    });
+  });
+
   describe("POST /api/sessions/:pane_id/switch", () => {
     it("returns success when switchClient succeeds", async () => {
       const switchClientSpy = mock((_paneId: string) => true);

@@ -1,11 +1,13 @@
+import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, MAX_FILES_PER_REQUEST } from "@shared/constants";
 import { DEFAULT_SLASH_COMMANDS } from "@shared/default-slash-commands";
 import type { PaneAction } from "@shared/types";
-import { Send } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Camera, FileText, Paperclip, Send, X } from "lucide-react";
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActionDetection } from "@/hooks/use-action-detection";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSendKeys } from "@/hooks/use-send-keys";
+import { useSendMessage } from "@/hooks/use-send-message";
 import { useSlashCommands } from "@/hooks/use-slash-commands";
 import { cn } from "@/lib/cn";
 import { CommandPalette } from "./command-palette";
@@ -16,16 +18,22 @@ interface SendKeysInputProps {
 
 export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const sendKeys = useSendKeys();
+  const sendMessage = useSendMessage();
   const { action, isDetecting, detect, clear } = useActionDetection(paneId);
   const isMobile = useMediaQuery("(max-width: 639px)");
   const { data: slashCommandsData } = useSlashCommands();
   const slashCommands = slashCommandsData?.commands ?? DEFAULT_SLASH_COMMANDS;
 
   const hasText = text.trim().length > 0;
+  const hasFiles = files.length > 0;
+  const isPending = sendKeys.isPending || sendMessage.isPending;
 
   // Open command palette with "/" key when no input is focused
   useEffect(() => {
@@ -79,9 +87,55 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     setTimeout(scroll, 400);
   };
 
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files;
+    if (!selected) return;
+
+    const newFiles = Array.from(selected);
+    for (const file of newFiles) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name} exceeds 10 MB limit`);
+        e.target.value = "";
+        return;
+      }
+    }
+
+    setFiles((prev) => {
+      const combined = [...prev, ...newFiles];
+      if (combined.length > MAX_FILES_PER_REQUEST) {
+        toast.error(`Maximum ${MAX_FILES_PER_REQUEST} files allowed`);
+        return prev;
+      }
+      return combined;
+    });
+
+    e.target.value = "";
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed && !hasFiles) return;
+
+    // When files are attached, use multipart upload endpoint
+    if (hasFiles) {
+      sendMessage.mutate(
+        { paneId, text: trimmed, files },
+        {
+          onSuccess: (data) => {
+            setText("");
+            setFiles([]);
+            inputRef.current?.focus();
+            const fileCount = data.uploadedFiles?.length ?? 0;
+            toast.success(fileCount > 0 ? `Sent with ${fileCount} file(s)` : `Sent: ${trimmed}`);
+          },
+        },
+      );
+      return;
+    }
 
     // If choices are shown with a "Type something" option, select it first
     const typeOption =
@@ -129,8 +183,8 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       e.preventDefault();
       handleSend(text);
     }
-    // Typing "/" in an empty textarea opens the command palette (Slack pattern)
-    if (e.key === "/" && !text) {
+    // Typing "/" in an empty textarea (no files) opens the command palette
+    if (e.key === "/" && !text && !hasFiles) {
       e.preventDefault();
       setIsPaletteOpen(true);
     }
@@ -174,9 +228,9 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     );
   };
 
-  /** Morphing action button: "/" when empty (opens palette), Send when has text */
+  /** Morphing action button: "/" when empty (opens palette), Send when has content */
   const handleActionButton = () => {
-    if (hasText) {
+    if (hasText || hasFiles) {
       handleSend(text);
     } else {
       setIsPaletteOpen(true);
@@ -217,7 +271,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           type="button"
           className="quick-action-btn"
           onClick={() => handleRawKey("Escape", "Esc")}
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           title="Send Escape key (vi normal mode)"
         >
           Esc
@@ -226,7 +280,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           type="button"
           className="quick-action-btn"
           onClick={() => handleRawKey("i", "i")}
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           title="Send i key (vi insert mode)"
         >
           i
@@ -235,7 +289,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           type="button"
           className="quick-action-btn"
           onClick={() => handleRawKey("Up", "↑")}
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           title="Send Up arrow key"
         >
           ↑
@@ -244,7 +298,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           type="button"
           className="quick-action-btn"
           onClick={() => handleRawKey("Down", "↓")}
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           title="Send Down arrow key"
         >
           ↓
@@ -253,7 +307,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           type="button"
           className="quick-action-btn"
           onClick={() => handleRawKey("Enter", "Enter")}
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           title="Send Enter key"
         >
           Enter
@@ -265,19 +319,84 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         isOpen={isPaletteOpen}
         onClose={() => setIsPaletteOpen(false)}
         onExecute={handleSlashCommand}
-        isPending={sendKeys.isPending}
+        isPending={isPending}
         commands={slashCommands}
       />
 
       {/* Dynamic AI-detected actions */}
-      <DynamicActions
-        action={action}
-        onQuickAction={handleQuickAction}
-        isPending={sendKeys.isPending}
-      />
+      <DynamicActions action={action} onQuickAction={handleQuickAction} isPending={isPending} />
 
-      {/* Input row: [textarea] [/ ↔ send] — morphing action button */}
+      {/* File preview thumbnails */}
+      {hasFiles && (
+        <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+          {files.map((file, index) => (
+            <FilePreview
+              key={`${file.name}-${file.size}-${index}`}
+              file={file}
+              onRemove={() => handleRemoveFile(index)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Input row: [attach] [camera?] [textarea] [/ ↔ send] */}
       <div className="flex items-end gap-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isPending}
+          className={cn(
+            "rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center relative",
+            "transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+            hasFiles
+              ? "bg-accent-blue/20 text-accent-blue border border-accent-blue"
+              : "bg-bg-secondary text-text-secondary border border-border-default hover:text-text-primary hover:bg-bg-tertiary",
+          )}
+          title="Attach files"
+        >
+          <Paperclip size={18} />
+          {hasFiles && (
+            <span className="absolute -top-1.5 -right-1.5 bg-accent-blue text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center leading-none">
+              {files.length}
+            </span>
+          )}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_FILE_TYPES}
+          multiple
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {isMobile && (
+          <>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={isPending}
+              className={cn(
+                "rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center",
+                "bg-bg-secondary text-text-secondary border border-border-default",
+                "hover:text-text-primary hover:bg-bg-tertiary transition-colors",
+                "disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+              title="Take photo"
+            >
+              <Camera size={18} />
+            </button>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+          </>
+        )}
+
         <textarea
           ref={inputRef}
           value={text}
@@ -291,9 +410,11 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
               ? action.placeholder
               : action.type === "choices" && action.options.some((o) => !o.autoEnter)
                 ? "Type here (auto-selects 'Type something')"
-                : "Send text to terminal..."
+                : hasFiles
+                  ? "Add instructions..."
+                  : "Send text to terminal..."
           }
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           className={cn(
             "flex-1 bg-bg-secondary border border-border-default rounded-lg px-3 py-2",
             "text-text-primary placeholder:text-text-muted font-mono text-sm",
@@ -304,20 +425,53 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           onClick={handleActionButton}
-          disabled={sendKeys.isPending}
+          disabled={isPending}
           className={cn(
             "rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center",
             "transition-all duration-200 ease-out",
             "disabled:opacity-40 disabled:cursor-not-allowed",
-            hasText
+            hasText || hasFiles
               ? "bg-accent-blue text-white hover:opacity-90"
               : "bg-bg-secondary text-text-secondary border border-border-default hover:text-text-primary hover:bg-bg-tertiary",
           )}
-          title={hasText ? "Send text to pane" : "Open command palette (/)"}
+          title={hasText || hasFiles ? "Send message" : "Open command palette (/)"}
         >
-          {hasText ? <Send size={18} /> : <span className="font-mono text-base font-bold">/</span>}
+          {hasText || hasFiles ? (
+            <Send size={18} />
+          ) : (
+            <span className="font-mono text-base font-bold">/</span>
+          )}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Renders a thumbnail preview for an attached file */
+function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const isImage = file.type.startsWith("image/");
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isImage) return;
+    const url = URL.createObjectURL(file);
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file, isImage]);
+
+  return (
+    <div className="file-preview">
+      {isImage && src ? (
+        <img src={src} alt={file.name} />
+      ) : (
+        <div className="file-preview-pdf">
+          <FileText size={16} />
+          <span className="truncate w-full text-center">{file.name.split(".").pop()}</span>
+        </div>
+      )}
+      <button type="button" className="file-preview-remove" onClick={onRemove}>
+        <X size={12} />
+      </button>
     </div>
   );
 }

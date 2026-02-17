@@ -30,11 +30,13 @@ import type {
   ProjectResponse,
   ProjectsApiResponse,
   SendKeysResponse,
+  SendMessageResponse,
   SessionResponse,
   SlashCommand,
   SlashCommandsResponse,
   SwitchClientResponse,
 } from "../src/shared/types";
+import type { SendMessageResult } from "../src/terminal/application/send-message";
 
 /**
  * Dependencies for the app factory.
@@ -72,6 +74,13 @@ export interface AppDeps {
   setSlashCommands?: (commands: SlashCommand[]) => SlashCommand[];
   discoverSlashCommands?: () => SlashCommand[];
   getBuiltinCommands?: () => SlashCommand[] | null;
+
+  // File upload + message sending
+  sendMessage?: (
+    paneId: string,
+    text: string,
+    files: Array<{ data: ArrayBuffer; name: string; type: string }>,
+  ) => SendMessageResult;
 
   // Launcher
   discoverProjects?: () => ProjectResponse[];
@@ -183,6 +192,52 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         { success: false, error: "Failed to send keys to pane" } satisfies SendKeysResponse,
         500,
       );
+    })
+
+    // POST /api/sessions/:pane_id/send-message (multipart: text + files)
+    .post("/api/sessions/:pane_id/send-message", async (c) => {
+      if (!deps.sendMessage) {
+        return c.json(
+          { success: false, error: "Not available" } satisfies SendMessageResponse,
+          501,
+        );
+      }
+
+      const body = await c.req.parseBody({ all: true });
+      const text = typeof body.text === "string" ? body.text : "";
+
+      const rawFiles = body.files;
+      const fileArray = Array.isArray(rawFiles) ? rawFiles : rawFiles ? [rawFiles] : [];
+      const validFiles = fileArray.filter((f): f is File => f instanceof File);
+
+      if (!text.trim() && validFiles.length === 0) {
+        return c.json(
+          { success: false, error: "Must provide text or files" } satisfies SendMessageResponse,
+          400,
+        );
+      }
+
+      const files = await Promise.all(
+        validFiles.map(async (f) => ({
+          data: await f.arrayBuffer(),
+          name: f.name,
+          type: f.type,
+        })),
+      );
+
+      const paneId = c.req.param("pane_id");
+      const result = deps.sendMessage(paneId, text, files);
+
+      if (result.success) {
+        return c.json({
+          success: true,
+          uploadedFiles: result.uploadedFiles.map((f) => ({
+            originalName: f.originalName,
+          })),
+        } satisfies SendMessageResponse);
+      }
+
+      return c.json({ success: false, error: result.error } satisfies SendMessageResponse, 500);
     })
 
     // POST /api/sessions/:pane_id/switch

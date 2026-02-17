@@ -26,6 +26,8 @@ import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infras
 import { DEFAULT_SLASH_COMMANDS } from "../src/shared/default-slash-commands";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
 import type { PaneContentDiff, PaneContentFull, SlashCommand } from "../src/shared/types";
+import { sendMessage } from "../src/terminal/application/send-message";
+import { createFileUploadDeps } from "../src/terminal/infrastructure/file-upload";
 import {
   buildTmuxTarget,
   getMonitoredProcesses,
@@ -200,6 +202,10 @@ const launcherDeps = createLauncherDeps({
   getGitRemoteUrl,
 });
 
+// File upload (temp directory for image/PDF uploads)
+const fileUploadDeps = createFileUploadDeps();
+setInterval(() => fileUploadDeps.cleanup(), 30 * 60 * 1000);
+
 // Plan discovery (slug cache: cwd → slug, stable per session lifetime)
 const planDeps = createPlanDiscoveryDeps();
 const slugCache = new Map<string, string | null>();
@@ -339,6 +345,11 @@ const app = createApp(
     sendKeys: (paneId, text) => sendKeys(paneId, text),
     sendRawKey: (paneId, key) => sendRawKey(paneId, key),
     switchClient: (paneId) => switchClient(paneId),
+    sendMessage: (paneId, text, files) =>
+      sendMessage(
+        { paneId, text, files },
+        { sendKeys: (pid, txt) => sendKeys(pid, txt), saveFile: fileUploadDeps.saveFile },
+      ),
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
     capturePaneContent: capturePaneContentEscaped,
     detectPaneActions: async (rawContent: string) => {
