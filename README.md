@@ -9,7 +9,11 @@ Monitoring dashboard for Claude Code and Codex sessions running in tmux. Auto-di
 - **AI summaries** — generates concise session summaries using Gemini 2.5 Flash when a session is idle
 - **Action detection** — identifies what type of input the agent expects (yes/no, choices, free-text, or none)
 - **Live dashboard** — Server-Sent Events push updates to the React UI in real time
-- **Terminal viewer** — xterm.js renders full ANSI output; send keystrokes directly from the browser
+- **Terminal viewer** — renders full ANSI output with clickable URLs; send keystrokes directly from the browser
+- **Session launcher** — discover projects and launch AI sessions from the dashboard
+- **Plan viewer** — browse and manage Claude Code plan files
+- **Command palette** — slash command discovery from installed plugins and built-in commands
+- **Session grouping** — visual grouping of orchestrator and worktree child sessions with unseen progress indicators
 - **Remote access** — reach the dashboard from any device via Tailscale
 
 ## Quick Start
@@ -77,8 +81,8 @@ GOOGLE_API_KEY="your-api-key" bunx @yellowblue1/panopticon
 
 ```bash
 bun install
-bun run dev          # Start dev server (frontend: 3847, backend: 3848)
-DEV_PORT=4000 bun run dev  # Custom ports (frontend: 4000, backend: 4001)
+bun run --cwd web dev          # Start dev server (frontend: 3847, backend: 3848)
+DEV_PORT=4000 bun run --cwd web dev  # Custom ports (frontend: 4000, backend: 4001)
 bun test             # Run all tests
 bun run lint         # Lint & format check (Biome)
 bun run typecheck    # TypeScript strict mode
@@ -92,7 +96,7 @@ bun run depcruise    # Dependency architecture check
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh/) |
 | Backend | [Hono](https://hono.dev/) |
-| Frontend | [React](https://react.dev/) 19, [TanStack Router & Query](https://tanstack.com/), [xterm.js](https://xtermjs.org/) |
+| Frontend | [React](https://react.dev/) 19, [TanStack Router & Query](https://tanstack.com/), [fancy-ansi](https://github.com/nicolo-ribaudo/fancy-ansi) |
 | AI | [Gemini 2.5 Flash](https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash) via [`@google/genai`](https://github.com/googleapis/js-genai) SDK |
 | Styling | [Tailwind CSS](https://tailwindcss.com/) |
 | Quality | [Biome](https://biomejs.dev/), TypeScript strict, [dependency-cruiser](https://github.com/sverweij/dependency-cruiser), [knip](https://knip.dev/) |
@@ -101,10 +105,12 @@ bun run depcruise    # Dependency architecture check
 
 ```
 src/
-  terminal/       # tmux operations, process discovery
-  session/        # session lifecycle & state machine
   intelligence/   # AI summarization, action detection
-  shared/         # shared type definitions
+  launcher/       # project discovery & session launching
+  plan/           # plan file discovery & viewing
+  session/        # session lifecycle & state machine
+  terminal/       # tmux operations, process discovery
+  shared/         # shared types & utilities
 web/
   server.ts       # Hono server (composition root)
   server-app.ts   # Route definitions & API handlers

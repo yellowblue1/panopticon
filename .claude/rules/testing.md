@@ -4,7 +4,7 @@
 
 - DI-based mocking via `deps` parameter. Do not use `vi.mock()` or module mocking.
 - Pre-built mock factories in `src/__tests__/helpers/fetch-mock.ts`:
-  - `mockGenerateContent(text)`, `mockGenerateContentEmpty()`, `mockGenerateContentError()`
+  - `mockGenerateContent(text)`, `mockGenerateContentEmpty()`, `mockGenerateContentError()`, `mockGenerateContentAuthError()`
   - Import via: `import { mockGenerateContent } from "../../__tests__";`
 
 ## Network Mocking

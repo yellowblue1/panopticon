@@ -6,7 +6,7 @@
 
 ## DI & Architecture
 
-- Dependencies defined as interfaces in `domain/ports.ts` (e.g., `SummaryDeps`, `SessionManagerDeps`).
+- Dependencies defined as interfaces in `domain/ports.ts` (e.g., `SummaryDeps`, `ActionDeps`, `SessionManagerDeps`, `PlanDiscoveryDeps`, `LauncherDeps`).
 - Application-layer functions accept a `deps` parameter. Infrastructure provides concrete implementations.
 - Composition root: `web/server.ts`. No DI container.
 
@@ -19,7 +19,7 @@
 ## Hono API
 
 - Backend: `createApp(deps: AppDeps)` factory in `web/server-app.ts`, exports `AppType`.
-- Frontend: `hc<AppType>("")` from `hono/client` for type-safe RPC calls.
+- Frontend: RPC client in `web/src/client/lib/rpc-client.ts` exports `sessionsApi`, `authApi`, `settingsApi`, `launcherApi`.
 
 ## Frontend
 
