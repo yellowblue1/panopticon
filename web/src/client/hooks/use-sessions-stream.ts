@@ -1,4 +1,4 @@
-import type { SessionsApiResponse } from "@shared/types";
+import type { FilePushSseEvent, SessionsApiResponse } from "@shared/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
@@ -22,7 +22,7 @@ interface PreviousSessionState {
   summaryHash: string;
 }
 
-export function useSessionsStream(): void {
+export function useSessionsStream(onFilePush?: (event: FilePushSseEvent) => void): void {
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
   const { batchMarkAsUnread } = useReadStatusContext();
@@ -135,6 +135,10 @@ export function useSessionsStream(): void {
       try {
         const parsed = JSON.parse(event.data);
         if (parsed.type === "heartbeat") return;
+        if (parsed.type === "file_push") {
+          onFilePush?.(parsed as FilePushSseEvent);
+          return;
+        }
         handleSessionsUpdate(parsed as SessionsApiResponse);
       } catch (err) {
         console.warn("Failed to parse SSE message:", err);

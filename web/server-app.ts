@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
@@ -89,6 +90,9 @@ export interface AppDeps {
   getLauncherConfig?: () => LauncherConfigData;
   setLauncherConfig?: (config: LauncherConfigData) => LauncherConfigData;
   browsePath?: (path: string) => { entries: BrowseEntry[]; basePath: string };
+
+  // MCP
+  handleMcpRequest?: (c: Context) => Promise<Response>;
 }
 
 /**
@@ -507,6 +511,14 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         basePath: result.basePath,
         timestamp: Date.now(),
       } satisfies BrowsePathResponse);
+    })
+
+    // MCP endpoint (Streamable HTTP transport)
+    .all("/mcp", async (c) => {
+      if (!deps.handleMcpRequest) {
+        return c.json({ error: "MCP not available" }, 501);
+      }
+      return deps.handleMcpRequest(c);
     })
 
     // Favicon routes
