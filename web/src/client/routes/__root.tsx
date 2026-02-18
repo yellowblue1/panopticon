@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { ConnectionProvider } from "@/contexts/connection-context";
 import { ReadStatusProvider } from "@/contexts/read-status-context";
+import { useFilePush } from "@/hooks/use-file-push";
 import { useSessionsStream } from "@/hooks/use-sessions-stream";
 import { queryClient } from "@/lib/query-client";
 
@@ -32,7 +33,8 @@ function RootLayout() {
 function AppShell() {
   // Keep SSE connection active on ALL pages (not just the dashboard)
   // so session status stays up-to-date on detail pages too
-  useSessionsStream();
+  const { handleFilePush } = useFilePush();
+  useSessionsStream(handleFilePush);
 
   return (
     <div className="font-sans bg-bg-primary text-text-primary min-h-dvh flex flex-col text-base leading-relaxed">

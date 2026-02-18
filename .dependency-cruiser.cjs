@@ -147,6 +147,68 @@ module.exports = {
       to: { path: "^src/launcher/" },
     },
 
+    // MCP isolation
+    {
+      name: "no-mcp-depends-on-session",
+      severity: "error",
+      from: { path: "^src/mcp/" },
+      to: { path: "^src/session/" },
+    },
+    {
+      name: "no-mcp-depends-on-terminal",
+      severity: "error",
+      from: { path: "^src/mcp/" },
+      to: { path: "^src/terminal/" },
+    },
+    {
+      name: "no-mcp-depends-on-intelligence",
+      severity: "error",
+      from: { path: "^src/mcp/" },
+      to: { path: "^src/intelligence/" },
+    },
+    {
+      name: "no-mcp-depends-on-plan",
+      severity: "error",
+      from: { path: "^src/mcp/" },
+      to: { path: "^src/plan/" },
+    },
+    {
+      name: "no-mcp-depends-on-launcher",
+      severity: "error",
+      from: { path: "^src/mcp/" },
+      to: { path: "^src/launcher/" },
+    },
+    {
+      name: "no-session-depends-on-mcp",
+      severity: "error",
+      from: { path: "^src/session/" },
+      to: { path: "^src/mcp/" },
+    },
+    {
+      name: "no-terminal-depends-on-mcp",
+      severity: "error",
+      from: { path: "^src/terminal/" },
+      to: { path: "^src/mcp/" },
+    },
+    {
+      name: "no-intelligence-depends-on-mcp",
+      severity: "error",
+      from: { path: "^src/intelligence/" },
+      to: { path: "^src/mcp/" },
+    },
+    {
+      name: "no-plan-depends-on-mcp",
+      severity: "error",
+      from: { path: "^src/plan/" },
+      to: { path: "^src/mcp/" },
+    },
+    {
+      name: "no-launcher-depends-on-mcp",
+      severity: "error",
+      from: { path: "^src/launcher/" },
+      to: { path: "^src/mcp/" },
+    },
+
     // ═══ SHARED KERNEL PROTECTION ═══
 
     {
@@ -154,7 +216,7 @@ module.exports = {
       comment: "Shared kernel must not depend on any bounded context",
       severity: "error",
       from: { path: "^src/shared/" },
-      to: { path: "^src/(terminal|session|intelligence|plan|launcher)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan|launcher|mcp)/" },
     },
 
     // ═══ CLIENT ISOLATION ═══
@@ -164,7 +226,7 @@ module.exports = {
       comment: "React client must not import server-side code",
       severity: "error",
       from: { path: "^web/src/client/" },
-      to: { path: "^src/(terminal|session|intelligence|plan|launcher)/" },
+      to: { path: "^src/(terminal|session|intelligence|plan|launcher|mcp)/" },
     },
   ],
 

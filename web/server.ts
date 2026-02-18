@@ -1,7 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { serveStatic } from "hono/bun";
+import { z } from "zod";
 import { detectPaneActions } from "../src/intelligence/application/detect-actions";
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
 import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
@@ -13,6 +16,8 @@ import { discoverProjects } from "../src/launcher/application/discover-projects"
 import { generateSessionName, launchSession } from "../src/launcher/application/launch-session";
 import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/application/manage-config";
 import { createLauncherDeps } from "../src/launcher/infrastructure/fs-operations";
+import { handleFilePush } from "../src/mcp/application/handle-file-push";
+import type { McpFilePushDeps } from "../src/mcp/domain/ports";
 import {
   deletePlan,
   findSlugForCwd,
@@ -24,7 +29,7 @@ import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
-import type { PaneContentDiff, PaneContentFull } from "../src/shared/types";
+import type { FilePushSseEvent, PaneContentDiff, PaneContentFull } from "../src/shared/types";
 import { sendMessage } from "../src/terminal/application/send-message";
 import { createFileUploadDeps } from "../src/terminal/infrastructure/file-upload";
 import {
@@ -194,6 +199,115 @@ function broadcastUpdate() {
     }
   }
 }
+
+// ═══ MCP config ═══
+
+const MCP_ENABLED = process.env.PANOPTICON_MCP?.toLowerCase() !== "false";
+
+/**
+ * Auto-register Panopticon in ~/.claude/.mcp.json so Claude Code discovers it on startup.
+ * Only adds the entry if it does not already exist. Preserves all other MCP server entries.
+ */
+function registerMcpConfig(port: number): void {
+  const mcpConfigPath = join(homedir(), ".claude", ".mcp.json");
+  const mcpConfigDir = join(homedir(), ".claude");
+
+  let config: { mcpServers?: Record<string, unknown> } = {};
+  try {
+    const raw = readFileSync(mcpConfigPath, "utf-8");
+    config = JSON.parse(raw);
+  } catch {
+    // File doesn't exist or is invalid JSON — start fresh
+  }
+
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
+
+  // Don't overwrite if user has already configured it
+  if ("panopticon" in config.mcpServers) return;
+
+  config.mcpServers.panopticon = {
+    type: "http",
+    url: `http://localhost:${port}/mcp`,
+  };
+
+  if (!existsSync(mcpConfigDir)) {
+    mkdirSync(mcpConfigDir, { recursive: true });
+  }
+  writeFileSync(mcpConfigPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
+  console.log(`Registered MCP endpoint in ${mcpConfigPath}`);
+}
+
+// ═══ MCP server ═══
+
+function broadcastFilePush(event: FilePushSseEvent): void {
+  const message = `data: ${JSON.stringify(event)}\n\n`;
+  for (const client of clients) {
+    try {
+      client.controller.enqueue(encoder.encode(message));
+    } catch {
+      clients.delete(client);
+    }
+  }
+}
+
+const mcpFilePushDeps: McpFilePushDeps = {
+  readFile: (path) => {
+    try {
+      return Buffer.from(readFileSync(path));
+    } catch {
+      return null;
+    }
+  },
+  getFileSize: (path) => {
+    try {
+      return statSync(path).size;
+    } catch {
+      return -1;
+    }
+  },
+  broadcastFilePush,
+};
+
+const mcpServer = new McpServer({
+  name: "panopticon",
+  version: "0.1.0",
+});
+
+const mcpTransport = new StreamableHTTPTransport({ sessionIdGenerator: undefined });
+
+mcpServer.tool(
+  "push_file",
+  "Push a file to the Panopticon browser dashboard for display or download",
+  {
+    file_path: z.string().describe("Absolute path to the file to push"),
+    session_id: z.string().optional().describe("Panopticon session/pane ID to associate with"),
+    filename: z.string().optional().describe("Display name for the file (defaults to basename)"),
+  },
+  async ({ file_path, session_id, filename }) => {
+    const result = handleFilePush(
+      { filePath: file_path, sessionId: session_id, filename },
+      mcpFilePushDeps,
+    );
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Pushed ${result.filename} (${result.mimeType}, ${result.size} bytes) to dashboard`,
+        },
+      ],
+    };
+  },
+);
 
 // Broadcast when session state changes
 sessionManager.onChange(() => {
@@ -403,6 +517,17 @@ const app = createApp(
       return { scanPaths: updated.scanPaths, useGhq: updated.useGhq };
     },
     browsePath: (path) => browsePathFn(path, launcherDeps),
+    handleMcpRequest: MCP_ENABLED
+      ? async (c) => {
+          if (!mcpServer.isConnected()) {
+            await mcpServer.connect(mcpTransport);
+          }
+          return (
+            (await mcpTransport.handleRequest(c)) ??
+            new Response("No response from MCP server", { status: 500 })
+          );
+        }
+      : undefined,
     discoverSlashCommands: () => {
       const cwds: string[] = [];
       for (const session of sessionManager.getSessions()) {
@@ -506,6 +631,15 @@ async function main() {
   }
 
   console.log(`Panopticon Web UI running at http://${server.hostname}:${server.port}`);
+
+  // Auto-register MCP endpoint in ~/.claude/.mcp.json
+  if (MCP_ENABLED) {
+    try {
+      registerMcpConfig(server.port);
+    } catch (err) {
+      console.warn("Failed to register MCP config:", err);
+    }
+  }
 
   // Start session polling
   sessionManager.start();

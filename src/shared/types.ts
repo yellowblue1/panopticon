@@ -173,3 +173,14 @@ export interface SendMessageResponse {
   error?: string;
   uploadedFiles?: Array<{ originalName: string }>;
 }
+
+// MCP file push types
+export interface FilePushSseEvent {
+  readonly type: "file_push";
+  readonly filename: string;
+  readonly mimeType: string;
+  readonly size: number;
+  readonly sessionId: string | null;
+  readonly timestamp: number;
+  readonly base64: string;
+}
