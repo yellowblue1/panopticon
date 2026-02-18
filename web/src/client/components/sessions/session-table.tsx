@@ -1,9 +1,10 @@
 import type { SessionResponse } from "@shared/types";
-import { CheckCheck } from "lucide-react";
+import { ArrowUpDown, CheckCheck } from "lucide-react";
 import { usePlansAvailability } from "@/hooks/use-plans-availability";
 import { useReadStatus } from "@/hooks/use-read-status";
+import { useSortLock } from "@/hooks/use-sort-lock";
 import { useUnreadCount } from "@/hooks/use-unread-count";
-import { groupSessions } from "@/lib/group-sessions";
+import { cn } from "@/lib/cn";
 import { SessionGroup } from "./session-group";
 import { SessionRow } from "./session-row";
 
@@ -16,6 +17,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
   const { readStatuses, lastSeenMap, markAsRead, markAllAsRead } = useReadStatus(paneIds);
   const { data: plansData } = usePlansAvailability();
   const unreadCount = useUnreadCount(paneIds);
+  const { groups, ungrouped, isSortLocked, toggleSortLock } = useSortLock(sessions);
 
   if (sessions.length === 0) {
     return (
@@ -28,18 +30,24 @@ export function SessionTable({ sessions }: SessionTableProps) {
     );
   }
 
-  const { groups, ungrouped } = groupSessions(sessions);
-
   return (
     <>
-      {unreadCount > 0 && (
-        <div className="flex justify-end mb-3">
-          <button type="button" className="mark-all-read-btn" onClick={markAllAsRead}>
+      <div className="flex justify-between items-center mb-3">
+        <button
+          type="button"
+          className={cn("toolbar-btn", isSortLocked && "sort-lock-btn-active")}
+          onClick={toggleSortLock}
+        >
+          <ArrowUpDown size={16} />
+          {isSortLocked ? "Sort paused" : "Auto-sort"}
+        </button>
+        {unreadCount > 0 && (
+          <button type="button" className="toolbar-btn" onClick={markAllAsRead}>
             <CheckCheck size={16} />
             Mark all as read
           </button>
-        </div>
-      )}
+        )}
+      </div>
       <table className="sessions-table">
         <thead>
           <tr>

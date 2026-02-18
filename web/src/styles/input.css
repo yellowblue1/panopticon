@@ -237,14 +237,23 @@ body {
   font-size: 0.6875rem;
 }
 
-/* Mark all as read button */
-.mark-all-read-btn {
+/* Toolbar buttons (shared base for sort-lock, mark-all-read, etc.) */
+.toolbar-btn {
   @apply flex items-center gap-1.5 bg-transparent border border-border-default rounded-md text-text-muted text-xs cursor-pointer transition-colors;
   padding: 6px 12px;
 }
 
-.mark-all-read-btn:hover {
+.toolbar-btn:hover {
   @apply bg-bg-secondary text-text-primary;
+}
+
+/* Sort lock toggle (active state) */
+.sort-lock-btn-active {
+  @apply bg-accent-blue/20 text-accent-blue border-accent-blue/50;
+}
+
+.sort-lock-btn-active:hover {
+  @apply bg-accent-blue/30;
 }
 
 /* Last-seen timestamp */
