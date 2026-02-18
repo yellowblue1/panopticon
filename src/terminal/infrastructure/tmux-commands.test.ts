@@ -119,12 +119,12 @@ describe("getProcessCwd", () => {
     expect(getProcessCwd(1234, exec)).toBe("/Users/test/project");
   });
 
-  it("parses lsof output for cwd", () => {
+  it("falls through to lsof when readlink returns empty string", () => {
     const exec = (cmd: string) => {
-      if (cmd.startsWith("readlink")) throw new Error("no /proc");
-      return "p1234\nfcwd\nn/Users/test/project";
+      if (cmd.startsWith("readlink")) return "";
+      return "p1234\nfcwd\nn/fallback/path";
     };
-    expect(getProcessCwd(1234, exec)).toBe("/Users/test/project");
+    expect(getProcessCwd(1234, exec)).toBe("/fallback/path");
   });
 
   it("returns null when both methods fail", () => {
