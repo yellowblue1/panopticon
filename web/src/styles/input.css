@@ -237,6 +237,24 @@ body {
   font-size: 0.6875rem;
 }
 
+/* Sort lock toggle */
+.sort-lock-btn {
+  @apply flex items-center gap-1.5 bg-transparent border border-border-default rounded-md text-text-muted text-xs cursor-pointer transition-colors;
+  padding: 6px 12px;
+}
+
+.sort-lock-btn:hover {
+  @apply bg-bg-secondary text-text-primary;
+}
+
+.sort-lock-btn-active {
+  @apply bg-accent-blue/20 text-accent-blue border-accent-blue/50;
+}
+
+.sort-lock-btn-active:hover {
+  @apply bg-accent-blue/30;
+}
+
 /* Mark all as read button */
 .mark-all-read-btn {
   @apply flex items-center gap-1.5 bg-transparent border border-border-default rounded-md text-text-muted text-xs cursor-pointer transition-colors;
