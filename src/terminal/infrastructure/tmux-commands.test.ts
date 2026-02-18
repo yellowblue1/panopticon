@@ -103,20 +103,42 @@ describe("getProcessTable", () => {
 });
 
 describe("getProcessCwd", () => {
-  it("parses lsof output for cwd", () => {
-    const exec = () => "p1234\nfcwd\nn/Users/test/project";
+  it("uses /proc readlink when available", () => {
+    const exec = (cmd: string) => {
+      if (cmd.startsWith("readlink")) return "/home/user/project";
+      throw new Error("should not reach lsof");
+    };
+    expect(getProcessCwd(1234, exec)).toBe("/home/user/project");
+  });
+
+  it("falls back to lsof when /proc is unavailable", () => {
+    const exec = (cmd: string) => {
+      if (cmd.startsWith("readlink")) throw new Error("no /proc");
+      return "p1234\nfcwd\nn/Users/test/project";
+    };
     expect(getProcessCwd(1234, exec)).toBe("/Users/test/project");
   });
 
-  it("returns null on failure", () => {
+  it("parses lsof output for cwd", () => {
+    const exec = (cmd: string) => {
+      if (cmd.startsWith("readlink")) throw new Error("no /proc");
+      return "p1234\nfcwd\nn/Users/test/project";
+    };
+    expect(getProcessCwd(1234, exec)).toBe("/Users/test/project");
+  });
+
+  it("returns null when both methods fail", () => {
     const exec = () => {
-      throw new Error("lsof failed");
+      throw new Error("failed");
     };
     expect(getProcessCwd(1234, exec)).toBeNull();
   });
 
-  it("returns null when no cwd line found", () => {
-    const exec = () => "p1234\nfother\n";
+  it("returns null when no cwd line found in lsof", () => {
+    const exec = (cmd: string) => {
+      if (cmd.startsWith("readlink")) throw new Error("no /proc");
+      return "p1234\nfother\n";
+    };
     expect(getProcessCwd(1234, exec)).toBeNull();
   });
 });
