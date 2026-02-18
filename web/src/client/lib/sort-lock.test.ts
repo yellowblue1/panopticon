@@ -52,7 +52,6 @@ describe("applyLockedOrder", () => {
         {
           orchestratorPaneId: "%0",
           childPaneIds: ["%1", "%2"],
-          baseCwd: "/home/user/proj",
         },
       ],
       ungroupedPaneIds: ["%3"],
@@ -79,7 +78,6 @@ describe("applyLockedOrder", () => {
         {
           orchestratorPaneId: "%0",
           childPaneIds: ["%1", "%2"],
-          baseCwd: "/home/user/proj",
         },
       ],
       ungroupedPaneIds: ["%3"],
@@ -120,7 +118,6 @@ describe("applyLockedOrder", () => {
         {
           orchestratorPaneId: "%0",
           childPaneIds: ["%1"],
-          baseCwd: "/home/user/proj",
         },
       ],
       ungroupedPaneIds: ["%2"],
@@ -178,7 +175,6 @@ describe("applyLockedOrder", () => {
         {
           orchestratorPaneId: "%0",
           childPaneIds: ["%1", "%2"],
-          baseCwd: "/home/user/proj",
         },
       ],
       ungroupedPaneIds: [],

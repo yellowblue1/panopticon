@@ -35,14 +35,14 @@ export function SessionTable({ sessions }: SessionTableProps) {
       <div className="flex justify-between items-center mb-3">
         <button
           type="button"
-          className={cn("sort-lock-btn", isSortLocked && "sort-lock-btn-active")}
+          className={cn("toolbar-btn", isSortLocked && "sort-lock-btn-active")}
           onClick={toggleSortLock}
         >
           <ArrowUpDown size={16} />
           {isSortLocked ? "Sort paused" : "Auto-sort"}
         </button>
         {unreadCount > 0 && (
-          <button type="button" className="mark-all-read-btn" onClick={markAllAsRead}>
+          <button type="button" className="toolbar-btn" onClick={markAllAsRead}>
             <CheckCheck size={16} />
             Mark all as read
           </button>

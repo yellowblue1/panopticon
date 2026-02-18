@@ -1,18 +1,12 @@
 import type { SessionResponse } from "@shared/types";
-import { groupSessions, type SessionGroup } from "./group-sessions";
+import { type GroupedSessions, groupSessions } from "./group-sessions";
 
 export interface LockedOrder {
   groups: Array<{
     orchestratorPaneId: string | null;
     childPaneIds: string[];
-    baseCwd: string;
   }>;
   ungroupedPaneIds: string[];
-}
-
-interface GroupedSessions {
-  groups: SessionGroup[];
-  ungrouped: SessionResponse[];
 }
 
 /**
@@ -24,7 +18,6 @@ export function captureOrder(result: GroupedSessions): LockedOrder {
     groups: result.groups.map((g) => ({
       orchestratorPaneId: g.orchestrator?.pane_id ?? null,
       childPaneIds: g.children.map((c) => c.pane_id),
-      baseCwd: g.children[0]?.cwd.split("-worktrees/")[0] ?? "",
     })),
     ungroupedPaneIds: result.ungrouped.map((s) => s.pane_id),
   };
