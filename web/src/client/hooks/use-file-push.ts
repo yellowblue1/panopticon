@@ -40,28 +40,29 @@ export function useFilePush(): {
 
     const blob = base64ToBlob(event.base64, event.mimeType);
     const objectUrl = URL.createObjectURL(blob);
+    let downloaded = false;
 
-    const isImage = event.mimeType.startsWith("image/");
+    const revokeIfNeeded = () => {
+      if (!downloaded) URL.revokeObjectURL(objectUrl);
+    };
 
-    if (isImage) {
-      toast(`File received: ${event.filename}`, {
-        description: "Click to download",
-        duration: 10000,
-        action: {
-          label: "Download",
-          onClick: () => triggerDownload(objectUrl, event.filename),
+    const description = event.mimeType.startsWith("image/")
+      ? "Click to download"
+      : `${event.mimeType} — ${formatFileSize(event.size)}`;
+
+    toast(`File received: ${event.filename}`, {
+      description,
+      duration: 10000,
+      action: {
+        label: "Download",
+        onClick: () => {
+          downloaded = true;
+          triggerDownload(objectUrl, event.filename);
         },
-      });
-    } else {
-      toast(`File received: ${event.filename}`, {
-        description: `${event.mimeType} — ${formatFileSize(event.size)}`,
-        duration: 10000,
-        action: {
-          label: "Download",
-          onClick: () => triggerDownload(objectUrl, event.filename),
-        },
-      });
-    }
+      },
+      onDismiss: revokeIfNeeded,
+      onAutoClose: revokeIfNeeded,
+    });
   };
 
   return { handleFilePush };

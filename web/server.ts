@@ -236,6 +236,8 @@ const mcpServer = new McpServer({
   version: "0.1.0",
 });
 
+const mcpTransport = new StreamableHTTPTransport({ sessionIdGenerator: undefined });
+
 mcpServer.tool(
   "push_file",
   "Push a file to the Panopticon browser dashboard for display or download",
@@ -477,10 +479,13 @@ const app = createApp(
     },
     browsePath: (path) => browsePathFn(path, launcherDeps),
     handleMcpRequest: async (c) => {
-      const transport = new StreamableHTTPTransport({ sessionIdGenerator: undefined });
-      await mcpServer.connect(transport);
-      const response = await transport.handleRequest(c);
-      return response ?? new Response("No response from MCP server", { status: 500 });
+      if (!mcpServer.isConnected()) {
+        await mcpServer.connect(mcpTransport);
+      }
+      return (
+        (await mcpTransport.handleRequest(c)) ??
+        new Response("No response from MCP server", { status: 500 })
+      );
     },
     discoverSlashCommands: () => {
       const cwds: string[] = [];
