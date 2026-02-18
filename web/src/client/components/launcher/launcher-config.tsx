@@ -10,8 +10,9 @@ interface ScanPathEntry {
   value: string;
 }
 
+let nextId = 0;
 function createEntry(value: string): ScanPathEntry {
-  return { id: Math.random().toString(36).slice(2) + Date.now().toString(36), value };
+  return { id: String(nextId++), value };
 }
 
 export function LauncherConfig() {
