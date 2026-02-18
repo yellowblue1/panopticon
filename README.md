@@ -14,6 +14,7 @@ Monitoring dashboard for Claude Code and Codex sessions running in tmux. Auto-di
 - **Plan viewer** — browse and manage Claude Code plan files
 - **Command palette** — slash command discovery from installed plugins and built-in commands
 - **Session grouping** — visual grouping of orchestrator and worktree child sessions with unseen progress indicators
+- **MCP file push** — Claude Code can push generated files (images, PDFs, etc.) directly to the browser via an embedded MCP endpoint
 - **Remote access** — reach the dashboard from any device via Tailscale
 
 ## Quick Start
@@ -76,6 +77,7 @@ GOOGLE_API_KEY="your-api-key" bunx @yellowblue1/panopticon
 | `PORT` | `3847` | HTTP server port |
 | `HOST` | `127.0.0.1` | Bind address |
 | `DEV_PORT` | `3847` | Vite dev server port (backend auto-assigns `DEV_PORT + 1`) |
+| `PANOPTICON_MCP` | *(enabled)* | Set to `false` to disable the MCP endpoint and auto-registration |
 
 ## Development
 
@@ -128,3 +130,44 @@ tailscale serve --bg 3847
 ```
 
 The dashboard will be available at `https://<your-machine>.ts.net`.
+
+## MCP File Push
+
+Panopticon embeds an [MCP](https://modelcontextprotocol.io/) endpoint that lets Claude Code push generated files (images, charts, PDFs, etc.) directly to the browser dashboard.
+
+### Zero-config setup
+
+On startup, Panopticon automatically registers itself in `~/.claude/.mcp.json`. Claude Code picks this up on its next launch — no manual configuration needed.
+
+To disable MCP entirely (endpoint + auto-registration):
+
+```bash
+PANOPTICON_MCP=false bun run web/server.ts
+```
+
+### Usage
+
+From Claude Code, call the `push_file` tool:
+
+```
+push_file({ file_path: "/path/to/chart.png" })
+```
+
+The file appears as a toast notification in the browser with a download button.
+
+### Manual configuration
+
+If you need to customize the MCP endpoint (e.g. non-default port), add to `~/.claude/.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "panopticon": {
+      "type": "http",
+      "url": "http://localhost:3847/mcp"
+    }
+  }
+}
+```
+
+Panopticon will not overwrite an existing `panopticon` entry.
