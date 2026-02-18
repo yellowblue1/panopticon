@@ -106,9 +106,19 @@ export function getProcessStartTime(pid: number, exec: ExecFn = defaultExec): st
 }
 
 /**
- * Get the current working directory of a process via lsof
+ * Get the current working directory of a process.
+ * Tries /proc/<pid>/cwd first (Linux, no extra tools needed),
+ * then falls back to lsof (macOS / systems without procfs).
  */
 export function getProcessCwd(pid: number, exec: ExecFn = defaultExec): string | null {
+  // Try /proc first — works in Docker and minimal Linux environments without lsof
+  try {
+    const cwd = exec(`readlink /proc/${pid}/cwd`);
+    if (cwd) return cwd;
+  } catch {
+    // /proc not available — fall through to lsof
+  }
+
   try {
     const output = exec(`lsof -a -p ${pid} -d cwd -Fn`);
     // lsof -Fn outputs lines starting with 'n' for the name field
