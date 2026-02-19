@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   discoverAllSlashCommands,
   discoverPluginCommands,
+  discoverSkillCommands,
   discoverSlashCommands,
 } from "./command-discovery";
 
@@ -491,6 +492,330 @@ describe("discoverPluginCommands", () => {
     try {
       const commands = discoverPluginCommands(homeDir);
       expect(commands).toEqual([{ command: "/multi:run", description: "Plugin command (multi)" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+});
+
+describe("discoverSkillCommands", () => {
+  it("returns empty array when ~/.claude/skills/ does not exist", () => {
+    const homeDir = createTempDir();
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("discovers skills with valid SKILL.md frontmatter", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "dev-flow");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      '---\nname: dev-flow\ndescription: Orchestrate development workflow\nargument-hint: "[--from=<step>]"\n---\n\n# Dev Flow',
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/dev-flow", description: "Orchestrate development workflow" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("uses directory name when name field is missing from frontmatter", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "my-skill");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\ndescription: A useful skill\n---\n\n# My Skill",
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([{ command: "/my-skill", description: "A useful skill" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("falls back to 'Skill' description when description field is missing", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "bare-skill");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, "SKILL.md"), "---\nname: bare-skill\n---\n\n# Bare Skill");
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([{ command: "/bare-skill", description: "Skill" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("handles SKILL.md without frontmatter delimiters", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "no-front");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, "SKILL.md"), "# Just markdown content");
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([{ command: "/no-front", description: "Skill" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("handles empty skills directory", () => {
+    const homeDir = createTempDir();
+    const skillsDir = join(homeDir, ".claude", "skills");
+    mkdirSync(skillsDir, { recursive: true });
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("discovers multiple skills sorted alphabetically", () => {
+    const homeDir = createTempDir();
+    const skillsDir = join(homeDir, ".claude", "skills");
+
+    const skillA = join(skillsDir, "alpha");
+    mkdirSync(skillA, { recursive: true });
+    writeFileSync(join(skillA, "SKILL.md"), "---\nname: alpha\ndescription: Alpha skill\n---\n");
+
+    const skillB = join(skillsDir, "beta");
+    mkdirSync(skillB, { recursive: true });
+    writeFileSync(join(skillB, "SKILL.md"), "---\nname: beta\ndescription: Beta skill\n---\n");
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/alpha", description: "Alpha skill" },
+        { command: "/beta", description: "Beta skill" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("ignores subdirectories without SKILL.md", () => {
+    const homeDir = createTempDir();
+    const skillsDir = join(homeDir, ".claude", "skills");
+
+    const validSkill = join(skillsDir, "valid");
+    mkdirSync(validSkill, { recursive: true });
+    writeFileSync(
+      join(validSkill, "SKILL.md"),
+      "---\nname: valid\ndescription: Valid skill\n---\n",
+    );
+
+    const invalidSkill = join(skillsDir, "invalid");
+    mkdirSync(invalidSkill, { recursive: true });
+    writeFileSync(join(invalidSkill, "README.md"), "# Not a skill");
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([{ command: "/valid", description: "Valid skill" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("discovers plugin-provided skills with namespace format", () => {
+    const homeDir = createTempDir();
+    const pluginDir = join(homeDir, ".claude", "plugins");
+    const pluginInstallDir = join(pluginDir, "cache", "mp", "my-plugin", "v1");
+    const pluginSkillDir = join(pluginInstallDir, "skills", "deploy");
+    mkdirSync(pluginSkillDir, { recursive: true });
+    writeFileSync(
+      join(pluginSkillDir, "SKILL.md"),
+      "---\nname: deploy\ndescription: Deploy to production\n---\n",
+    );
+
+    writeFileSync(
+      join(pluginDir, "installed_plugins.json"),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "my-plugin@mp": [
+            {
+              scope: "user",
+              installPath: pluginInstallDir,
+              version: "v1",
+              installedAt: "2025-01-01T00:00:00.000Z",
+              lastUpdated: "2025-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      }),
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/my-plugin:deploy", description: "Deploy to production" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("merges user skills and plugin skills", () => {
+    const homeDir = createTempDir();
+
+    const userSkillDir = join(homeDir, ".claude", "skills", "my-flow");
+    mkdirSync(userSkillDir, { recursive: true });
+    writeFileSync(
+      join(userSkillDir, "SKILL.md"),
+      "---\nname: my-flow\ndescription: My workflow\n---\n",
+    );
+
+    const pluginDir = join(homeDir, ".claude", "plugins");
+    const pluginInstallDir = join(pluginDir, "cache", "mp", "tool", "v1");
+    const pluginSkillDir = join(pluginInstallDir, "skills", "analyze");
+    mkdirSync(pluginSkillDir, { recursive: true });
+    writeFileSync(
+      join(pluginSkillDir, "SKILL.md"),
+      "---\nname: analyze\ndescription: Analyze code\n---\n",
+    );
+
+    writeFileSync(
+      join(pluginDir, "installed_plugins.json"),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "tool@mp": [
+            {
+              scope: "user",
+              installPath: pluginInstallDir,
+              version: "v1",
+              installedAt: "2025-01-01T00:00:00.000Z",
+              lastUpdated: "2025-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      }),
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/my-flow", description: "My workflow" },
+        { command: "/tool:analyze", description: "Analyze code" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+});
+
+describe("discoverAllSlashCommands with skills", () => {
+  it("includes skill commands alongside project, global, and plugin commands", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const globalDir = join(homeDir, ".claude", "commands");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "commit.md"), "# Commit");
+
+    const projectDir = join(cwd, ".claude", "commands");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "deploy.md"), "# Deploy");
+
+    const skillDir = join(homeDir, ".claude", "skills", "dev-flow");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: dev-flow\ndescription: Development workflow\n---\n",
+    );
+
+    try {
+      const commands = discoverAllSlashCommands([cwd], homeDir);
+      expect(commands).toEqual([
+        { command: "/commit", description: "Custom command (global)" },
+        { command: "/deploy", description: "Custom command (project)" },
+        { command: "/dev-flow", description: "Development workflow" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("commands with same name as skills take priority (command wins)", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const globalDir = join(homeDir, ".claude", "commands");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "deploy.md"), "# Deploy command");
+
+    const skillDir = join(homeDir, ".claude", "skills", "deploy");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: deploy\ndescription: Deploy skill\n---\n",
+    );
+
+    try {
+      const commands = discoverAllSlashCommands([cwd], homeDir);
+      expect(commands).toEqual([{ command: "/deploy", description: "Custom command (global)" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("skills have priority over plugin commands with same base name", () => {
+    const homeDir = createTempDir();
+
+    const skillDir = join(homeDir, ".claude", "skills", "review");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: review\ndescription: Code review skill\n---\n",
+    );
+
+    const pluginDir = join(homeDir, ".claude", "plugins");
+    const pluginCommandsDir = join(pluginDir, "cache", "mp", "tool", "v1", "commands");
+    mkdirSync(pluginCommandsDir, { recursive: true });
+    writeFileSync(join(pluginCommandsDir, "plugin-cmd.md"), "# Plugin cmd");
+    writeFileSync(
+      join(pluginDir, "installed_plugins.json"),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "tool@mp": [
+            {
+              scope: "user",
+              installPath: join(pluginDir, "cache", "mp", "tool", "v1"),
+              version: "v1",
+              installedAt: "2025-01-01T00:00:00.000Z",
+              lastUpdated: "2025-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      }),
+    );
+
+    try {
+      const commands = discoverAllSlashCommands([], homeDir);
+      expect(commands).toEqual([
+        { command: "/review", description: "Code review skill" },
+        { command: "/tool:plugin-cmd", description: "Plugin command (tool)" },
+      ]);
     } finally {
       rmSync(homeDir, { recursive: true });
     }

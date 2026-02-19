@@ -8,6 +8,29 @@ function listMdFiles(dir: string): string[] {
   return readdirSync(dir).filter((f) => f.endsWith(".md"));
 }
 
+function listSubdirectories(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+}
+
+function parseFrontmatter(content: string): Record<string, string> {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const result: Record<string, string> = {};
+  for (const line of match[1].split("\n")) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex === -1) continue;
+    const key = line.slice(0, colonIndex).trim();
+    const raw = line.slice(colonIndex + 1).trim();
+    if (!key || !raw) continue;
+    const unquoted = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
+    result[key] = unquoted;
+  }
+  return result;
+}
+
 function toSlashCommand(
   name: string,
   source: "global" | "project" | "plugin",
@@ -81,6 +104,71 @@ export function discoverPluginCommands(homeDir?: string): SlashCommand[] {
 }
 
 /**
+ * Read a SKILL.md file and return a SlashCommand.
+ *
+ * Parses YAML frontmatter for `name` and `description`.
+ * Falls back to the directory name when `name` is absent and "Skill"
+ * when `description` is absent.
+ */
+function readSkillFile(skillMdPath: string, dirName: string, pluginName?: string): SlashCommand {
+  const content = readFileSync(skillMdPath, "utf-8");
+  const meta = parseFrontmatter(content);
+  const name = meta.name || dirName;
+  const description = meta.description || "Skill";
+  if (pluginName) {
+    return { command: `/${pluginName}:${name}`, description };
+  }
+  return { command: `/${name}`, description };
+}
+
+/**
+ * Discover slash commands from Claude Code skills.
+ *
+ * Scans ~/.claude/skills/{name}/SKILL.md for user skills and
+ * each installed plugin's skills/{name}/SKILL.md for plugin skills.
+ * Plugin skills are namespaced as /{pluginName}:{skillName}.
+ */
+export function discoverSkillCommands(homeDir?: string): SlashCommand[] {
+  const home = homeDir ?? homedir();
+  const commands: SlashCommand[] = [];
+
+  const userSkillsDir = join(home, ".claude", "skills");
+  for (const dirName of listSubdirectories(userSkillsDir)) {
+    const skillMd = join(userSkillsDir, dirName, "SKILL.md");
+    if (existsSync(skillMd)) {
+      commands.push(readSkillFile(skillMd, dirName));
+    }
+  }
+
+  const pluginsFile = join(home, ".claude", "plugins", "installed_plugins.json");
+  if (existsSync(pluginsFile)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(pluginsFile, "utf-8"));
+    } catch {
+      parsed = null;
+    }
+    if (isInstalledPlugins(parsed)) {
+      for (const [key, entries] of Object.entries(parsed.plugins)) {
+        if (!Array.isArray(entries) || entries.length === 0) continue;
+        const entry = entries[0];
+        if (typeof entry?.installPath !== "string") continue;
+        const pluginName = parsePluginName(key);
+        const pluginSkillsDir = join(entry.installPath, "skills");
+        for (const dirName of listSubdirectories(pluginSkillsDir)) {
+          const skillMd = join(pluginSkillsDir, dirName, "SKILL.md");
+          if (existsSync(skillMd)) {
+            commands.push(readSkillFile(skillMd, dirName, pluginName));
+          }
+        }
+      }
+    }
+  }
+
+  return commands.sort((a, b) => a.command.localeCompare(b.command));
+}
+
+/**
  * Discover slash commands by scanning .claude/commands/ directories.
  *
  * Scans both global (~/.claude/commands/) and project ({cwd}/.claude/commands/).
@@ -117,10 +205,9 @@ export function discoverSlashCommands(cwd: string, homeDir?: string): SlashComma
 /**
  * Discover slash commands across multiple session CWDs.
  *
- * Scans ~/.claude/commands/ (global, lowest priority) and each CWD's
- * .claude/commands/ (project, higher priority). When the same command
- * name appears in multiple locations, project commands win over global,
- * and the first CWD wins over later CWDs.
+ * Priority (highest → lowest): project commands → global commands →
+ * skill commands → plugin commands. When the same command name appears
+ * in multiple locations, the higher-priority source wins.
  */
 export function discoverAllSlashCommands(cwds: string[], homeDir?: string): SlashCommand[] {
   const home = homeDir ?? homedir();
@@ -142,6 +229,13 @@ export function discoverAllSlashCommands(cwds: string[], homeDir?: string): Slas
     const name = basename(file, ".md");
     if (!seen.has(name)) {
       seen.set(name, toSlashCommand(name, "global"));
+    }
+  }
+
+  for (const cmd of discoverSkillCommands(home)) {
+    const name = cmd.command.slice(1);
+    if (!seen.has(name)) {
+      seen.set(name, cmd);
     }
   }
 
