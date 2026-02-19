@@ -42,5 +42,8 @@
     "msw": "^2.12.10",
     "type-coverage": "^2.29.7",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "minimatch": ">=10.2.1"
   }
 }
