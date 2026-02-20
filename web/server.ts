@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { StreamableHTTPTransport } from "@hono/mcp";
@@ -17,6 +17,7 @@ import { generateSessionName, launchSession } from "../src/launcher/application/
 import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/application/manage-config";
 import { createLauncherDeps } from "../src/launcher/infrastructure/fs-operations";
 import { handleFilePush } from "../src/mcp/application/handle-file-push";
+import { registerMcpConfig } from "../src/mcp/application/register-config";
 import type { McpFilePushDeps } from "../src/mcp/domain/ports";
 import {
   deletePlan,
@@ -203,41 +204,6 @@ function broadcastUpdate() {
 // ═══ MCP config ═══
 
 const MCP_ENABLED = process.env.PANOPTICON_MCP?.toLowerCase() !== "false";
-
-/**
- * Auto-register Panopticon in ~/.claude/.mcp.json so Claude Code discovers it on startup.
- * Only adds the entry if it does not already exist. Preserves all other MCP server entries.
- */
-function registerMcpConfig(port: number): void {
-  const mcpConfigPath = join(homedir(), ".claude", ".mcp.json");
-  const mcpConfigDir = join(homedir(), ".claude");
-
-  let config: { mcpServers?: Record<string, unknown> } = {};
-  try {
-    const raw = readFileSync(mcpConfigPath, "utf-8");
-    config = JSON.parse(raw);
-  } catch {
-    // File doesn't exist or is invalid JSON — start fresh
-  }
-
-  if (!config.mcpServers) {
-    config.mcpServers = {};
-  }
-
-  // Don't overwrite if user has already configured it
-  if ("panopticon" in config.mcpServers) return;
-
-  config.mcpServers.panopticon = {
-    type: "http",
-    url: `http://localhost:${port}/mcp`,
-  };
-
-  if (!existsSync(mcpConfigDir)) {
-    mkdirSync(mcpConfigDir, { recursive: true });
-  }
-  writeFileSync(mcpConfigPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
-  console.log(`Registered MCP endpoint in ${mcpConfigPath}`);
-}
 
 // ═══ MCP server ═══
 
@@ -632,10 +598,33 @@ async function main() {
 
   console.log(`Panopticon Web UI running at http://${server.hostname}:${server.port}`);
 
-  // Auto-register MCP endpoint in ~/.claude/.mcp.json
+  // Auto-register MCP endpoint in ~/.claude.json
   if (MCP_ENABLED) {
     try {
-      registerMcpConfig(server.port);
+      const claudeJsonPath = join(homedir(), ".claude.json");
+      const registered = registerMcpConfig(server.port, {
+        readFile: (p) => {
+          try {
+            return readFileSync(p, "utf-8");
+          } catch {
+            return null;
+          }
+        },
+        writeFile: (p, c) => writeFileSync(p, c, "utf-8"),
+        removeFile: (p) => {
+          try {
+            unlinkSync(p);
+          } catch {
+            // Ignore if file doesn't exist
+          }
+        },
+        fileExists: (p) => existsSync(p),
+        claudeJsonPath,
+        oldMcpJsonPath: join(homedir(), ".claude", ".mcp.json"),
+      });
+      if (registered) {
+        console.log(`Registered MCP endpoint in ${claudeJsonPath}`);
+      }
     } catch (err) {
       console.warn("Failed to register MCP config:", err);
     }
