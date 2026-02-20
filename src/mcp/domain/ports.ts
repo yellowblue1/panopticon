@@ -5,3 +5,12 @@ export interface McpFilePushDeps {
   readonly getFileSize: (path: string) => number;
   readonly broadcastFilePush: (event: FilePushSseEvent) => void;
 }
+
+export interface McpConfigDeps {
+  readonly readFile: (path: string) => string | null;
+  readonly writeFile: (path: string, content: string) => void;
+  readonly removeFile: (path: string) => void;
+  readonly fileExists: (path: string) => boolean;
+  readonly claudeJsonPath: string;
+  readonly oldMcpJsonPath: string;
+}

@@ -137,7 +137,7 @@ Panopticon embeds an [MCP](https://modelcontextprotocol.io/) endpoint that lets 
 
 ### Zero-config setup
 
-On startup, Panopticon automatically registers itself in `~/.claude/.mcp.json`. Claude Code picks this up on its next launch — no manual configuration needed.
+On startup, Panopticon automatically registers itself in `~/.claude.json`. Claude Code picks this up on its next launch — no manual configuration needed.
 
 To disable MCP entirely (endpoint + auto-registration):
 
@@ -157,7 +157,7 @@ The file appears as a toast notification in the browser with a download button.
 
 ### Manual configuration
 
-If you need to customize the MCP endpoint (e.g. non-default port), add to `~/.claude/.mcp.json`:
+If you need to customize the MCP endpoint (e.g. non-default port), add an `mcpServers` entry to `~/.claude.json`:
 
 ```json
 {
@@ -169,5 +169,7 @@ If you need to customize the MCP endpoint (e.g. non-default port), add to `~/.cl
   }
 }
 ```
+
+> **Note:** `~/.claude.json` contains other Claude Code settings. Only add or modify the `mcpServers.panopticon` entry.
 
 Panopticon will not overwrite an existing `panopticon` entry.
