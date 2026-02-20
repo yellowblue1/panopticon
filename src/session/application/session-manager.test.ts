@@ -122,6 +122,7 @@ describe("SessionManager", () => {
       expect(sessions[0].git_branch).toBe("main");
       expect(sessions[0].status).toBe("busy");
       expect(sessions[0].tmux_target).toBe("main:0.0");
+      expect(sessions[0].tmux_session_name).toBe("main");
       expect(sessions[0].agent_type).toBe("claude");
     });
 
