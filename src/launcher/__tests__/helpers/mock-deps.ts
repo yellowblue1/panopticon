@@ -5,6 +5,7 @@ export function createMockLauncherDeps(overrides: Partial<LauncherDeps> = {}): L
   return {
     readDir: () => [],
     isDirectory: () => true,
+    isGitWorktree: () => false,
     pathExists: () => true,
     resolvePath: (p) => p.replace("~", "/home/test"),
     homeDir: () => "/home/test",
