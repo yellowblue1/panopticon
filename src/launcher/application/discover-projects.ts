@@ -14,6 +14,7 @@ export function discoverProjects(deps: LauncherDeps): Project[] {
       const fullPath = `${resolved}/${entry}`;
       if (projects.has(fullPath)) continue;
       if (!deps.isDirectory(fullPath)) continue;
+      if (deps.isGitWorktree(fullPath)) continue;
 
       projects.set(fullPath, {
         name: deps.getProjectName(fullPath),
@@ -31,6 +32,7 @@ export function discoverProjects(deps: LauncherDeps): Project[] {
       for (const relPath of ghqProjects) {
         const fullPath = `${ghqRootPath}/${relPath}`;
         if (projects.has(fullPath)) continue;
+        if (deps.isGitWorktree(fullPath)) continue;
 
         projects.set(fullPath, {
           name: deps.getProjectName(fullPath),

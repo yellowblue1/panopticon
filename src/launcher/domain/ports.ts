@@ -4,6 +4,7 @@ export interface LauncherDeps {
   // Filesystem
   readDir: (path: string) => string[];
   isDirectory: (path: string) => boolean;
+  isGitWorktree: (path: string) => boolean;
   pathExists: (path: string) => boolean;
   resolvePath: (path: string) => string;
   homeDir: () => string;

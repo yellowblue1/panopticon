@@ -59,6 +59,18 @@ export function createLauncherDeps(infraDeps: LauncherInfraDeps): LauncherDeps {
       }
     },
 
+    isGitWorktree: (path) => {
+      try {
+        const dotGit = join(path, ".git");
+        if (!existsSync(dotGit)) return false;
+        if (statSync(dotGit).isDirectory()) return false;
+        const content = readFileSync(dotGit, "utf-8");
+        return content.includes(".git/worktrees/");
+      } catch {
+        return false;
+      }
+    },
+
     pathExists: (path) => existsSync(path),
 
     resolvePath: (path) => resolve(path.replace(/^~/, homedir())),

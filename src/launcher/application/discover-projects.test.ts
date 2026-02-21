@@ -168,6 +168,47 @@ describe("discoverProjects", () => {
     expect(projects.map((p) => p.name)).toEqual(["alpha", "middle", "zebra"]);
   });
 
+  it("excludes git worktrees from scan path results", () => {
+    const deps = createMockLauncherDeps({
+      readConfig: () => ({ scanPaths: ["/home/test/src"], useGhq: false }),
+      readDir: () => ["real-project", "real-project-worktrees"],
+      isGitWorktree: (path) => path.endsWith("-worktrees"),
+    });
+
+    const projects = discoverProjects(deps);
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.name).toBe("real-project");
+  });
+
+  it("excludes git worktrees from ghq results", () => {
+    const deps = createMockLauncherDeps({
+      readConfig: () => ({ scanPaths: [], useGhq: true }),
+      ghqRoot: () => "/home/test/ghq",
+      ghqList: () => ["github.com/user/repo", "github.com/user/repo-worktrees"],
+      isGitWorktree: (path) => path.endsWith("-worktrees"),
+      getProjectName: (cwd) => cwd.split("/").pop() ?? "unknown",
+    });
+
+    const projects = discoverProjects(deps);
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.name).toBe("repo");
+  });
+
+  it("includes non-worktree projects normally when worktree filter is active", () => {
+    const deps = createMockLauncherDeps({
+      readConfig: () => ({ scanPaths: ["/home/test/src"], useGhq: true }),
+      readDir: (path) => (path === "/home/test/src" ? ["alpha", "beta"] : []),
+      ghqRoot: () => "/home/test/ghq",
+      ghqList: () => ["github.com/user/gamma"],
+      isGitWorktree: () => false,
+      getProjectName: (cwd) => cwd.split("/").pop() ?? "unknown",
+    });
+
+    const projects = discoverProjects(deps);
+    expect(projects).toHaveLength(3);
+    expect(projects.map((p) => p.name)).toEqual(["alpha", "beta", "gamma"]);
+  });
+
   it("combines scan paths and ghq results, both sorted", () => {
     const deps = createMockLauncherDeps({
       readConfig: () => ({
