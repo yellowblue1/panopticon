@@ -164,7 +164,7 @@ describe("launchSession", () => {
       deps,
     );
 
-    expect(sentTexts).toEqual(["git checkout main && claude"]);
+    expect(sentTexts).toEqual(["git checkout main; claude"]);
   });
 
   it("skips git checkout when default branch is not available", () => {

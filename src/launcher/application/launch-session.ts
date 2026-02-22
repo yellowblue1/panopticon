@@ -33,7 +33,7 @@ export function launchSession(config: LaunchConfig, deps: LauncherDeps): LaunchR
   // command instead of executing it.
   const defaultBranch = deps.getDefaultBranch(config.projectPath);
   if (defaultBranch) {
-    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch} && ${config.agentType}`);
+    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch}; ${config.agentType}`);
   } else {
     deps.tmuxSendKeys(paneId, config.agentType);
   }
