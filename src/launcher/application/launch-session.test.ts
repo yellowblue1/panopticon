@@ -149,7 +149,7 @@ describe("launchSession", () => {
     expect(keysSent).toBe(false);
   });
 
-  it("sends git checkout before agent command when default branch is available", () => {
+  it("sends git checkout and agent command combined when default branch is available", () => {
     const sentTexts: string[] = [];
 
     const deps = createMockLauncherDeps({
@@ -164,7 +164,7 @@ describe("launchSession", () => {
       deps,
     );
 
-    expect(sentTexts).toEqual(["git checkout main", "claude"]);
+    expect(sentTexts).toEqual(["git checkout main; claude"]);
   });
 
   it("skips git checkout when default branch is not available", () => {

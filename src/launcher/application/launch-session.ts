@@ -26,11 +26,17 @@ export function launchSession(config: LaunchConfig, deps: LauncherDeps): LaunchR
     };
   }
 
+  // Combine git checkout and agent command into a single tmuxSendKeys call.
+  // Sending them separately causes the Enter key (\r) from the first command to be
+  // buffered in canonical mode and translated to \n (Ctrl-J) by the terminal driver.
+  // Fish shell's Ctrl-J binding (e.g. zoxide's `zi`) then intercepts the second
+  // command instead of executing it.
   const defaultBranch = deps.getDefaultBranch(config.projectPath);
   if (defaultBranch) {
-    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch}`);
+    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch}; ${config.agentType}`);
+  } else {
+    deps.tmuxSendKeys(paneId, config.agentType);
   }
-  deps.tmuxSendKeys(paneId, config.agentType);
 
   return {
     success: true,
