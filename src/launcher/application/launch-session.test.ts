@@ -54,7 +54,9 @@ describe("launchSession", () => {
     expect(result.paneId).toBe("%0");
     expect(result.error).toBeUndefined();
     expect(createdSession).toEqual({ name: "app-claude", cwd: "/home/test/src/app" });
-    expect(sentKeys).toEqual([{ paneId: "%0", text: "claude" }]);
+    expect(sentKeys).toHaveLength(1);
+    expect(sentKeys[0].paneId).toBe("%0");
+    expect(sentKeys[0].text).toMatch(/^claude --session-id [0-9a-f-]{36}$/);
   });
 
   it("creates a new window when session name already exists", () => {
@@ -149,7 +151,7 @@ describe("launchSession", () => {
     expect(keysSent).toBe(false);
   });
 
-  it("sends git checkout before agent command when default branch is available", () => {
+  it("sends git checkout and agent command combined when default branch is available", () => {
     const sentTexts: string[] = [];
 
     const deps = createMockLauncherDeps({
@@ -164,7 +166,8 @@ describe("launchSession", () => {
       deps,
     );
 
-    expect(sentTexts).toEqual(["git checkout main", "claude"]);
+    expect(sentTexts).toHaveLength(1);
+    expect(sentTexts[0]).toMatch(/^git checkout main && claude --session-id [0-9a-f-]{36}$/);
   });
 
   it("skips git checkout when default branch is not available", () => {
@@ -182,6 +185,7 @@ describe("launchSession", () => {
       deps,
     );
 
-    expect(sentTexts).toEqual(["claude"]);
+    expect(sentTexts).toHaveLength(1);
+    expect(sentTexts[0]).toMatch(/^claude --session-id [0-9a-f-]{36}$/);
   });
 });
