@@ -29,9 +29,7 @@ export function launchSession(config: LaunchConfig, deps: LauncherDeps): LaunchR
   // Use --session-id with a fresh UUID to skip the project picker and start
   // a new session in the current directory
   const agentCommand =
-    config.agentType === "claude"
-      ? `claude --session-id ${crypto.randomUUID()}`
-      : config.agentType;
+    config.agentType === "claude" ? `claude --session-id ${crypto.randomUUID()}` : config.agentType;
 
   // Combine git checkout and agent command into a single send to avoid
   // timing issues where the second paste arrives before the first completes
