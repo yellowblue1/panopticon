@@ -26,18 +26,16 @@ export function launchSession(config: LaunchConfig, deps: LauncherDeps): LaunchR
     };
   }
 
-  // Use --session-id with a fresh UUID to skip the project picker and start
-  // a new session in the current directory
-  const agentCommand =
-    config.agentType === "claude" ? `claude --session-id ${crypto.randomUUID()}` : config.agentType;
-
-  // Combine git checkout and agent command into a single send to avoid
-  // timing issues where the second paste arrives before the first completes
+  // Combine git checkout and agent command into a single tmuxSendKeys call.
+  // Sending them separately causes the Enter key (\r) from the first command to be
+  // buffered in canonical mode and translated to \n (Ctrl-J) by the terminal driver.
+  // Fish shell's Ctrl-J binding (e.g. zoxide's `zi`) then intercepts the second
+  // command instead of executing it.
   const defaultBranch = deps.getDefaultBranch(config.projectPath);
   if (defaultBranch) {
-    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch} && ${agentCommand}`);
+    deps.tmuxSendKeys(paneId, `git checkout ${defaultBranch} && ${config.agentType}`);
   } else {
-    deps.tmuxSendKeys(paneId, agentCommand);
+    deps.tmuxSendKeys(paneId, config.agentType);
   }
 
   return {
