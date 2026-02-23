@@ -60,7 +60,7 @@ export function SessionRow({
           <AgentTypeIcon agentType={session.agent_type} />
           <div className="flex flex-col">
             <span className="project-name">{session.project_name}</span>
-            <span className="tmux-session-name">{session.tmux_session_name}</span>
+            <span className="tmux-session-name">{session.tmux_target}</span>
             {lastSeenAt > 0 && (
               <span className="last-seen">Seen {formatRelativeTime(lastSeenAt)}</span>
             )}
