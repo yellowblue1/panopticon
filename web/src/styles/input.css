@@ -256,6 +256,11 @@ body {
   @apply bg-accent-blue/30;
 }
 
+/* Tmux session name */
+.tmux-session-name {
+  @apply text-text-muted text-xs leading-tight font-mono;
+}
+
 /* Last-seen timestamp */
 .last-seen {
   @apply text-text-muted text-xs leading-tight;

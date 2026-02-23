@@ -11,6 +11,7 @@ function makeSession(overrides: Partial<SessionResponse> & { cwd: string }): Ses
     status: "busy",
     summary: null,
     tmux_target: "main:0.0",
+    tmux_session_name: "main",
     last_activity: "2026-02-16T00:00:00.000Z",
     agent_type: "claude",
     ...overrides,

@@ -13,6 +13,7 @@ export interface SessionResponse {
   status: SessionStatus;
   summary: string | null;
   tmux_target: string;
+  tmux_session_name: string;
   last_activity: string;
   agent_type: AgentType;
   cwd: string;
