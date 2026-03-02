@@ -1,3 +1,4 @@
+import { compareWithHysteresis } from "@shared/sort";
 import type { SessionResponse } from "@shared/types";
 
 export interface SessionGroup {
@@ -90,17 +91,24 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   const groups: SessionGroup[] = [];
 
   for (const group of groupsByBaseCwd.values()) {
-    group.children.sort((a, b) => b.last_activity.localeCompare(a.last_activity));
+    group.children.sort((a, b) =>
+      compareWithHysteresis(a.last_activity, b.last_activity, a.pane_id.localeCompare(b.pane_id)),
+    );
     groups.push(group);
   }
 
   for (const children of orphansByBaseCwd.values()) {
-    children.sort((a, b) => b.last_activity.localeCompare(a.last_activity));
+    children.sort((a, b) =>
+      compareWithHysteresis(a.last_activity, b.last_activity, a.pane_id.localeCompare(b.pane_id)),
+    );
     groups.push({ orchestrator: null, children });
   }
 
   groups.sort((a, b) => {
-    return getGroupMaxActivity(b).localeCompare(getGroupMaxActivity(a));
+    const tiebreaker = (a.orchestrator?.pane_id ?? a.children[0]?.pane_id ?? "").localeCompare(
+      b.orchestrator?.pane_id ?? b.children[0]?.pane_id ?? "",
+    );
+    return compareWithHysteresis(getGroupMaxActivity(a), getGroupMaxActivity(b), tiebreaker);
   });
 
   const ungrouped: SessionResponse[] = [];

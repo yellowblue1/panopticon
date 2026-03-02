@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { compareWithHysteresis } from "../../shared/sort";
 import type { AgentType, SessionResponse } from "../../shared/types";
 import type { SessionState } from "../../terminal/domain/types";
 import type { SessionManagerDeps, SessionManagerOptions } from "../domain/ports";
@@ -111,7 +112,9 @@ export class SessionManager {
   getSessions(): SessionResponse[] {
     const sessions = Array.from(this.sessions.values());
 
-    sessions.sort((a, b) => b.last_activity.localeCompare(a.last_activity));
+    sessions.sort((a, b) =>
+      compareWithHysteresis(a.last_activity, b.last_activity, a.pane_id.localeCompare(b.pane_id)),
+    );
 
     return sessions.map((s) => ({
       pane_id: s.pane_id,
