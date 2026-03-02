@@ -36,6 +36,14 @@ function getGroupMaxActivity(g: SessionGroup): string {
   return max;
 }
 
+function byActivityThenPaneId(a: SessionResponse, b: SessionResponse): number {
+  return compareWithHysteresis(
+    a.last_activity,
+    b.last_activity,
+    a.pane_id.localeCompare(b.pane_id),
+  );
+}
+
 /**
  * Group sessions by orchestrator/worktree relationship.
  *
@@ -91,24 +99,29 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   const groups: SessionGroup[] = [];
 
   for (const group of groupsByBaseCwd.values()) {
-    group.children.sort((a, b) =>
-      compareWithHysteresis(a.last_activity, b.last_activity, a.pane_id.localeCompare(b.pane_id)),
-    );
+    group.children.sort(byActivityThenPaneId);
     groups.push(group);
   }
 
   for (const children of orphansByBaseCwd.values()) {
-    children.sort((a, b) =>
-      compareWithHysteresis(a.last_activity, b.last_activity, a.pane_id.localeCompare(b.pane_id)),
-    );
+    children.sort(byActivityThenPaneId);
     groups.push({ orchestrator: null, children });
+  }
+
+  const maxActivityByGroup = new Map<SessionGroup, string>();
+  for (const g of groups) {
+    maxActivityByGroup.set(g, getGroupMaxActivity(g));
   }
 
   groups.sort((a, b) => {
     const tiebreaker = (a.orchestrator?.pane_id ?? a.children[0]?.pane_id ?? "").localeCompare(
       b.orchestrator?.pane_id ?? b.children[0]?.pane_id ?? "",
     );
-    return compareWithHysteresis(getGroupMaxActivity(a), getGroupMaxActivity(b), tiebreaker);
+    return compareWithHysteresis(
+      maxActivityByGroup.get(a) ?? "",
+      maxActivityByGroup.get(b) ?? "",
+      tiebreaker,
+    );
   });
 
   const ungrouped: SessionResponse[] = [];

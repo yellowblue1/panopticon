@@ -10,7 +10,7 @@ const SORT_HYSTERESIS_MS = 5_000;
  * @param b - Second ISO 8601 timestamp
  * @param tiebreaker - Pre-computed stable comparator value (used when timestamps are close)
  * @param thresholdMs - Hysteresis threshold in milliseconds (default: 5000)
- * @returns Standard comparator result (-1, 0, or 1)
+ * @returns -1 or 1 when timestamps differ by more than threshold, otherwise tiebreaker
  */
 export function compareWithHysteresis(
   a: string,
