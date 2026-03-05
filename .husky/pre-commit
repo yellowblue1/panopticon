@@ -1,5 +1,9 @@
 # Activate mise to make bun/node available in hook environment
-eval "$("$HOME/.local/bin/mise" activate bash --shims)"
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate bash --shims)"
+elif [ -x "$HOME/.local/bin/mise" ]; then
+  eval "$("$HOME/.local/bin/mise" activate bash --shims)"
+fi
 
 BRANCH=$(git branch --show-current)
 if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then
