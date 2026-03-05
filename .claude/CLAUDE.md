@@ -36,4 +36,4 @@ Each bounded context follows `application/` / `domain/` / `infrastructure/` layo
 
 ## Quality Standards
 
-Pre-commit hooks (via [pre-commit](https://pre-commit.com/)): Biome check, TypeScript check, dependency-cruiser, `bun run knip` (dead code), `bun run type-coverage` (>= 99%), security audit, branch protection, trailing-whitespace, end-of-file, YAML/JSON checks, and actionlint.
+Pre-commit hooks (via husky + lint-staged): Biome check on staged files (`*.{js,jsx,ts,tsx,json,css}`) and branch protection (main/develop). Heavy checks (TypeScript, dependency-cruiser, knip, type-coverage, security audit) run in CI only.

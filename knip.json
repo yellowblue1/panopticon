@@ -3,7 +3,8 @@
   "workspaces": {
     ".": {
       "entry": ["src/shared/types.ts", "**/*.test.ts", "test-setup.ts"],
-      "project": ["src/**/*.ts", "bin/**/*.ts"]
+      "project": ["src/**/*.ts", "bin/**/*.ts"],
+      "ignoreDependencies": ["lint-staged"]
     },
     "web": {
       "vite": true,

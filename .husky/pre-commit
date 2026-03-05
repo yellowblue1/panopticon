@@ -1,0 +1,10 @@
+# Activate mise to make bun/node available in hook environment
+eval "$("$HOME/.local/bin/mise" activate bash --shims)"
+
+BRANCH=$(git branch --show-current)
+if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then
+  echo "Direct commits to ${BRANCH} are prohibited. Create a feature branch and submit a PR."
+  exit 1
+fi
+
+bun run lint-staged
