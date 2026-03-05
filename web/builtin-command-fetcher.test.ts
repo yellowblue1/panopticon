@@ -5,6 +5,7 @@ import {
   BuiltinCommandProvider,
   fetchBuiltinCommands,
   parseBuiltinCommands,
+  parseBundledSkills,
   readCachedBuiltinCommands,
 } from "./builtin-command-fetcher";
 
@@ -115,11 +116,77 @@ describe("parseBuiltinCommands", () => {
   });
 });
 
+const SAMPLE_SKILLS_MARKDOWN = `## Bundled skills
+
+Bundled skills ship with Claude Code and are available in every session.
+
+* **\`/simplify\`**: reviews your recently changed files for code reuse, quality, and efficiency issues, then fixes them.
+
+* **\`/batch <instruction>\`**: orchestrates large-scale changes across a codebase in parallel.
+
+* **\`/debug [description]\`**: troubleshoots your current Claude Code session by reading the session debug log.
+
+Claude Code also includes a bundled developer platform skill.
+
+## Getting started
+`;
+
+describe("parseBundledSkills", () => {
+  it("parses bundled skills from markdown bullet list", () => {
+    const result = parseBundledSkills(SAMPLE_SKILLS_MARKDOWN);
+
+    expect(result).toEqual([
+      {
+        command: "/simplify",
+        description:
+          "reviews your recently changed files for code reuse, quality, and efficiency issues, then fixes them.",
+      },
+      {
+        command: "/batch",
+        description: "orchestrates large-scale changes across a codebase in parallel.",
+      },
+      {
+        command: "/debug",
+        description:
+          "troubleshoots your current Claude Code session by reading the session debug log.",
+      },
+    ]);
+  });
+
+  it("returns empty array when section is missing", () => {
+    expect(parseBundledSkills("# No bundled skills here")).toEqual([]);
+  });
+
+  it("strips markdown links from descriptions", () => {
+    const markdown = `## Bundled skills
+
+* **\`/foo\`**: uses [worktrees](/en/worktrees) for isolation.
+
+## Next
+`;
+    const result = parseBundledSkills(markdown);
+    expect(result[0].description).toBe("uses worktrees for isolation.");
+  });
+});
+
+function createMockFetchText(
+  commandsMd = SAMPLE_MARKDOWN,
+  skillsMd: string | null = SAMPLE_SKILLS_MARKDOWN,
+) {
+  return mock(async (url: string) => {
+    if (url.includes("skills.md")) {
+      if (skillsMd === null) throw new Error("Not found");
+      return skillsMd;
+    }
+    return commandsMd;
+  });
+}
+
 function createMockDeps(
   overrides: Partial<BuiltinCommandFetcherDeps> = {},
 ): BuiltinCommandFetcherDeps {
   return {
-    fetchText: mock(async () => SAMPLE_MARKDOWN),
+    fetchText: createMockFetchText(),
     readFileSync: mock(() => "[]"),
     writeFileSync: mock(() => {}),
     existsSync: mock(() => false),
@@ -130,31 +197,68 @@ function createMockDeps(
 }
 
 describe("fetchBuiltinCommands", () => {
-  it("fetches markdown, parses commands, and writes cache file", async () => {
+  it("fetches commands and bundled skills, then writes cache file", async () => {
     const writeFileSync = mock((_path: string, _data: string) => {});
     const mkdirSync = mock((_path: string) => {});
     const deps = createMockDeps({ writeFileSync, mkdirSync });
 
     const result = await fetchBuiltinCommands(deps);
 
-    expect(result.length).toBe(5);
+    expect(result.length).toBe(8); // 5 built-in + 3 bundled skills
     expect(result[0].command).toBe("/clear");
+    expect(result.find((c) => c.command === "/simplify")).toBeTruthy();
+    expect(result.find((c) => c.command === "/batch")).toBeTruthy();
     expect(mkdirSync).toHaveBeenCalledWith("/tmp/test-cache");
     expect(writeFileSync).toHaveBeenCalled();
     const writtenPath = writeFileSync.mock.calls[0][0];
     expect(writtenPath).toContain("builtin-commands.json");
   });
 
-  it("returns empty array when parsed result is empty", async () => {
+  it("deduplicates commands that appear in both sources", async () => {
+    const skillsWithDebug = `## Bundled skills
+
+* **\`/debug [description]\`**: troubleshoots your session.
+
+## Next
+`;
+    const commandsWithDebug = `## Built-in commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/debug [description]\` | Debug session |
+
+### MCP prompts
+`;
     const deps = createMockDeps({
-      fetchText: mock(async () => "# No commands here"),
+      fetchText: createMockFetchText(commandsWithDebug, skillsWithDebug),
+    });
+
+    const result = await fetchBuiltinCommands(deps);
+    const debugCmds = result.filter((c) => c.command === "/debug");
+    expect(debugCmds.length).toBe(1);
+    expect(debugCmds[0].description).toBe("Debug session");
+  });
+
+  it("returns commands even when skills fetch fails", async () => {
+    const deps = createMockDeps({
+      fetchText: createMockFetchText(SAMPLE_MARKDOWN, null),
+    });
+
+    const result = await fetchBuiltinCommands(deps);
+    expect(result.length).toBe(5);
+    expect(result[0].command).toBe("/clear");
+  });
+
+  it("returns empty array when both sources are empty", async () => {
+    const deps = createMockDeps({
+      fetchText: createMockFetchText("# No commands here", "# No skills here"),
     });
 
     const result = await fetchBuiltinCommands(deps);
     expect(result).toEqual([]);
   });
 
-  it("propagates fetch errors", async () => {
+  it("propagates fetch errors from commands endpoint", async () => {
     const deps = createMockDeps({
       fetchText: mock(async () => {
         throw new Error("Network error");
@@ -243,8 +347,9 @@ describe("BuiltinCommandProvider", () => {
 
     const commands = provider.getCommands();
     expect(commands).not.toBeNull();
-    expect(commands?.length).toBe(5);
+    expect(commands?.length).toBe(8); // 5 built-in + 3 bundled skills
     expect(commands?.[0].command).toBe("/clear");
+    expect(commands?.find((c) => c.command === "/simplify")).toBeTruthy();
   });
 
   it("retains previous commands when fetch fails after start", async () => {
@@ -253,9 +358,10 @@ describe("BuiltinCommandProvider", () => {
     const deps = createMockDeps({
       existsSync: mock(() => true),
       readFileSync: mock(() => JSON.stringify(cached)),
-      fetchText: mock(async () => {
+      fetchText: mock(async (_url: string) => {
         callCount++;
-        if (callCount > 1) throw new Error("Network error");
+        if (callCount > 2) throw new Error("Network error");
+        if (_url.includes("skills.md")) return SAMPLE_SKILLS_MARKDOWN;
         return SAMPLE_MARKDOWN;
       }),
     });
@@ -265,10 +371,10 @@ describe("BuiltinCommandProvider", () => {
 
     await provider.start();
     const afterFirst = provider.getCommands();
-    expect(afterFirst?.length).toBe(5);
+    expect(afterFirst?.length).toBe(8);
 
     await provider.refresh();
-    expect(provider.getCommands()?.length).toBe(5);
+    expect(provider.getCommands()?.length).toBe(8);
   });
 
   it("stop clears the timer", () => {
