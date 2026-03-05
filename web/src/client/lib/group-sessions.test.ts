@@ -267,6 +267,69 @@ describe("groupSessions", () => {
     expect(group.children[1].pane_id).toBe("%1");
   });
 
+  it("keeps children in stable pane_id order when last_activity is within hysteresis threshold", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%0",
+        cwd: "/home/user/myproject",
+        last_activity: "2026-02-16T00:10:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/myproject-worktrees/branch-a",
+        last_activity: "2026-02-16T00:05:02.000Z",
+      }),
+      makeSession({
+        pane_id: "%2",
+        cwd: "/home/user/myproject-worktrees/branch-b",
+        last_activity: "2026-02-16T00:05:04.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    const group = result.groups[0];
+    // %2 has slightly newer activity (2s difference < 5s threshold),
+    // so order falls back to pane_id ascending: %1 before %2
+    expect(group.children[0].pane_id).toBe("%1");
+    expect(group.children[1].pane_id).toBe("%2");
+  });
+
+  it("keeps groups in stable order when max activities are within hysteresis threshold", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%0",
+        cwd: "/home/user/project-a",
+        project_name: "project-a",
+        last_activity: "2026-02-16T00:05:01.000Z",
+      }),
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/project-a-worktrees/feat",
+        project_name: "project-a",
+        last_activity: "2026-02-16T00:05:03.000Z",
+      }),
+      makeSession({
+        pane_id: "%2",
+        cwd: "/home/user/project-b",
+        project_name: "project-b",
+        last_activity: "2026-02-16T00:05:02.000Z",
+      }),
+      makeSession({
+        pane_id: "%3",
+        cwd: "/home/user/project-b-worktrees/feat",
+        project_name: "project-b",
+        last_activity: "2026-02-16T00:05:04.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.groups).toHaveLength(2);
+    // Max activities: project-a=00:05:03, project-b=00:05:04 (1s diff < 5s threshold)
+    // Falls back to orchestrator pane_id: %0 < %2, so project-a first
+    expect(result.groups[0].orchestrator?.project_name).toBe("project-a");
+    expect(result.groups[1].orchestrator?.project_name).toBe("project-b");
+  });
+
   it("sorts groups by max activity across all members, not just orchestrator", () => {
     const sessions = [
       makeSession({

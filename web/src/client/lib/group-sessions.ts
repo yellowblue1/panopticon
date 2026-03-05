@@ -1,3 +1,4 @@
+import { compareWithHysteresis } from "@shared/sort";
 import type { SessionResponse } from "@shared/types";
 
 export interface SessionGroup {
@@ -33,6 +34,14 @@ function getGroupMaxActivity(g: SessionGroup): string {
     if (c.last_activity > max) max = c.last_activity;
   }
   return max;
+}
+
+function byActivityThenPaneId(a: SessionResponse, b: SessionResponse): number {
+  return compareWithHysteresis(
+    a.last_activity,
+    b.last_activity,
+    a.pane_id.localeCompare(b.pane_id),
+  );
 }
 
 /**
@@ -90,17 +99,29 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   const groups: SessionGroup[] = [];
 
   for (const group of groupsByBaseCwd.values()) {
-    group.children.sort((a, b) => b.last_activity.localeCompare(a.last_activity));
+    group.children.sort(byActivityThenPaneId);
     groups.push(group);
   }
 
   for (const children of orphansByBaseCwd.values()) {
-    children.sort((a, b) => b.last_activity.localeCompare(a.last_activity));
+    children.sort(byActivityThenPaneId);
     groups.push({ orchestrator: null, children });
   }
 
+  const maxActivityByGroup = new Map<SessionGroup, string>();
+  for (const g of groups) {
+    maxActivityByGroup.set(g, getGroupMaxActivity(g));
+  }
+
   groups.sort((a, b) => {
-    return getGroupMaxActivity(b).localeCompare(getGroupMaxActivity(a));
+    const tiebreaker = (a.orchestrator?.pane_id ?? a.children[0]?.pane_id ?? "").localeCompare(
+      b.orchestrator?.pane_id ?? b.children[0]?.pane_id ?? "",
+    );
+    return compareWithHysteresis(
+      maxActivityByGroup.get(a) ?? "",
+      maxActivityByGroup.get(b) ?? "",
+      tiebreaker,
+    );
   });
 
   const ungrouped: SessionResponse[] = [];
