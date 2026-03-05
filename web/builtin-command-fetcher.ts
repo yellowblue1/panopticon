@@ -16,7 +16,7 @@ export interface BuiltinCommandFetcherDeps {
 }
 
 function stripMarkdownLinks(text: string): string {
-  return text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  return text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trimEnd();
 }
 
 /**
@@ -111,7 +111,7 @@ export function parseBundledSkills(markdown: string): SlashCommand[] {
     if (!match) continue;
 
     const command = match[1];
-    const description = stripMarkdownLinks(match[2]).replace(/\s+$/, "");
+    const description = stripMarkdownLinks(match[2]);
 
     commands.push({ command, description });
   }

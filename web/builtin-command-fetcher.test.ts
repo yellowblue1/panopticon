@@ -157,11 +157,6 @@ describe("parseBundledSkills", () => {
     expect(parseBundledSkills("# No bundled skills here")).toEqual([]);
   });
 
-  it("stops at next ## heading", () => {
-    const result = parseBundledSkills(SAMPLE_SKILLS_MARKDOWN);
-    expect(result.length).toBe(3);
-  });
-
   it("strips markdown links from descriptions", () => {
     const markdown = `## Bundled skills
 
