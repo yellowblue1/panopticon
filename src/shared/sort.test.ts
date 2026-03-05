@@ -61,4 +61,16 @@ describe("compareWithHysteresis", () => {
     expect(compareWithHysteresis(a, b, 42, 2_000)).toBe(1);
     expect(compareWithHysteresis(a, b, 42, 4_000)).toBe(42);
   });
+
+  it("sorts by recency for any nonzero difference when threshold is 0", () => {
+    const a = base;
+    const b = offsetMs(1);
+
+    expect(compareWithHysteresis(a, b, 42, 0)).toBe(1);
+    expect(compareWithHysteresis(b, a, 42, 0)).toBe(-1);
+  });
+
+  it("uses tiebreaker for identical timestamps when threshold is 0", () => {
+    expect(compareWithHysteresis(base, base, 42, 0)).toBe(42);
+  });
 });
