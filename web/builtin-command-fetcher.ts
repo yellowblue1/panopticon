@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { SlashCommand } from "../src/shared/types";
 
 const DOCS_URL = "https://code.claude.com/docs/en/interactive-mode.md";
+const SKILLS_DOCS_URL = "https://code.claude.com/docs/en/skills.md";
 const CACHE_FILENAME = "builtin-commands.json";
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -12,6 +13,10 @@ export interface BuiltinCommandFetcherDeps {
   existsSync: (path: string) => boolean;
   mkdirSync: (path: string) => void;
   cacheDir: string;
+}
+
+function stripMarkdownLinks(text: string): string {
+  return text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
 }
 
 /**
@@ -70,7 +75,7 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
     if (!commandMatch) continue;
 
     const command = commandMatch[1];
-    const description = rawDescription.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+    const description = stripMarkdownLinks(rawDescription);
 
     commands.push({ command, description });
   }
@@ -79,13 +84,66 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
 }
 
 /**
- * Fetch built-in commands from official docs and write to file cache.
+ * Parse bundled skills from Claude Code skills docs markdown.
+ *
+ * Extracts bullet items under "## Bundled skills" that match
+ * the pattern: **`/command`** or **`/command <args>`**: description
+ */
+export function parseBundledSkills(markdown: string): SlashCommand[] {
+  const lines = markdown.split("\n");
+  const commands: SlashCommand[] = [];
+
+  let inSection = false;
+
+  for (const line of lines) {
+    if (!inSection) {
+      if (/^## Bundled skills/.test(line)) {
+        inSection = true;
+      }
+      continue;
+    }
+
+    if (/^## /.test(line) && !/^## Bundled skills/.test(line)) {
+      break;
+    }
+
+    const match = line.match(/^\* \*\*`(\/\S+?)(?:\s+[^`]*)?\s*`\*\*:\s*(.+)/);
+    if (!match) continue;
+
+    const command = match[1];
+    const description = stripMarkdownLinks(match[2]).replace(/\s+$/, "");
+
+    commands.push({ command, description });
+  }
+
+  return commands;
+}
+
+/**
+ * Fetch built-in commands and bundled skills from official docs,
+ * then write combined result to file cache.
  */
 export async function fetchBuiltinCommands(
   deps: BuiltinCommandFetcherDeps,
 ): Promise<SlashCommand[]> {
-  const markdown = await deps.fetchText(DOCS_URL);
-  const commands = parseBuiltinCommands(markdown);
+  const [docsResult, skillsResult] = await Promise.allSettled([
+    deps.fetchText(DOCS_URL),
+    deps.fetchText(SKILLS_DOCS_URL),
+  ]);
+
+  if (docsResult.status === "rejected") throw docsResult.reason;
+
+  const commands = parseBuiltinCommands(docsResult.value);
+
+  if (skillsResult.status === "fulfilled") {
+    const bundled = parseBundledSkills(skillsResult.value);
+    const seen = new Set(commands.map((c) => c.command));
+    for (const cmd of bundled) {
+      if (!seen.has(cmd.command)) {
+        commands.push(cmd);
+      }
+    }
+  }
 
   if (commands.length > 0) {
     const cachePath = join(deps.cacheDir, CACHE_FILENAME);
