@@ -4,8 +4,8 @@ import {
   type BuiltinCommandFetcherDeps,
   BuiltinCommandProvider,
   fetchBuiltinCommands,
-  parseBundledSkills,
   parseBuiltinCommands,
+  parseBundledSkills,
   readCachedBuiltinCommands,
 } from "./builtin-command-fetcher";
 
@@ -143,8 +143,7 @@ describe("parseBundledSkills", () => {
       },
       {
         command: "/batch",
-        description:
-          "orchestrates large-scale changes across a codebase in parallel.",
+        description: "orchestrates large-scale changes across a codebase in parallel.",
       },
       {
         command: "/debug",
