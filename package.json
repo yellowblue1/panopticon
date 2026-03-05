@@ -50,9 +50,5 @@
     "*.{js,jsx,ts,tsx,json,css}": [
       "biome check --write"
     ]
-  },
-  "overrides": {
-    "minimatch": ">=10.2.3",
-    "rollup": ">=4.59.0"
   }
 }
