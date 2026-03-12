@@ -330,6 +330,56 @@ describe("groupSessions", () => {
     expect(result.groups[1].orchestrator?.project_name).toBe("project-b");
   });
 
+  it("sorts ungrouped sessions by activity descending with hysteresis", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%2",
+        cwd: "/home/user/project-c",
+        project_name: "project-c",
+        last_activity: "2026-02-16T00:01:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%0",
+        cwd: "/home/user/project-a",
+        project_name: "project-a",
+        last_activity: "2026-02-16T00:10:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/project-b",
+        project_name: "project-b",
+        last_activity: "2026-02-16T00:05:00.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.ungrouped).toHaveLength(3);
+    // Sorted by last_activity descending: %0 (00:10) > %1 (00:05) > %2 (00:01)
+    expect(result.ungrouped.map((s) => s.pane_id)).toEqual(["%0", "%1", "%2"]);
+  });
+
+  it("keeps ungrouped in stable pane_id order when activity is within hysteresis threshold", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/project-b",
+        project_name: "project-b",
+        last_activity: "2026-02-16T00:05:03.000Z",
+      }),
+      makeSession({
+        pane_id: "%0",
+        cwd: "/home/user/project-a",
+        project_name: "project-a",
+        last_activity: "2026-02-16T00:05:01.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.ungrouped).toHaveLength(2);
+    // 2s difference < 5s threshold, falls back to pane_id ascending: %0 before %1
+    expect(result.ungrouped.map((s) => s.pane_id)).toEqual(["%0", "%1"]);
+  });
+
   it("sorts groups by max activity across all members, not just orchestrator", () => {
     const sessions = [
       makeSession({
