@@ -119,6 +119,12 @@ describe("hasSessionsChanged", () => {
     expect(hasSessionsChanged(prev, next)).toBe(true);
   });
 
+  it("returns true when tmux_session_name changes", () => {
+    const prev = makeResponse([makeSession({ tmux_session_name: "main" })]);
+    const next = makeResponse([makeSession({ tmux_session_name: "dev" })]);
+    expect(hasSessionsChanged(prev, next)).toBe(true);
+  });
+
   it("returns true when a session is added", () => {
     const prev = makeResponse([]);
     const next = makeResponse([makeSession()]);
