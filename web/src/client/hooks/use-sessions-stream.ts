@@ -6,6 +6,7 @@ import { useReadStatusContext } from "@/contexts/read-status-context";
 import { hashContent } from "@/lib/hash-content";
 import { clearNotificationTracking, showBrowserNotification } from "@/lib/notifications";
 import { authKeys, sessionKeys } from "@/lib/query-keys";
+import { hasSessionsChanged } from "@/lib/sessions-changed";
 import { fetchSessions } from "./use-sessions";
 
 const POLL_INTERVAL_MS = 5000;
@@ -78,7 +79,12 @@ export function useSessionsStream(onFilePush?: (event: FilePushSseEvent) => void
       await batchMarkAsUnread(changedPaneIds);
     }
 
-    queryClient.setQueryData<SessionsApiResponse>(sessionKeys.lists(), data);
+    // Only update cache when rendering-relevant fields changed to avoid
+    // unnecessary re-renders that reset scroll position (see #92).
+    const currentData = queryClient.getQueryData<SessionsApiResponse>(sessionKeys.lists());
+    if (!currentData || hasSessionsChanged(currentData, data)) {
+      queryClient.setQueryData<SessionsApiResponse>(sessionKeys.lists(), data);
+    }
     // Invalidate auth status to pick up runtime auth error changes
     queryClient.invalidateQueries({ queryKey: authKeys.status() });
   };
