@@ -138,5 +138,7 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     }
   }
 
+  ungrouped.sort(byActivityThenPaneId);
+
   return { groups, ungrouped };
 }
