@@ -1,8 +1,32 @@
 import type { SessionResponse, SessionsApiResponse } from "@shared/types";
 
 /**
+ * Keys intentionally excluded from the equality check.
+ *
+ * `last_activity` — updated every few seconds by the polling loop. Treating it
+ * as rendering-relevant would cause near-continuous re-renders that reset the
+ * scroll position. Server-side sort-order changes driven by `last_activity`
+ * are still detected because the comparison is index-based: when the server
+ * reorders sessions, `pane_id` at a given index changes and triggers an update.
+ */
+type IgnoredSessionKey = "last_activity";
+
+/** Compile-time guard: every `SessionResponse` field must be either compared or explicitly ignored. */
+const _comparedKeys: Record<Exclude<keyof SessionResponse, IgnoredSessionKey>, true> = {
+  pane_id: true,
+  status: true,
+  summary: true,
+  project_name: true,
+  git_branch: true,
+  github_repo_url: true,
+  tmux_target: true,
+  tmux_session_name: true,
+  agent_type: true,
+  cwd: true,
+};
+
+/**
  * Compare two sessions for rendering-relevant field equality.
- * Excludes `last_activity` (sort-only, not displayed in UI).
  */
 function isSessionEqual(a: SessionResponse, b: SessionResponse): boolean {
   return (
