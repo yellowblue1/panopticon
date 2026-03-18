@@ -203,25 +203,14 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     );
   };
 
-  /** Send a slash command: text + Enter (selects autocomplete) + Enter (executes) */
+  /** Send a slash command via text + Enter (backend appends Enter automatically) */
   const handleSlashCommand = (command: string) => {
     sendKeys.mutate(
       { paneId, text: command },
       {
         onSuccess: () => {
-          // Claude Code's autocomplete consumes the first Enter to select the command.
-          // Send a second Enter after a short delay to actually execute it.
-          setTimeout(() => {
-            sendKeys.mutate(
-              { paneId, text: "Enter", raw: true },
-              {
-                onSuccess: () => {
-                  toast.success(`Sent: ${command}`);
-                  inputRef.current?.focus();
-                },
-              },
-            );
-          }, 200);
+          toast.success(`Sent: ${command}`);
+          inputRef.current?.focus();
         },
       },
     );
