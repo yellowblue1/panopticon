@@ -202,20 +202,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       },
     );
   };
-
-  /** Send a slash command via text + Enter (backend appends Enter automatically) */
-  const handleSlashCommand = (command: string) => {
-    sendKeys.mutate(
-      { paneId, text: command },
-      {
-        onSuccess: () => {
-          toast.success(`Sent: ${command}`);
-          inputRef.current?.focus();
-        },
-      },
-    );
-  };
-
   /** Morphing action button: "/" when empty (opens palette), Send when has content */
   const handleActionButton = () => {
     if (hasText || hasFiles) {
@@ -306,7 +292,17 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       <CommandPalette
         isOpen={isPaletteOpen}
         onClose={() => setIsPaletteOpen(false)}
-        onExecute={handleSlashCommand}
+        onExecute={(command) => {
+          setText(`${command} `);
+          setIsPaletteOpen(false);
+          requestAnimationFrame(() => {
+            const el = inputRef.current;
+            if (el) {
+              el.focus();
+              el.setSelectionRange(el.value.length, el.value.length);
+            }
+          });
+        }}
         isPending={isPending}
         commands={slashCommands}
       />
