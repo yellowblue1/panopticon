@@ -180,7 +180,13 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend(text);
+      const trimmed = text.trim();
+      if (trimmed.startsWith("/")) {
+        handleSlashCommand(trimmed);
+        setText("");
+      } else {
+        handleSend(text);
+      }
     }
     // Typing "/" in an empty textarea (no files) opens the command palette
     if (e.key === "/" && !text && !hasFiles) {
@@ -219,7 +225,13 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   /** Morphing action button: "/" when empty (opens palette), Send when has content */
   const handleActionButton = () => {
     if (hasText || hasFiles) {
-      handleSend(text);
+      const trimmed = text.trim();
+      if (trimmed.startsWith("/")) {
+        handleSlashCommand(trimmed);
+        setText("");
+      } else {
+        handleSend(text);
+      }
     } else {
       setIsPaletteOpen(true);
     }
