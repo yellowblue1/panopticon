@@ -180,13 +180,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const trimmed = text.trim();
-      if (trimmed.startsWith("/")) {
-        handleSlashCommand(trimmed);
-        setText("");
-      } else {
-        handleSend(text);
-      }
+      dispatchInput();
     }
     // Typing "/" in an empty textarea (no files) opens the command palette
     if (e.key === "/" && !text && !hasFiles) {
@@ -215,6 +209,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       { paneId, text: command },
       {
         onSuccess: () => {
+          setText("");
           toast.success(`Sent: ${command}`);
           inputRef.current?.focus();
         },
@@ -222,16 +217,20 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     );
   };
 
+  /** Route input to slash command handler or normal send based on `/` prefix */
+  const dispatchInput = () => {
+    const trimmed = text.trim();
+    if (!hasFiles && trimmed.startsWith("/")) {
+      handleSlashCommand(trimmed);
+    } else {
+      handleSend(text);
+    }
+  };
+
   /** Morphing action button: "/" when empty (opens palette), Send when has content */
   const handleActionButton = () => {
     if (hasText || hasFiles) {
-      const trimmed = text.trim();
-      if (trimmed.startsWith("/")) {
-        handleSlashCommand(trimmed);
-        setText("");
-      } else {
-        handleSend(text);
-      }
+      dispatchInput();
     } else {
       setIsPaletteOpen(true);
     }
