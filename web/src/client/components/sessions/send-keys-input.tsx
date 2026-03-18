@@ -294,7 +294,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         onClose={() => setIsPaletteOpen(false)}
         onExecute={(command) => {
           setText(`${command} `);
-          setIsPaletteOpen(false);
           requestAnimationFrame(() => {
             const el = inputRef.current;
             if (el) {
