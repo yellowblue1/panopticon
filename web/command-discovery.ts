@@ -122,11 +122,14 @@ function readSkillFile(skillMdPath: string, dirName: string, pluginName?: string
 }
 
 /**
- * Discover slash commands from Claude Code skills.
+ * Discover slash commands from global and plugin skills.
  *
  * Scans ~/.claude/skills/{name}/SKILL.md for user skills and
  * each installed plugin's skills/{name}/SKILL.md for plugin skills.
  * Plugin skills are namespaced as /{pluginName}:{skillName}.
+ *
+ * Note: project-level skills ({cwd}/.claude/skills/) are NOT included here;
+ * they are handled by discoverAllSlashCommands() which requires CWD context.
  */
 export function discoverSkillCommands(homeDir?: string): SlashCommand[] {
   const home = homeDir ?? homedir();
