@@ -51,6 +51,8 @@ function parseFrontmatter(content: string): Record<string, string> {
 
     if (!raw) continue;
 
+    // YAML literal blocks (|, |-) preserve newlines by spec, but we collapse
+    // all multiline indicators to a single line for command palette display.
     if (raw === ">" || raw === ">-" || raw === "|" || raw === "|-") {
       currentKey = key;
       multilineValue = "";

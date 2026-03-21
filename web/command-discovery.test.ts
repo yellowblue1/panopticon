@@ -598,6 +598,44 @@ describe("discoverSkillCommands", () => {
     }
   });
 
+  it("parses YAML literal block (|) in description, collapsing to single line", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "lint-tool");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: lint-tool\ndescription: |\n  Run linting across\n  the entire project.\n---\n\n# Lint",
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/lint-tool", description: "Run linting across the entire project." },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("parses YAML literal strip (|-) in description, collapsing to single line", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "fmt-tool");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: fmt-tool\ndescription: |-\n  Format all source\n  files consistently.\n---\n\n# Format",
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/fmt-tool", description: "Format all source files consistently." },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
   it("handles SKILL.md without frontmatter delimiters", () => {
     const homeDir = createTempDir();
     const skillDir = join(homeDir, ".claude", "skills", "no-front");
