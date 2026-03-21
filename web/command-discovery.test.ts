@@ -560,6 +560,44 @@ describe("discoverSkillCommands", () => {
     }
   });
 
+  it("parses YAML folded string (>) in description", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "seo-tool");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: seo-tool\ndescription: >\n  SEO content drafting for blog\n  and help articles.\n---\n\n# SEO Tool",
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/seo-tool", description: "SEO content drafting for blog and help articles." },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("parses YAML folded strip (>-) in description", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".claude", "skills", "my-flow");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: my-flow\ndescription: >-\n  Orchestrate development\n  workflow steps.\n---\n\n# My Flow",
+    );
+
+    try {
+      const commands = discoverSkillCommands(homeDir);
+      expect(commands).toEqual([
+        { command: "/my-flow", description: "Orchestrate development workflow steps." },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
   it("handles SKILL.md without frontmatter delimiters", () => {
     const homeDir = createTempDir();
     const skillDir = join(homeDir, ".claude", "skills", "no-front");
