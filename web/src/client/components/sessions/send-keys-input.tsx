@@ -212,12 +212,11 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   };
 
   /** Send a raw tmux key name (Escape, i, etc.) without Enter */
-  const handleRawKey = (key: string, label: string) => {
+  const handleRawKey = (key: string) => {
     sendKeys.mutate(
       { paneId, text: key, raw: true },
       {
         onSuccess: () => {
-          toast.success(`Sent: ${label}`);
           inputRef.current?.focus();
           setTimeout(() => {
             inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -244,7 +243,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
-          onClick={() => handleRawKey("Escape", "Esc")}
+          onClick={() => handleRawKey("Escape")}
           disabled={isPending}
           title="Send Escape key (vi normal mode)"
         >
@@ -253,7 +252,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
-          onClick={() => handleRawKey("i", "i")}
+          onClick={() => handleRawKey("i")}
           disabled={isPending}
           title="Send i key (vi insert mode)"
         >
@@ -262,7 +261,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
-          onClick={() => handleRawKey("Up", "↑")}
+          onClick={() => handleRawKey("Up")}
           disabled={isPending}
           title="Send Up arrow key"
         >
@@ -271,7 +270,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
-          onClick={() => handleRawKey("Down", "↓")}
+          onClick={() => handleRawKey("Down")}
           disabled={isPending}
           title="Send Down arrow key"
         >
@@ -280,7 +279,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
-          onClick={() => handleRawKey("Enter", "Enter")}
+          onClick={() => handleRawKey("Enter")}
           disabled={isPending}
           title="Send Enter key"
         >
