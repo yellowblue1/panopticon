@@ -19,15 +19,53 @@ function parseFrontmatter(content: string): Record<string, string> {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (!match) return {};
   const result: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
+  const lines = match[1].split("\n");
+
+  let currentKey = "";
+  let multilineValue = "";
+  let inMultiline = false;
+
+  const flushMultiline = () => {
+    if (currentKey) {
+      result[currentKey] = multilineValue.replace(/\s+/g, " ").trim();
+    }
+    currentKey = "";
+    multilineValue = "";
+    inMultiline = false;
+  };
+
+  for (const line of lines) {
+    if (inMultiline) {
+      if (/^\s/.test(line)) {
+        multilineValue += ` ${line.trim()}`;
+        continue;
+      }
+      flushMultiline();
+    }
+
     const colonIndex = line.indexOf(":");
     if (colonIndex === -1) continue;
     const key = line.slice(0, colonIndex).trim();
     const raw = line.slice(colonIndex + 1).trim();
-    if (!key || !raw) continue;
+    if (!key) continue;
+
+    if (!raw) continue;
+
+    // YAML literal blocks (|, |-) preserve newlines by spec, but we collapse
+    // all multiline indicators to a single line for command palette display.
+    if (raw === ">" || raw === ">-" || raw === "|" || raw === "|-") {
+      currentKey = key;
+      multilineValue = "";
+      inMultiline = true;
+      continue;
+    }
+
     const unquoted = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
     result[key] = unquoted;
   }
+
+  if (inMultiline) flushMultiline();
+
   return result;
 }
 
