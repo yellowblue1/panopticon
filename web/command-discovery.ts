@@ -205,9 +205,9 @@ export function discoverSlashCommands(cwd: string, homeDir?: string): SlashComma
 /**
  * Discover slash commands across multiple session CWDs.
  *
- * Priority (highest → lowest): project commands → global commands →
- * skill commands → plugin commands. When the same command name appears
- * in multiple locations, the higher-priority source wins.
+ * Priority (highest → lowest): project commands → project skills →
+ * global commands → global skills → plugin commands. When the same
+ * command name appears in multiple locations, the higher-priority source wins.
  */
 export function discoverAllSlashCommands(cwds: string[], homeDir?: string): SlashCommand[] {
   const home = homeDir ?? homedir();
@@ -221,6 +221,18 @@ export function discoverAllSlashCommands(cwds: string[], homeDir?: string): Slas
       const name = basename(file, ".md");
       if (!seen.has(name)) {
         seen.set(name, toSlashCommand(name, "project"));
+      }
+    }
+  }
+
+  // Project-level skills: {cwd}/.claude/skills/{name}/SKILL.md
+  for (const cwd of cwds) {
+    const projectSkillsDir = join(cwd, ".claude", "skills");
+    for (const dirName of listSubdirectories(projectSkillsDir)) {
+      if (seen.has(dirName)) continue;
+      const skillMd = join(projectSkillsDir, dirName, "SKILL.md");
+      if (existsSync(skillMd)) {
+        seen.set(dirName, readSkillFile(skillMd, dirName));
       }
     }
   }

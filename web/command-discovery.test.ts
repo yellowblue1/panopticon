@@ -820,4 +820,75 @@ describe("discoverAllSlashCommands with skills", () => {
       rmSync(homeDir, { recursive: true });
     }
   });
+
+  it("discovers project-level skills from {cwd}/.claude/skills/", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const projectSkillDir = join(cwd, ".claude", "skills", "seo-content");
+    mkdirSync(projectSkillDir, { recursive: true });
+    writeFileSync(
+      join(projectSkillDir, "SKILL.md"),
+      "---\nname: seo-content\ndescription: SEO content drafting\n---\n",
+    );
+
+    try {
+      const commands = discoverAllSlashCommands([cwd], homeDir);
+      expect(commands).toEqual([{ command: "/seo-content", description: "SEO content drafting" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("project skills have higher priority than global skills", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const globalSkillDir = join(homeDir, ".claude", "skills", "deploy");
+    mkdirSync(globalSkillDir, { recursive: true });
+    writeFileSync(
+      join(globalSkillDir, "SKILL.md"),
+      "---\nname: deploy\ndescription: Global deploy\n---\n",
+    );
+
+    const projectSkillDir = join(cwd, ".claude", "skills", "deploy");
+    mkdirSync(projectSkillDir, { recursive: true });
+    writeFileSync(
+      join(projectSkillDir, "SKILL.md"),
+      "---\nname: deploy\ndescription: Project deploy\n---\n",
+    );
+
+    try {
+      const commands = discoverAllSlashCommands([cwd], homeDir);
+      expect(commands).toEqual([{ command: "/deploy", description: "Project deploy" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("project commands take priority over project skills with same name", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const projectDir = join(cwd, ".claude", "commands");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "test.md"), "# Test command");
+
+    const projectSkillDir = join(cwd, ".claude", "skills", "test");
+    mkdirSync(projectSkillDir, { recursive: true });
+    writeFileSync(
+      join(projectSkillDir, "SKILL.md"),
+      "---\nname: test\ndescription: Test skill\n---\n",
+    );
+
+    try {
+      const commands = discoverAllSlashCommands([cwd], homeDir);
+      expect(commands).toEqual([{ command: "/test", description: "Custom command (project)" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
 });
