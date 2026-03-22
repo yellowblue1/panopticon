@@ -101,7 +101,6 @@ export function GhosttyTerminal({
   const [ready, setReady] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const isAtBottomRef = useRef(true);
-  const lastContentHashRef = useRef<string | null>(null);
   const lastRenderedContentRef = useRef<string | null>(null);
 
   // Initialize WASM and create terminal
@@ -159,16 +158,17 @@ export function GhosttyTerminal({
       terminalRef.current = null;
       fitAddonRef.current = null;
       setReady(false);
-      lastContentHashRef.current = null;
       lastRenderedContentRef.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Register PR link provider when githubRepoUrl changes
   useEffect(() => {
     const term = terminalRef.current;
     if (!term || !ready || !githubRepoUrl) return;
-    term.registerLinkProvider(createPrLinkProvider(term, githubRepoUrl));
+    const provider = createPrLinkProvider(term, githubRepoUrl);
+    term.registerLinkProvider(provider);
+    return () => provider.dispose?.();
   }, [githubRepoUrl, ready]);
 
   // Write content to terminal when it changes
@@ -182,10 +182,8 @@ export function GhosttyTerminal({
       return;
     }
 
-    // Skip if content unchanged (simple length+prefix check for browser)
-    const fingerprint = `${content.length}:${content.slice(0, 100)}:${content.slice(-100)}`;
-    if (fingerprint === lastContentHashRef.current) return;
-    lastContentHashRef.current = fingerprint;
+    // Skip if content unchanged
+    if (content === lastRenderedContentRef.current) return;
     lastRenderedContentRef.current = content;
 
     // Reset and write new content
@@ -212,8 +210,6 @@ export function GhosttyTerminal({
 
     // Resume content updates with latest content
     if (content != null && content !== lastRenderedContentRef.current) {
-      const fingerprint = `${content.length}:${content.slice(0, 100)}:${content.slice(-100)}`;
-      lastContentHashRef.current = fingerprint;
       lastRenderedContentRef.current = content;
       term.reset();
       term.write(content);
