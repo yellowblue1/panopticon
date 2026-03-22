@@ -20,6 +20,9 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
+  optimizeDeps: {
+    exclude: ["ghostty-web"],
+  },
   root: "src",
   publicDir: "../public",
   build: {

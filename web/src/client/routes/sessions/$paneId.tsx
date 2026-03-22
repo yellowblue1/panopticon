@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FileText, SquareTerminal } from "lucide-react";
 import { useEffect, useState } from "react";
+import { GhosttyTerminal } from "@/components/sessions/ghostty-terminal";
 import { PlanViewer } from "@/components/sessions/plan-viewer";
 import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
-import { TerminalViewer } from "@/components/sessions/terminal-viewer";
 import { StatusBadge } from "@/components/ui/badge";
 import { useDeletePlan } from "@/hooks/use-delete-plan";
 import { usePaneContent } from "@/hooks/use-pane-content";
@@ -138,7 +138,7 @@ function SessionDetailPage() {
           )}
 
           {paneData?.content != null && (
-            <TerminalViewer
+            <GhosttyTerminal
               content={paneData.content}
               className={cn("pane-viewer", isExpanded && "pane-viewer--expanded")}
               isExpanded={isExpanded}
