@@ -1,8 +1,28 @@
+import { copyFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+
+/**
+ * Copy ghostty-web WASM binary to the public directory so it can be loaded
+ * at runtime via `/ghostty-vt.wasm`. Runs once at server start / build start.
+ */
+function ghosttyWasmPlugin(): Plugin {
+  const src = resolve(__dirname, "node_modules/ghostty-web/ghostty-vt.wasm");
+  const dest = resolve(__dirname, "public/ghostty-vt.wasm");
+  function copy() {
+    if (existsSync(src) && !existsSync(dest)) {
+      copyFileSync(src, dest);
+    }
+  }
+  return {
+    name: "ghostty-wasm-copy",
+    buildStart: copy,
+    configureServer: () => copy(),
+  };
+}
 
 const devPort = process.env.DEV_PORT ? Number.parseInt(process.env.DEV_PORT, 10) : 3847;
 const backendPort = devPort + 1;
@@ -19,10 +39,8 @@ export default defineConfig({
       },
     }),
     tailwindcss(),
+    ghosttyWasmPlugin(),
   ],
-  optimizeDeps: {
-    exclude: ["ghostty-web"],
-  },
   root: "src",
   publicDir: "../public",
   build: {
