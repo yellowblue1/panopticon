@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { SlashCommand } from "../src/shared/types";
 
-const DOCS_URL = "https://code.claude.com/docs/en/interactive-mode.md";
+const DOCS_URL = "https://code.claude.com/docs/en/commands.md";
 const SKILLS_DOCS_URL = "https://code.claude.com/docs/en/skills.md";
 const CACHE_FILENAME = "builtin-commands.json";
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -22,26 +22,32 @@ function stripMarkdownLinks(text: string): string {
 /**
  * Parse built-in commands from Claude Code docs markdown.
  *
- * Extracts the table under "## Built-in commands", stopping at
- * "### MCP prompts" or the next "##" heading.
+ * Extracts the first markdown table found under an h1 or h2
+ * "Built-in commands" heading, stopping at the next heading of
+ * equal or higher level.
  */
 export function parseBuiltinCommands(markdown: string): SlashCommand[] {
   const lines = markdown.split("\n");
 
   let inSection = false;
+  let sectionLevel = 0;
   let inTable = false;
   let headerRowSeen = false;
   const commands: SlashCommand[] = [];
 
   for (const line of lines) {
     if (!inSection) {
-      if (/^## Built-in commands/.test(line)) {
+      const headingMatch = line.match(/^(#{1,2}) Built-in commands/);
+      if (headingMatch) {
         inSection = true;
+        sectionLevel = headingMatch[1].length;
       }
       continue;
     }
 
-    if (/^### /.test(line) || (/^## /.test(line) && !/^## Built-in commands/.test(line))) {
+    // Stop at any heading with equal or higher level (fewer or equal #)
+    const nextHeading = line.match(/^(#{1,3}) /);
+    if (nextHeading && nextHeading[1].length <= sectionLevel && !/Built-in commands/.test(line)) {
       break;
     }
 

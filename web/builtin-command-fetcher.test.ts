@@ -40,6 +40,17 @@ const SAMPLE_MARKDOWN_NEXT_H2 = `## Built-in commands
 Some other section.
 `;
 
+const SAMPLE_MARKDOWN_H1 = `# Built-in commands
+
+Type \`/\` in Claude Code to see all available commands.
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/clear\` | Clear conversation history |
+| \`/compact [instructions]\` | Compact conversation |
+| \`/help\` | Get help |
+`;
+
 describe("parseBuiltinCommands", () => {
   it("parses standard markdown table from Built-in commands section", () => {
     const result = parseBuiltinCommands(SAMPLE_MARKDOWN);
@@ -68,6 +79,15 @@ describe("parseBuiltinCommands", () => {
     const result = parseBuiltinCommands(SAMPLE_MARKDOWN_NEXT_H2);
     expect(result).toEqual([
       { command: "/clear", description: "Clear history" },
+      { command: "/help", description: "Get help" },
+    ]);
+  });
+
+  it("parses h1 heading (# Built-in commands) used on dedicated commands page", () => {
+    const result = parseBuiltinCommands(SAMPLE_MARKDOWN_H1);
+    expect(result).toEqual([
+      { command: "/clear", description: "Clear conversation history" },
+      { command: "/compact", description: "Compact conversation" },
       { command: "/help", description: "Get help" },
     ]);
   });
