@@ -45,9 +45,9 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
       continue;
     }
 
-    // Stop at any heading with equal or higher level (fewer or equal #)
-    const nextHeading = line.match(/^(#{1,3}) /);
-    if (nextHeading && nextHeading[1].length <= sectionLevel && !/Built-in commands/.test(line)) {
+    // Stop at any heading at the same depth or shallower
+    const nextHeading = line.match(/^(#+) /);
+    if (nextHeading && nextHeading[1].length <= sectionLevel) {
       break;
     }
 
