@@ -6,7 +6,7 @@ export function Toaster() {
 
   return (
     <SonnerToaster
-      position={isMobile ? "top-center" : "bottom-right"}
+      position={isMobile ? "top-center" : "top-right"}
       toastOptions={{
         style: {
           background: "var(--color-bg-tertiary)",
