@@ -37,7 +37,7 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
 
   for (const line of lines) {
     if (!inSection) {
-      const headingMatch = line.match(/^(#{1,2}) Built-in commands/);
+      const headingMatch = line.match(/^(#{1,2}) Built-in commands\s*$/);
       if (headingMatch) {
         inSection = true;
         sectionLevel = headingMatch[1].length;
