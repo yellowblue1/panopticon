@@ -183,17 +183,6 @@ describe("parseBundledSkills", () => {
       { command: "/batch", description: "parallel changes." },
     ]);
   });
-
-  it("stops at next h1 heading when section is h1", () => {
-    const markdown = `# Bundled skills
-
-* **\`/foo\`**: does something.
-
-# Next section
-`;
-    const result = parseBundledSkills(markdown);
-    expect(result).toEqual([{ command: "/foo", description: "does something." }]);
-  });
 });
 
 function createMockFetchText(

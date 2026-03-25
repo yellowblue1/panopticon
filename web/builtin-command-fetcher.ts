@@ -106,7 +106,6 @@ export function parseBundledSkills(markdown: string): SlashCommand[] {
       continue;
     }
 
-    // Stop at any heading at the same depth or shallower
     const nextHeading = line.match(/^(#+) /);
     if (nextHeading && nextHeading[1].length <= sectionLevel) {
       break;
