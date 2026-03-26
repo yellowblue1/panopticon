@@ -40,6 +40,17 @@ const SAMPLE_MARKDOWN_NEXT_H2 = `## Built-in commands
 Some other section.
 `;
 
+const SAMPLE_MARKDOWN_H1 = `# Built-in commands
+
+Type \`/\` in Claude Code to see all available commands.
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/clear\` | Clear conversation history |
+| \`/compact [instructions]\` | Compact conversation |
+| \`/help\` | Get help |
+`;
+
 describe("parseBuiltinCommands", () => {
   it("parses standard markdown table from Built-in commands section", () => {
     const result = parseBuiltinCommands(SAMPLE_MARKDOWN);
@@ -70,6 +81,30 @@ describe("parseBuiltinCommands", () => {
       { command: "/clear", description: "Clear history" },
       { command: "/help", description: "Get help" },
     ]);
+  });
+
+  it("parses table under h1 Built-in commands heading", () => {
+    const result = parseBuiltinCommands(SAMPLE_MARKDOWN_H1);
+    expect(result).toEqual([
+      { command: "/clear", description: "Clear conversation history" },
+      { command: "/compact", description: "Compact conversation" },
+      { command: "/help", description: "Get help" },
+    ]);
+  });
+
+  it("stops at next h1 heading when section is h1", () => {
+    const markdown = `# Built-in commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/clear\` | Clear history |
+
+# Another top-level section
+
+More content.
+`;
+    const result = parseBuiltinCommands(markdown);
+    expect(result).toEqual([{ command: "/clear", description: "Clear history" }]);
   });
 
   it("strips [arg] and <arg> from command names", () => {
