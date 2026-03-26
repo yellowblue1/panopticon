@@ -92,24 +92,28 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
 /**
  * Parse bundled skills from Claude Code skills docs markdown.
  *
- * Extracts bullet items under "## Bundled skills" that match
- * the pattern: **`/command`** or **`/command <args>`**: description
+ * Extracts bullet items under an h1 or h2 "Bundled skills" heading
+ * that match the pattern: **`/command`** or **`/command <args>`**: description
  */
 export function parseBundledSkills(markdown: string): SlashCommand[] {
   const lines = markdown.split("\n");
   const commands: SlashCommand[] = [];
 
   let inSection = false;
+  let sectionLevel = 0;
 
   for (const line of lines) {
     if (!inSection) {
-      if (/^## Bundled skills/.test(line)) {
+      const headingMatch = line.match(/^(#{1,2}) Bundled skills\s*$/);
+      if (headingMatch) {
         inSection = true;
+        sectionLevel = headingMatch[1].length;
       }
       continue;
     }
 
-    if (/^## /.test(line) && !/^## Bundled skills/.test(line)) {
+    const nextHeading = line.match(/^(#+) /);
+    if (nextHeading && nextHeading[1].length <= sectionLevel) {
       break;
     }
 

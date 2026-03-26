@@ -202,6 +202,22 @@ describe("parseBundledSkills", () => {
     const result = parseBundledSkills(markdown);
     expect(result[0].description).toBe("uses worktrees for isolation.");
   });
+
+  it("parses skills under h1 Bundled skills heading", () => {
+    const markdown = `# Bundled skills
+
+* **\`/simplify\`**: reviews changed files.
+
+* **\`/batch <instruction>\`**: parallel changes.
+
+# Another section
+`;
+    const result = parseBundledSkills(markdown);
+    expect(result).toEqual([
+      { command: "/simplify", description: "reviews changed files." },
+      { command: "/batch", description: "parallel changes." },
+    ]);
+  });
 });
 
 function createMockFetchText(
