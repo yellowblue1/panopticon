@@ -124,12 +124,10 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       sendMessage.mutate(
         { paneId, text: trimmed, files },
         {
-          onSuccess: (data) => {
+          onSuccess: () => {
             setText("");
             setFiles([]);
             inputRef.current?.focus();
-            const fileCount = data.uploadedFiles?.length ?? 0;
-            toast.success(fileCount > 0 ? `Sent with ${fileCount} file(s)` : `Sent: ${trimmed}`);
           },
         },
       );
@@ -154,7 +152,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
                   onSuccess: () => {
                     setText("");
                     inputRef.current?.focus();
-                    toast.success(`Sent: ${trimmed}`);
                   },
                 },
               );
@@ -171,7 +168,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         onSuccess: () => {
           setText("");
           inputRef.current?.focus();
-          toast.success(`Sent: ${trimmed}`);
         },
       },
     );
@@ -195,7 +191,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       { paneId, text: value },
       {
         onSuccess: () => {
-          toast.success(`Sent: ${value}`);
           clear();
           inputRef.current?.focus();
         },

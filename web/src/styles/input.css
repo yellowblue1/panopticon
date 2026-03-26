@@ -270,8 +270,8 @@ body {
 .toast {
   @apply fixed bg-bg-tertiary text-text-primary py-3.5 px-6 rounded-lg text-[0.9375rem] transition-all z-[1000];
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  /* Desktop: bottom-right corner */
-  bottom: max(24px, env(safe-area-inset-bottom));
+  /* Desktop: top-right corner */
+  top: max(24px, env(safe-area-inset-top));
   right: max(24px, env(safe-area-inset-right));
 }
 
@@ -280,13 +280,13 @@ body {
     /* Mobile: centered horizontally */
     right: 16px;
     left: 16px;
-    bottom: max(16px, env(safe-area-inset-bottom));
+    top: max(16px, env(safe-area-inset-top));
     text-align: center;
   }
 }
 
 .toast.hidden {
-  @apply opacity-0 translate-y-2.5 pointer-events-none;
+  @apply opacity-0 -translate-y-2.5 pointer-events-none;
 }
 
 .toast.success {
