@@ -4,3 +4,6 @@ coverage
 .env
 *.log
 .DS_Store
+
+# Auto-copied WASM binary (see web/vite.config.ts ghosttyWasmPlugin)
+web/public/ghostty-vt.wasm

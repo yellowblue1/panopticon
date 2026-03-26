@@ -336,29 +336,6 @@ body {
 }
 
 /* ============================================
-   Terminal ANSI Color Theme (fancy-ansi)
-   ============================================ */
-
-:root {
-  --ansi-black: #586069;
-  --ansi-red: #f85149;
-  --ansi-green: #3fb950;
-  --ansi-yellow: #d29922;
-  --ansi-blue: #58a6ff;
-  --ansi-magenta: #bc8cff;
-  --ansi-cyan: #39c5cf;
-  --ansi-white: #f0f6fc;
-  --ansi-bright-black: #8b949e;
-  --ansi-bright-red: #ff7b72;
-  --ansi-bright-green: #56d364;
-  --ansi-bright-yellow: #e3b341;
-  --ansi-bright-blue: #79c0ff;
-  --ansi-bright-magenta: #d2a8ff;
-  --ansi-bright-cyan: #56d4dd;
-  --ansi-bright-white: #ffffff;
-}
-
-/* ============================================
    Pane Content Viewer
    ============================================ */
 
@@ -369,52 +346,15 @@ body {
   overscroll-behavior: contain;
 }
 
-.pane-viewer .terminal-content {
-  padding: 12px;
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  font-size: 14px;
-  line-height: 1.2;
-  color: #c9d1d9;
-  background: transparent;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  user-select: text;
-  -webkit-user-select: text;
+/* ghostty-web canvas container — fills the pane viewer area */
+.ghostty-terminal-container {
+  padding: 4px;
 }
 
-/* Terminal link styles */
-.terminal-content a.terminal-link {
-  color: var(--color-accent-blue);
-  text-decoration: underline;
-  text-decoration-color: rgba(88, 166, 255, 0.4);
-  text-underline-offset: 2px;
-  cursor: pointer;
-  transition: text-decoration-color 0.15s ease;
-}
-
-.terminal-content a.terminal-link:hover {
-  text-decoration-color: var(--color-accent-blue);
-}
-
-/* Fit-width: disable wrapping so content extends to its natural width */
-.pane-viewer--fit-width .terminal-content {
-  white-space: pre;
-  overflow-wrap: normal;
-}
-
-/* Desktop fit-width toggle: expand the frame to match content width, centered. */
-@media (min-width: 640px) {
-  .pane-viewer--fit-width {
-    width: max-content;
-    min-width: 100%;
-    overflow: visible;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  .pane-viewer--fit-width .terminal-content {
-    min-width: fit-content;
-  }
+.ghostty-terminal-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* Vertical expand mode — hide root header and remove vertical padding */
@@ -434,15 +374,6 @@ html.vertical-expand [data-app-shell] {
   flex: 1;
   min-height: 0;
   max-height: none;
-}
-
-/* Suppress centering transform in expanded fit-width mode */
-@media (min-width: 640px) {
-  .pane-viewer--expanded.pane-viewer--fit-width {
-    left: auto;
-    transform: none;
-    overflow-x: auto;
-  }
 }
 
 /* ============================================
@@ -770,12 +701,6 @@ html.vertical-expand [data-app-shell] {
     max-height: calc(100dvh - 260px);
     min-height: 150px;
     @apply rounded-none border-x-0;
-  }
-
-  /* Mobile fit-width: let terminal content expand to content width inside the
-     horizontally-scrollable container (overflow-x:auto on scrollContainerRef). */
-  .pane-viewer--fit-width .terminal-content {
-    min-width: fit-content;
   }
 
   .plan-placeholder {
