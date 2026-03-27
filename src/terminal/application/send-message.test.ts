@@ -50,7 +50,7 @@ describe("sendMessage", () => {
     );
   });
 
-  it("composes text + files with blank line separator", () => {
+  it("composes text + files with space separator", () => {
     const deps = createMockDeps();
     const files = [
       { data: new ArrayBuffer(10), name: "img.png", type: "image/png" },
@@ -62,7 +62,7 @@ describe("sendMessage", () => {
     expect(result.uploadedFiles).toHaveLength(2);
     expect(deps.sendKeys).toHaveBeenCalledWith(
       "%0",
-      "check this\n\n/tmp/panopticon-uploads/123-abc-img.png\n/tmp/panopticon-uploads/123-abc-doc.pdf",
+      "check this /tmp/panopticon-uploads/123-abc-img.png /tmp/panopticon-uploads/123-abc-doc.pdf",
     );
   });
 
