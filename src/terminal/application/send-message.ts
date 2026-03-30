@@ -56,9 +56,9 @@ export function sendMessage(input: SendMessageInput, deps: SendMessageDeps): Sen
     parts.push(trimmedText);
   }
   if (savedFiles.length > 0) {
-    parts.push(savedFiles.map((f) => f.savedPath).join("\n"));
+    parts.push(savedFiles.map((f) => f.savedPath).join(" "));
   }
-  const composedText = parts.join("\n\n");
+  const composedText = parts.join(" ");
 
   const success = deps.sendKeys(paneId, composedText);
   if (!success) {
