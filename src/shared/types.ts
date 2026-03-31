@@ -86,6 +86,11 @@ export interface SwitchClientResponse {
   error?: string;
 }
 
+export interface InterruptResponse {
+  success: boolean;
+  error?: string;
+}
+
 // Action detection types for dynamic action buttons
 export type PaneAction =
   | { type: "choices"; options: { label: string; value: string; autoEnter: boolean }[] }

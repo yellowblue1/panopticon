@@ -9,6 +9,7 @@ import {
   getProcessTable,
   getProjectName,
   isTmuxAvailable,
+  sendInterrupt,
   startPipePane,
   stopPipePane,
   switchClient,
@@ -313,5 +314,45 @@ describe("switchClient", () => {
     };
 
     expect(switchClient("%99", exec)).toBe(false);
+  });
+});
+
+describe("sendInterrupt", () => {
+  it("sends space literal then C-c in correct order", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    const result = sendInterrupt("%0", exec);
+    expect(result).toBe(true);
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toContain("send-keys");
+    expect(commands[0]).toContain("-l");
+    expect(commands[0]).toContain("' '");
+    expect(commands[1]).toContain("send-keys");
+    expect(commands[1]).toContain("C-c");
+    expect(commands[1]).not.toContain("-l");
+  });
+
+  it("escapes pane id in both commands", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    sendInterrupt("%0", exec);
+    expect(commands[0]).toContain("'%0'");
+    expect(commands[1]).toContain("'%0'");
+  });
+
+  it("returns false on failure", () => {
+    const exec = () => {
+      throw new Error("pane not found");
+    };
+
+    expect(sendInterrupt("%99", exec)).toBe(false);
   });
 });

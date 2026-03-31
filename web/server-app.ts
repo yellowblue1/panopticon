@@ -18,6 +18,7 @@ import type {
   BrowsePathResponse,
   DeletePlanResponse,
   GeminiBackend,
+  InterruptResponse,
   LauncherConfigData,
   LauncherConfigResponse,
   LaunchResponse,
@@ -47,6 +48,7 @@ export interface AppDeps {
   sendKeys?: (paneId: string, text: string) => boolean;
   sendRawKey?: (paneId: string, key: string) => boolean;
   switchClient?: (paneId: string) => boolean;
+  sendInterrupt?: (paneId: string) => boolean;
   capturePaneContent?: (paneId: string) => string | null;
   detectPaneActions?: (content: string) => Promise<PaneAction>;
 
@@ -261,6 +263,27 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
           success: false,
           error: "Failed to switch to pane",
         } satisfies SwitchClientResponse,
+        500,
+      );
+    })
+
+    // POST /api/sessions/:pane_id/interrupt
+    .post("/api/sessions/:pane_id/interrupt", (c) => {
+      if (!deps.sendInterrupt) {
+        return c.json({ success: false, error: "Not available" } satisfies InterruptResponse, 501);
+      }
+
+      const paneId = c.req.param("pane_id");
+      const success = deps.sendInterrupt(paneId);
+
+      if (success) {
+        return c.json({ success: true } satisfies InterruptResponse);
+      }
+      return c.json(
+        {
+          success: false,
+          error: "Failed to send interrupt to pane",
+        } satisfies InterruptResponse,
         500,
       );
     })

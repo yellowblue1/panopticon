@@ -4,6 +4,7 @@ import { Camera, FileText, Paperclip, Send, X } from "lucide-react";
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActionDetection } from "@/hooks/use-action-detection";
+import { useInterrupt } from "@/hooks/use-interrupt";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSendKeys } from "@/hooks/use-send-keys";
 import { useSendMessage } from "@/hooks/use-send-message";
@@ -25,6 +26,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const sendKeys = useSendKeys();
   const sendMessage = useSendMessage();
+  const interrupt = useInterrupt();
   const { action, isDetecting, detect, clear } = useActionDetection(paneId);
   const isMobile = useMediaQuery("(max-width: 639px)");
   const { data: slashCommandsData } = useSlashCommands();
@@ -32,7 +34,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
 
   const hasText = text.trim().length > 0;
   const hasFiles = files.length > 0;
-  const isPending = sendKeys.isPending || sendMessage.isPending;
+  const isPending = sendKeys.isPending || sendMessage.isPending || interrupt.isPending;
 
   // Open command palette with "/" key when no input is focused
   useEffect(() => {
@@ -279,6 +281,24 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           title="Send Enter key"
         >
           Enter
+        </button>
+        <button
+          type="button"
+          className="quick-action-btn"
+          onClick={() =>
+            interrupt.mutate(
+              { paneId },
+              {
+                onSuccess: () => {
+                  inputRef.current?.focus();
+                },
+              },
+            )
+          }
+          disabled={isPending}
+          title="Send Ctrl-C (interrupt / clear input)"
+        >
+          C-c
         </button>
       </div>
 
