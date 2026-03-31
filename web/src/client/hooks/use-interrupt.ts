@@ -2,9 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { sessionsApi } from "@/lib/rpc-client";
 
-type InterruptInput = {
+interface InterruptInput {
   paneId: string;
-};
+}
 
 export function useInterrupt() {
   return useMutation({
