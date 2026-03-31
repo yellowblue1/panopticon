@@ -276,15 +276,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
-          onClick={() => handleRawKey("Enter")}
-          disabled={isPending}
-          title="Send Enter key"
-        >
-          Enter
-        </button>
-        <button
-          type="button"
-          className="quick-action-btn"
           onClick={() =>
             interrupt.mutate(
               { paneId },
@@ -299,6 +290,15 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           title="Send Ctrl-C (interrupt / clear input)"
         >
           C-c
+        </button>
+        <button
+          type="button"
+          className="quick-action-btn"
+          onClick={() => handleRawKey("Enter")}
+          disabled={isPending}
+          title="Send Enter key"
+        >
+          Enter
         </button>
       </div>
 
