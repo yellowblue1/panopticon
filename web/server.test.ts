@@ -15,6 +15,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     sendKeys: () => true,
     sendRawKey: () => true,
     switchClient: () => true,
+    sendInterrupt: () => true,
     capturePaneContent: () => null,
     detectPaneActions: async () => ({ type: "none" }),
     geminiBackend: "vertex-ai",
@@ -344,6 +345,47 @@ describe("Hono API endpoints", () => {
       const app = createApp(depsWithout as AppDeps);
 
       const res = await app.request("/api/sessions/%250/switch", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(501);
+    });
+  });
+
+  describe("POST /api/sessions/:pane_id/interrupt", () => {
+    it("returns success when sendInterrupt succeeds", async () => {
+      const sendInterruptSpy = mock((_paneId: string) => true);
+      const deps = createMockDeps({ sendInterrupt: sendInterruptSpy });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/interrupt", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(sendInterruptSpy).toHaveBeenCalledWith("%0");
+    });
+
+    it("returns 500 when sendInterrupt fails", async () => {
+      const deps = createMockDeps({ sendInterrupt: () => false });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/interrupt", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+    });
+
+    it("returns 501 when sendInterrupt dependency is not provided", async () => {
+      const { sendInterrupt: _, ...depsWithout } = createMockDeps();
+      const app = createApp(depsWithout as AppDeps);
+
+      const res = await app.request("/api/sessions/%250/interrupt", {
         method: "POST",
       });
 

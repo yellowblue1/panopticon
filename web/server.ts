@@ -51,6 +51,7 @@ import {
   getProcessTable,
   getProjectName,
   isTmuxAvailable,
+  sendInterrupt,
   sendKeys,
   sendRawKey,
   startPipePane,
@@ -390,6 +391,7 @@ const app = createApp(
     sendKeys: (paneId, text) => sendKeys(paneId, text),
     sendRawKey: (paneId, key) => sendRawKey(paneId, key),
     switchClient: (paneId) => switchClient(paneId),
+    sendInterrupt: (paneId) => sendInterrupt(paneId),
     sendMessage: (paneId, text, files) =>
       sendMessage(
         { paneId, text, files },

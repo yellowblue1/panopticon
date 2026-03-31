@@ -234,6 +234,23 @@ export function sendRawKey(paneId: string, key: string, exec: ExecFn = defaultEx
 }
 
 /**
+ * Send a safe interrupt (C-c) to a tmux pane.
+ * Inserts a space character before C-c to prevent session termination
+ * when the input line is empty (Claude Code exits on C-c with empty input).
+ * Both commands execute synchronously with no async yield between them.
+ */
+export function sendInterrupt(paneId: string, exec: ExecFn = defaultExec): boolean {
+  try {
+    const target = shellEscape(paneId);
+    exec(`tmux send-keys -t ${target} -l ' '`);
+    exec(`tmux send-keys -t ${target} C-c`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Switch the current tmux client to the specified pane.
  * Uses `tmux switch-client -t <pane_id>` to change the active pane
  * in the user's terminal.
