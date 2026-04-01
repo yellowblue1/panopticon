@@ -112,12 +112,32 @@ describe("sendMessage", () => {
     expect(deps.sendKeys).not.toHaveBeenCalled();
   });
 
-  it("returns error when sendKeys fails", async () => {
+  it("returns error when sendKeys fails for text", async () => {
     const deps = createMockDeps({ sendKeys: mock(() => false) });
     const result = await sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Failed to send text to pane");
+  });
+
+  it("returns error when sendKeys fails for file path", async () => {
+    const deps = createMockDeps({ sendKeys: mock(() => false) });
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+    const result = await sendMessage({ paneId: "%0", text: "check", files }, deps);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Failed to send file path to pane");
+  });
+
+  it("calls sleep between files and text, but not for files-only", async () => {
+    const deps = createMockDeps();
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+
+    await sendMessage({ paneId: "%0", text: "", files }, deps);
+    expect(deps.sleep).not.toHaveBeenCalled();
+
+    await sendMessage({ paneId: "%0", text: "hello", files }, deps);
+    expect(deps.sleep).toHaveBeenCalledWith(500);
   });
 
   it("returns uploaded file metadata on success", async () => {
