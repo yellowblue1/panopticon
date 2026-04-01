@@ -129,7 +129,7 @@ describe("sendMessage", () => {
     expect(result.error).toBe("Failed to send file path to pane");
   });
 
-  it("does not call sleep for files-only send", async () => {
+  it("does not call sleep for single file without text", async () => {
     const deps = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
 
@@ -137,12 +137,24 @@ describe("sendMessage", () => {
     expect(deps.sleep).not.toHaveBeenCalled();
   });
 
-  it("calls sleep between files and text", async () => {
+  it("calls sleep between file and text", async () => {
     const deps = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
 
     await sendMessage({ paneId: "%0", text: "hello", files }, deps);
+    expect(deps.sleep).toHaveBeenCalledTimes(1);
     expect(deps.sleep).toHaveBeenCalledWith(500);
+  });
+
+  it("calls sleep between each file and before text for multiple files", async () => {
+    const deps = createMockDeps();
+    const files = [
+      { data: new ArrayBuffer(10), name: "a.png", type: "image/png" },
+      { data: new ArrayBuffer(10), name: "b.png", type: "image/png" },
+    ];
+
+    await sendMessage({ paneId: "%0", text: "hello", files }, deps);
+    expect(deps.sleep).toHaveBeenCalledTimes(2);
   });
 
   it("returns uploaded file metadata on success", async () => {

@@ -60,8 +60,11 @@ export async function sendMessage(
     savedFiles.push(result.file);
   }
 
-  for (const file of savedFiles) {
-    if (!deps.sendKeys(paneId, file.savedPath)) {
+  for (let i = 0; i < savedFiles.length; i++) {
+    if (i > 0) {
+      await deps.sleep(FILE_INPUT_DELAY_MS);
+    }
+    if (!deps.sendKeys(paneId, savedFiles[i].savedPath)) {
       return {
         success: false,
         error: "Failed to send file path to pane",
