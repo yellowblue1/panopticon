@@ -1,9 +1,15 @@
 import { MAX_FILES_PER_REQUEST } from "../../shared/constants";
 import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload";
 
+// CLIs like Claude Code only detect image paths when they arrive as standalone
+// inputs (with Enter). When files and text are sent together, this delay gives
+// the CLI time to process file inputs before the text arrives.
+const FILE_INPUT_DELAY_MS = 500;
+
 export interface SendMessageDeps {
   sendKeys: (paneId: string, text: string) => boolean;
   saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => SaveFileResult;
+  sleep: (ms: number) => Promise<void>;
 }
 
 interface SendMessageInput {
@@ -22,7 +28,10 @@ export interface SendMessageResult {
   readonly uploadedFiles: readonly UploadedFile[];
 }
 
-export function sendMessage(input: SendMessageInput, deps: SendMessageDeps): SendMessageResult {
+export async function sendMessage(
+  input: SendMessageInput,
+  deps: SendMessageDeps,
+): Promise<SendMessageResult> {
   const { paneId, text, files } = input;
   const trimmedText = text.trim();
 
@@ -51,22 +60,27 @@ export function sendMessage(input: SendMessageInput, deps: SendMessageDeps): Sen
     savedFiles.push(result.file);
   }
 
-  const parts: string[] = [];
-  if (trimmedText) {
-    parts.push(trimmedText);
+  for (const file of savedFiles) {
+    if (!deps.sendKeys(paneId, file.savedPath)) {
+      return {
+        success: false,
+        error: "Failed to send file path to pane",
+        uploadedFiles: savedFiles,
+      };
+    }
   }
-  if (savedFiles.length > 0) {
-    parts.push(savedFiles.map((f) => f.savedPath).join(" "));
-  }
-  const composedText = parts.join(" ");
 
-  const success = deps.sendKeys(paneId, composedText);
-  if (!success) {
-    return {
-      success: false,
-      error: "Failed to send message to pane",
-      uploadedFiles: savedFiles,
-    };
+  if (trimmedText) {
+    if (savedFiles.length > 0) {
+      await deps.sleep(FILE_INPUT_DELAY_MS);
+    }
+    if (!deps.sendKeys(paneId, trimmedText)) {
+      return {
+        success: false,
+        error: "Failed to send text to pane",
+        uploadedFiles: savedFiles,
+      };
+    }
   }
 
   return { success: true, uploadedFiles: savedFiles };
