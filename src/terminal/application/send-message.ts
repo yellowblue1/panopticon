@@ -61,11 +61,11 @@ export async function sendMessage(
   }
 
   const inputs = [...savedFiles.map((f) => f.savedPath), ...(trimmedText ? [trimmedText] : [])];
-  for (const [i, input] of inputs.entries()) {
+  for (const [i, payload] of inputs.entries()) {
     if (i > 0) {
       await deps.sleep(FILE_INPUT_DELAY_MS);
     }
-    if (!deps.sendKeys(paneId, input)) {
+    if (!deps.sendKeys(paneId, payload)) {
       return {
         success: false,
         error: "Failed to send to pane",
