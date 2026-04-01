@@ -143,7 +143,7 @@ describe("sendMessage", () => {
 
     await sendMessage({ paneId: "%0", text: "hello", files }, deps);
     expect(deps.sleep).toHaveBeenCalledTimes(1);
-    expect(deps.sleep).toHaveBeenCalledWith(500);
+    expect(deps.sleep).toHaveBeenCalledWith(2000);
   });
 
   it("calls sleep between each file and before text for multiple files", async () => {

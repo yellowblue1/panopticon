@@ -4,7 +4,7 @@ import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload
 // CLIs like Claude Code only detect image paths when they arrive as standalone
 // inputs (with Enter). When files and text are sent together, this delay gives
 // the CLI time to process file inputs before the text arrives.
-const FILE_INPUT_DELAY_MS = 500;
+const FILE_INPUT_DELAY_MS = 2000;
 
 export interface SendMessageDeps {
   sendKeys: (paneId: string, text: string) => boolean;
