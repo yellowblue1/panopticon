@@ -129,12 +129,17 @@ describe("sendMessage", () => {
     expect(result.error).toBe("Failed to send file path to pane");
   });
 
-  it("calls sleep between files and text, but not for files-only", async () => {
+  it("does not call sleep for files-only send", async () => {
     const deps = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
 
     await sendMessage({ paneId: "%0", text: "", files }, deps);
     expect(deps.sleep).not.toHaveBeenCalled();
+  });
+
+  it("calls sleep between files and text", async () => {
+    const deps = createMockDeps();
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
 
     await sendMessage({ paneId: "%0", text: "hello", files }, deps);
     expect(deps.sleep).toHaveBeenCalledWith(500);
