@@ -117,7 +117,7 @@ describe("sendMessage", () => {
     const result = await sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("Failed to send text to pane");
+    expect(result.error).toContain("Failed to send to pane");
   });
 
   it("returns error when sendKeys fails for file path", async () => {
@@ -126,7 +126,7 @@ describe("sendMessage", () => {
     const result = await sendMessage({ paneId: "%0", text: "check", files }, deps);
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Failed to send file path to pane");
+    expect(result.error).toBe("Failed to send to pane");
   });
 
   it("does not call sleep for single file without text", async () => {

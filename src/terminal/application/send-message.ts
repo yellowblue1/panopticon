@@ -60,27 +60,15 @@ export async function sendMessage(
     savedFiles.push(result.file);
   }
 
-  for (let i = 0; i < savedFiles.length; i++) {
+  const inputs = [...savedFiles.map((f) => f.savedPath), ...(trimmedText ? [trimmedText] : [])];
+  for (const [i, input] of inputs.entries()) {
     if (i > 0) {
       await deps.sleep(FILE_INPUT_DELAY_MS);
     }
-    if (!deps.sendKeys(paneId, savedFiles[i].savedPath)) {
+    if (!deps.sendKeys(paneId, input)) {
       return {
         success: false,
-        error: "Failed to send file path to pane",
-        uploadedFiles: savedFiles,
-      };
-    }
-  }
-
-  if (trimmedText) {
-    if (savedFiles.length > 0) {
-      await deps.sleep(FILE_INPUT_DELAY_MS);
-    }
-    if (!deps.sendKeys(paneId, trimmedText)) {
-      return {
-        success: false,
-        error: "Failed to send text to pane",
+        error: "Failed to send to pane",
         uploadedFiles: savedFiles,
       };
     }
