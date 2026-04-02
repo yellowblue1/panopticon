@@ -280,15 +280,26 @@ export function capturePaneContent(paneId: string, exec: ExecFn = defaultExec): 
 /**
  * Capture pane content with ANSI escape sequences preserved.
  * Uses -e flag to include color/style codes for terminal rendering.
- * Captures up to 500 lines of scrollback history (-S -500) so users
- * can scroll up in the viewer to see content that scrolled off screen.
+ *
+ * Detects whether the pane is in alternate screen mode (smcup/rmcup)
+ * and adjusts capture strategy:
+ * - Alternate screen ON: uses -a flag to capture the alternate buffer
+ * - Alternate screen OFF: captures 500 lines of scrollback history (-S -500)
  */
 export function capturePaneContentEscaped(
   paneId: string,
   exec: ExecFn = defaultExec,
 ): string | null {
   try {
-    return exec(`tmux capture-pane -p -e -S -500 -t ${shellEscape(paneId)}`);
+    const target = shellEscape(paneId);
+    return exec(
+      `alt=$(tmux display-message -p -t ${target} '#{alternate_on}' 2>/dev/null); ` +
+        `if [ "$alt" = "1" ]; then ` +
+        `tmux capture-pane -p -e -a -t ${target}; ` +
+        `else ` +
+        `tmux capture-pane -p -e -S -500 -t ${target}; ` +
+        `fi`,
+    );
   } catch {
     return null;
   }

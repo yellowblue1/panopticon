@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
   capturePaneContent,
+  capturePaneContentEscaped,
+  capturePaneContentSanitized,
   getAllTmuxPanes,
   getGitBranch,
   getGitRemoteUrl,
@@ -242,6 +244,59 @@ describe("capturePaneContent", () => {
       throw new Error("tmux error");
     };
     expect(capturePaneContent("%0", exec)).toBeNull();
+  });
+});
+
+describe("capturePaneContentEscaped", () => {
+  it("returns captured content", () => {
+    const exec = () => "\x1b[32mline 1\x1b[0m\nline 2\n❯ ";
+    expect(capturePaneContentEscaped("%0", exec)).toBe("\x1b[32mline 1\x1b[0m\nline 2\n❯ ");
+  });
+
+  it("includes alternate screen detection in command", () => {
+    let executedCommand = "";
+    const exec = (cmd: string) => {
+      executedCommand = cmd;
+      return "content";
+    };
+
+    capturePaneContentEscaped("%0", exec);
+    expect(executedCommand).toContain("alternate_on");
+    expect(executedCommand).toContain("capture-pane -p -e -a");
+    expect(executedCommand).toContain("capture-pane -p -e -S -500");
+  });
+
+  it("escapes pane id in the command", () => {
+    let executedCommand = "";
+    const exec = (cmd: string) => {
+      executedCommand = cmd;
+      return "content";
+    };
+
+    capturePaneContentEscaped("%0", exec);
+    expect(executedCommand).toContain("'%0'");
+  });
+
+  it("returns null on tmux error", () => {
+    const exec = () => {
+      throw new Error("tmux error");
+    };
+    expect(capturePaneContentEscaped("%0", exec)).toBeNull();
+  });
+});
+
+describe("capturePaneContentSanitized", () => {
+  it("returns sanitized content from escaped capture", () => {
+    const exec = () => "\x1b[32mhello\x1b[0m world";
+    const result = capturePaneContentSanitized("%0", exec);
+    expect(result).toBe("hello world");
+  });
+
+  it("returns null when capture fails", () => {
+    const exec = () => {
+      throw new Error("tmux error");
+    };
+    expect(capturePaneContentSanitized("%0", exec)).toBeNull();
   });
 });
 
