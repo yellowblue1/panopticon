@@ -42,7 +42,7 @@ interface FileUploadDeps {
 
 function sanitizeFilename(name: string): string {
   return name
-    .replace(/[/\\:*?"<>|]/g, "_")
+    .replace(/[/\\:*?"<>|\s]/g, "_")
     .replace(/\.{2,}/g, ".")
     .slice(-100);
 }

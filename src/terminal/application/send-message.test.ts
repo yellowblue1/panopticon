@@ -16,85 +16,95 @@ function createMockDeps(overrides: Partial<SendMessageDeps> = {}): SendMessageDe
         },
       }),
     ),
+    sleep: mock(() => Promise.resolve()),
     ...overrides,
   };
 }
 
 describe("sendMessage", () => {
-  it("sends text-only message via sendKeys", () => {
+  it("sends text-only message via sendKeys", async () => {
     const deps = createMockDeps();
-    const result = sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);
 
     expect(result.success).toBe(true);
     expect(result.uploadedFiles).toHaveLength(0);
     expect(deps.sendKeys).toHaveBeenCalledWith("%0", "hello");
   });
 
-  it("trims whitespace from text", () => {
+  it("trims whitespace from text", async () => {
     const deps = createMockDeps();
-    sendMessage({ paneId: "%0", text: "  hello  ", files: [] }, deps);
+    await sendMessage({ paneId: "%0", text: "  hello  ", files: [] }, deps);
 
     expect(deps.sendKeys).toHaveBeenCalledWith("%0", "hello");
   });
 
-  it("sends files-only with file paths", () => {
+  it("sends files-only with one sendKeys call per file", async () => {
     const deps = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "screenshot.png", type: "image/png" }];
-    const result = sendMessage({ paneId: "%0", text: "", files }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "", files }, deps);
 
     expect(result.success).toBe(true);
     expect(result.uploadedFiles).toHaveLength(1);
+    expect(deps.sendKeys).toHaveBeenCalledTimes(1);
     expect(deps.sendKeys).toHaveBeenCalledWith(
       "%0",
       "/tmp/panopticon-uploads/123-abc-screenshot.png",
     );
   });
 
-  it("composes text + files with space separator", () => {
+  it("sends file paths individually then text as separate sendKeys calls", async () => {
     const deps = createMockDeps();
     const files = [
       { data: new ArrayBuffer(10), name: "img.png", type: "image/png" },
       { data: new ArrayBuffer(20), name: "doc.pdf", type: "application/pdf" },
     ];
-    const result = sendMessage({ paneId: "%0", text: "check this", files }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "check this", files }, deps);
 
     expect(result.success).toBe(true);
     expect(result.uploadedFiles).toHaveLength(2);
-    expect(deps.sendKeys).toHaveBeenCalledWith(
+    expect(deps.sendKeys).toHaveBeenCalledTimes(3);
+    expect(deps.sendKeys).toHaveBeenNthCalledWith(
+      1,
       "%0",
-      "check this /tmp/panopticon-uploads/123-abc-img.png /tmp/panopticon-uploads/123-abc-doc.pdf",
+      "/tmp/panopticon-uploads/123-abc-img.png",
     );
+    expect(deps.sendKeys).toHaveBeenNthCalledWith(
+      2,
+      "%0",
+      "/tmp/panopticon-uploads/123-abc-doc.pdf",
+    );
+    expect(deps.sendKeys).toHaveBeenNthCalledWith(3, "%0", "check this");
   });
 
-  it("returns error when text and files are both empty", () => {
+  it("returns error when text and files are both empty", async () => {
     const deps = createMockDeps();
-    const result = sendMessage({ paneId: "%0", text: "", files: [] }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "", files: [] }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Must provide text or files");
   });
 
-  it("returns error when files exceed maximum count", () => {
+  it("returns error when files exceed maximum count", async () => {
     const deps = createMockDeps();
     const files = Array.from({ length: 6 }, (_, i) => ({
       data: new ArrayBuffer(10),
       name: `file${i}.png`,
       type: "image/png",
     }));
-    const result = sendMessage({ paneId: "%0", text: "test", files }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "test", files }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Maximum");
   });
 
-  it("returns error with reason when saveFile fails", () => {
+  it("returns error with reason when saveFile fails", async () => {
     const deps = createMockDeps({
       saveFile: mock(
         (): SaveFileResult => ({ ok: false, reason: "Unsupported file type: text/javascript" }),
       ),
     });
     const files = [{ data: new ArrayBuffer(10), name: "bad.exe", type: "text/javascript" }];
-    const result = sendMessage({ paneId: "%0", text: "test", files }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "test", files }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Failed to save file");
@@ -102,18 +112,55 @@ describe("sendMessage", () => {
     expect(deps.sendKeys).not.toHaveBeenCalled();
   });
 
-  it("returns error when sendKeys fails", () => {
+  it("returns error when sendKeys fails for text", async () => {
     const deps = createMockDeps({ sendKeys: mock(() => false) });
-    const result = sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("Failed to send message");
+    expect(result.error).toContain("Failed to send to pane");
   });
 
-  it("returns uploaded file metadata on success", () => {
+  it("returns error when sendKeys fails for file path", async () => {
+    const deps = createMockDeps({ sendKeys: mock(() => false) });
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+    const result = await sendMessage({ paneId: "%0", text: "check", files }, deps);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Failed to send to pane");
+  });
+
+  it("does not call sleep for single file without text", async () => {
+    const deps = createMockDeps();
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+
+    await sendMessage({ paneId: "%0", text: "", files }, deps);
+    expect(deps.sleep).not.toHaveBeenCalled();
+  });
+
+  it("calls sleep between file and text", async () => {
+    const deps = createMockDeps();
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+
+    await sendMessage({ paneId: "%0", text: "hello", files }, deps);
+    expect(deps.sleep).toHaveBeenCalledTimes(1);
+    expect(deps.sleep).toHaveBeenCalledWith(2000);
+  });
+
+  it("calls sleep between each file and before text for multiple files", async () => {
+    const deps = createMockDeps();
+    const files = [
+      { data: new ArrayBuffer(10), name: "a.png", type: "image/png" },
+      { data: new ArrayBuffer(10), name: "b.png", type: "image/png" },
+    ];
+
+    await sendMessage({ paneId: "%0", text: "hello", files }, deps);
+    expect(deps.sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns uploaded file metadata on success", async () => {
     const deps = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "test.png", type: "image/png" }];
-    const result = sendMessage({ paneId: "%0", text: "msg", files }, deps);
+    const result = await sendMessage({ paneId: "%0", text: "msg", files }, deps);
 
     expect(result.success).toBe(true);
     expect(result.uploadedFiles).toHaveLength(1);

@@ -216,7 +216,7 @@ describe("Hono API endpoints", () => {
 
     it("returns 400 when both text and files are empty", async () => {
       const deps = createMockDeps({
-        sendMessage: mock(() => ({ success: true, uploadedFiles: [] })),
+        sendMessage: mock(() => Promise.resolve({ success: true, uploadedFiles: [] })),
       });
       const app = createApp(deps);
 
@@ -233,10 +233,9 @@ describe("Hono API endpoints", () => {
     });
 
     it("returns success for text-only message", async () => {
-      const sendMessageSpy = mock((_paneId: string, _text: string, _files: unknown[]) => ({
-        success: true,
-        uploadedFiles: [],
-      }));
+      const sendMessageSpy = mock((_paneId: string, _text: string, _files: unknown[]) =>
+        Promise.resolve({ success: true, uploadedFiles: [] }),
+      );
       const deps = createMockDeps({ sendMessage: sendMessageSpy });
       const app = createApp(deps);
 
@@ -257,17 +256,19 @@ describe("Hono API endpoints", () => {
     });
 
     it("returns success for message with file", async () => {
-      const sendMessageSpy = mock((_paneId: string, _text: string, _files: unknown[]) => ({
-        success: true,
-        uploadedFiles: [
-          {
-            originalName: "test.png",
-            savedPath: "/tmp/panopticon-uploads/123-test.png",
-            mimeType: "image/png",
-            size: 100,
-          },
-        ],
-      }));
+      const sendMessageSpy = mock((_paneId: string, _text: string, _files: unknown[]) =>
+        Promise.resolve({
+          success: true,
+          uploadedFiles: [
+            {
+              originalName: "test.png",
+              savedPath: "/tmp/panopticon-uploads/123-test.png",
+              mimeType: "image/png",
+              size: 100,
+            },
+          ],
+        }),
+      );
       const deps = createMockDeps({ sendMessage: sendMessageSpy });
       const app = createApp(deps);
 
@@ -289,11 +290,9 @@ describe("Hono API endpoints", () => {
 
     it("returns 500 when sendMessage fails", async () => {
       const deps = createMockDeps({
-        sendMessage: mock(() => ({
-          success: false,
-          error: "Failed to send",
-          uploadedFiles: [],
-        })),
+        sendMessage: mock(() =>
+          Promise.resolve({ success: false, error: "Failed to send", uploadedFiles: [] }),
+        ),
       });
       const app = createApp(deps);
 

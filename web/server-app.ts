@@ -80,7 +80,7 @@ export interface AppDeps {
     paneId: string,
     text: string,
     files: Array<{ data: ArrayBuffer; name: string; type: string }>,
-  ) => SendMessageResult;
+  ) => Promise<SendMessageResult>;
 
   // Launcher
   discoverProjects?: () => ProjectResponse[];
@@ -229,7 +229,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       );
 
       const paneId = c.req.param("pane_id");
-      const result = deps.sendMessage(paneId, text, files);
+      const result = await deps.sendMessage(paneId, text, files);
 
       if (result.success) {
         return c.json({

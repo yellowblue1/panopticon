@@ -105,6 +105,23 @@ describe("createFileUploadDeps", () => {
       }
     });
 
+    it("sanitizes filenames with whitespace", () => {
+      const fsDeps = createMockFsDeps();
+      const deps = createFileUploadDeps(fsDeps);
+
+      const result = deps.saveFile(
+        new ArrayBuffer(10),
+        "Screenshot 2026-04-01 at 9.33.10.png",
+        "image/png",
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.file.savedPath).not.toContain(" ");
+        expect(result.file.savedPath).toContain("Screenshot_2026-04-01_at_9.33.10.png");
+      }
+    });
+
     it("creates upload directory if it does not exist", () => {
       const fsDeps = createMockFsDeps({ existsSync: mock(() => false) });
       const deps = createFileUploadDeps(fsDeps);

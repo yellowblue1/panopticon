@@ -395,7 +395,11 @@ const app = createApp(
     sendMessage: (paneId, text, files) =>
       sendMessage(
         { paneId, text, files },
-        { sendKeys: (pid, txt) => sendKeys(pid, txt), saveFile: fileUploadDeps.saveFile },
+        {
+          sendKeys: (pid, txt) => sendKeys(pid, txt),
+          saveFile: fileUploadDeps.saveFile,
+          sleep: (ms) => Bun.sleep(ms),
+        },
       ),
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
     capturePaneContent: capturePaneContentEscaped,
