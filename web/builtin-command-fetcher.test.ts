@@ -155,35 +155,33 @@ const SAMPLE_SKILLS_MARKDOWN = `## Bundled skills
 
 Bundled skills ship with Claude Code and are available in every session.
 
-* **\`/simplify\`**: reviews your recently changed files for code reuse, quality, and efficiency issues, then fixes them.
-
-* **\`/batch <instruction>\`**: orchestrates large-scale changes across a codebase in parallel.
-
-* **\`/debug [description]\`**: troubleshoots your current Claude Code session by reading the session debug log.
-
-Claude Code also includes a bundled developer platform skill.
+| Skill | Purpose |
+| :--- | :--- |
+| \`/simplify [focus]\` | Review your recently changed files for code reuse, quality, and efficiency issues, then fix them. |
+| \`/batch <instruction>\` | Orchestrate large-scale changes across a codebase in parallel. |
+| \`/debug [description]\` | Troubleshoot your current Claude Code session by reading the session debug log. |
 
 ## Getting started
 `;
 
 describe("parseBundledSkills", () => {
-  it("parses bundled skills from markdown bullet list", () => {
+  it("parses bundled skills from markdown table", () => {
     const result = parseBundledSkills(SAMPLE_SKILLS_MARKDOWN);
 
     expect(result).toEqual([
       {
         command: "/simplify",
         description:
-          "reviews your recently changed files for code reuse, quality, and efficiency issues, then fixes them.",
+          "Review your recently changed files for code reuse, quality, and efficiency issues, then fix them.",
       },
       {
         command: "/batch",
-        description: "orchestrates large-scale changes across a codebase in parallel.",
+        description: "Orchestrate large-scale changes across a codebase in parallel.",
       },
       {
         command: "/debug",
         description:
-          "troubleshoots your current Claude Code session by reading the session debug log.",
+          "Troubleshoot your current Claude Code session by reading the session debug log.",
       },
     ]);
   });
@@ -195,27 +193,30 @@ describe("parseBundledSkills", () => {
   it("strips markdown links from descriptions", () => {
     const markdown = `## Bundled skills
 
-* **\`/foo\`**: uses [worktrees](/en/worktrees) for isolation.
+| Skill | Purpose |
+| :--- | :--- |
+| \`/foo\` | Uses [worktrees](/en/worktrees) for isolation. |
 
 ## Next
 `;
     const result = parseBundledSkills(markdown);
-    expect(result[0].description).toBe("uses worktrees for isolation.");
+    expect(result[0].description).toBe("Uses worktrees for isolation.");
   });
 
   it("parses skills under h1 Bundled skills heading", () => {
     const markdown = `# Bundled skills
 
-* **\`/simplify\`**: reviews changed files.
-
-* **\`/batch <instruction>\`**: parallel changes.
+| Skill | Purpose |
+| :--- | :--- |
+| \`/simplify\` | Reviews changed files. |
+| \`/batch <instruction>\` | Parallel changes. |
 
 # Another section
 `;
     const result = parseBundledSkills(markdown);
     expect(result).toEqual([
-      { command: "/simplify", description: "reviews changed files." },
-      { command: "/batch", description: "parallel changes." },
+      { command: "/simplify", description: "Reviews changed files." },
+      { command: "/batch", description: "Parallel changes." },
     ]);
   });
 });
@@ -268,7 +269,9 @@ describe("fetchBuiltinCommands", () => {
   it("deduplicates commands that appear in both sources", async () => {
     const skillsWithDebug = `## Bundled skills
 
-* **\`/debug [description]\`**: troubleshoots your session.
+| Skill | Purpose |
+| :--- | :--- |
+| \`/debug [description]\` | Troubleshoot your session. |
 
 ## Next
 `;
