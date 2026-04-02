@@ -20,24 +20,23 @@ function stripMarkdownLinks(text: string): string {
 }
 
 /**
- * Parse built-in commands from Claude Code docs markdown.
- *
- * Extracts the first markdown table found under an h1 or h2
- * "Built-in commands" heading, stopping at the next heading of
- * equal or higher level.
+ * Parse the first markdown table under a given heading (h1 or h2),
+ * extracting slash commands and their descriptions.
+ * Stops at the next heading of equal or higher level.
  */
-export function parseBuiltinCommands(markdown: string): SlashCommand[] {
+function parseCommandTable(markdown: string, heading: string): SlashCommand[] {
   const lines = markdown.split("\n");
+  const headingPattern = new RegExp(`^(#{1,2}) ${heading}\\s*$`);
+  const commands: SlashCommand[] = [];
 
   let inSection = false;
   let sectionLevel = 0;
   let inTable = false;
-  let headerRowSeen = false;
-  const commands: SlashCommand[] = [];
+  let separatorSeen = false;
 
   for (const line of lines) {
     if (!inSection) {
-      const headingMatch = line.match(/^(#{1,2}) Built-in commands\s*$/);
+      const headingMatch = line.match(headingPattern);
       if (headingMatch) {
         inSection = true;
         sectionLevel = headingMatch[1].length;
@@ -45,7 +44,6 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
       continue;
     }
 
-    // Stop at any heading at the same depth or shallower
     const nextHeading = line.match(/^(#+) /);
     if (nextHeading && nextHeading[1].length <= sectionLevel) {
       break;
@@ -53,18 +51,18 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
 
     if (!line.startsWith("|")) {
       inTable = false;
-      headerRowSeen = false;
+      separatorSeen = false;
       continue;
     }
 
     if (!inTable) {
       inTable = true;
-      headerRowSeen = false;
+      separatorSeen = false;
       continue; // skip header row
     }
 
-    if (!headerRowSeen) {
-      headerRowSeen = true;
+    if (!separatorSeen) {
+      separatorSeen = true;
       continue; // skip separator row
     }
 
@@ -74,59 +72,24 @@ export function parseBuiltinCommands(markdown: string): SlashCommand[] {
       .filter((c) => c.length > 0);
     if (cells.length < 2) continue;
 
-    const rawCommand = cells[0];
-    const rawDescription = cells[1];
-
-    const commandMatch = rawCommand.match(/`(\/\S+?)(?:\s+[[<][^\]>]*[\]>])*`/);
+    const commandMatch = cells[0].match(/`(\/\S+?)(?:\s+[[<][^\]>]*[\]>])*`/);
     if (!commandMatch) continue;
 
-    const command = commandMatch[1];
-    const description = stripMarkdownLinks(rawDescription);
-
-    commands.push({ command, description });
+    commands.push({
+      command: commandMatch[1],
+      description: stripMarkdownLinks(cells[1]),
+    });
   }
 
   return commands;
 }
 
-/**
- * Parse bundled skills from Claude Code skills docs markdown.
- *
- * Extracts bullet items under an h1 or h2 "Bundled skills" heading
- * that match the pattern: **`/command`** or **`/command <args>`**: description
- */
+export function parseBuiltinCommands(markdown: string): SlashCommand[] {
+  return parseCommandTable(markdown, "Built-in commands");
+}
+
 export function parseBundledSkills(markdown: string): SlashCommand[] {
-  const lines = markdown.split("\n");
-  const commands: SlashCommand[] = [];
-
-  let inSection = false;
-  let sectionLevel = 0;
-
-  for (const line of lines) {
-    if (!inSection) {
-      const headingMatch = line.match(/^(#{1,2}) Bundled skills\s*$/);
-      if (headingMatch) {
-        inSection = true;
-        sectionLevel = headingMatch[1].length;
-      }
-      continue;
-    }
-
-    const nextHeading = line.match(/^(#+) /);
-    if (nextHeading && nextHeading[1].length <= sectionLevel) {
-      break;
-    }
-
-    const match = line.match(/^\* \*\*`(\/\S+?)(?:\s+[^`]*)?\s*`\*\*:\s*(.+)/);
-    if (!match) continue;
-
-    const command = match[1];
-    const description = stripMarkdownLinks(match[2]);
-
-    commands.push({ command, description });
-  }
-
-  return commands;
+  return parseCommandTable(markdown, "Bundled skills");
 }
 
 /**
