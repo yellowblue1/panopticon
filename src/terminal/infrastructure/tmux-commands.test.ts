@@ -10,6 +10,7 @@ import {
   getProcessStartTime,
   getProcessTable,
   getProjectName,
+  isAlternateScreen,
   isTmuxAvailable,
   sendInterrupt,
   startPipePane,
@@ -247,34 +248,66 @@ describe("capturePaneContent", () => {
   });
 });
 
-describe("capturePaneContentEscaped", () => {
-  it("returns captured content", () => {
-    const exec = () => "\x1b[32mline 1\x1b[0m\nline 2\n❯ ";
-    expect(capturePaneContentEscaped("%0", exec)).toBe("\x1b[32mline 1\x1b[0m\nline 2\n❯ ");
+describe("isAlternateScreen", () => {
+  it("returns true when alternate_on is 1", () => {
+    const exec = () => "1";
+    expect(isAlternateScreen("%0", exec)).toBe(true);
   });
 
-  it("includes alternate screen detection in command", () => {
-    let executedCommand = "";
+  it("returns false when alternate_on is 0", () => {
+    const exec = () => "0";
+    expect(isAlternateScreen("%0", exec)).toBe(false);
+  });
+
+  it("returns false on tmux error", () => {
+    const exec = () => {
+      throw new Error("tmux error");
+    };
+    expect(isAlternateScreen("%0", exec)).toBe(false);
+  });
+});
+
+describe("capturePaneContentEscaped", () => {
+  it("uses -a flag when pane is in alternate screen mode", () => {
+    const commands: string[] = [];
     const exec = (cmd: string) => {
-      executedCommand = cmd;
-      return "content";
+      commands.push(cmd);
+      if (cmd.includes("display-message")) return "1";
+      return "\x1b[32malt content\x1b[0m";
     };
 
-    capturePaneContentEscaped("%0", exec);
-    expect(executedCommand).toContain("alternate_on");
-    expect(executedCommand).toContain("capture-pane -p -e -a");
-    expect(executedCommand).toContain("capture-pane -p -e -S -500");
+    const result = capturePaneContentEscaped("%0", exec);
+    expect(result).toBe("\x1b[32malt content\x1b[0m");
+    expect(commands[1]).toContain("-a");
+    expect(commands[1]).not.toContain("-S -500");
+  });
+
+  it("uses -S -500 flag when pane is NOT in alternate screen mode", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      if (cmd.includes("display-message")) return "0";
+      return "scrollback content";
+    };
+
+    const result = capturePaneContentEscaped("%0", exec);
+    expect(result).toBe("scrollback content");
+    expect(commands[1]).toContain("-S -500");
+    expect(commands[1]).not.toContain("-a");
   });
 
   it("escapes pane id in the command", () => {
-    let executedCommand = "";
+    const commands: string[] = [];
     const exec = (cmd: string) => {
-      executedCommand = cmd;
+      commands.push(cmd);
+      if (cmd.includes("display-message")) return "0";
       return "content";
     };
 
     capturePaneContentEscaped("%0", exec);
-    expect(executedCommand).toContain("'%0'");
+    for (const cmd of commands) {
+      expect(cmd).toContain("'%0'");
+    }
   });
 
   it("returns null on tmux error", () => {
