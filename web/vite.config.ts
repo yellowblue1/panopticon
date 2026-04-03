@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 
 const devPort = process.env.DEV_PORT ? Number.parseInt(process.env.DEV_PORT, 10) : 3847;
 const backendPort = devPort + 1;
+const host = process.env.HOST ?? "127.0.0.1";
 
 export default defineConfig({
   plugins: [
@@ -34,16 +35,16 @@ export default defineConfig({
     },
   },
   server: {
-    host: process.env.HOST ?? "127.0.0.1",
+    host,
     allowedHosts: ["localhost", "127.0.0.1", ".ts.net"],
     port: devPort,
     proxy: {
       "/api/": {
-        target: `http://localhost:${backendPort}`,
+        target: `http://${host}:${backendPort}`,
         changeOrigin: true,
       },
       "/favicon.ico": {
-        target: `http://localhost:${backendPort}`,
+        target: `http://${host}:${backendPort}`,
         changeOrigin: true,
       },
     },
