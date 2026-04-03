@@ -278,17 +278,33 @@ export function capturePaneContent(paneId: string, exec: ExecFn = defaultExec): 
 }
 
 /**
+ * Check whether a tmux pane is in alternate screen mode (smcup/rmcup).
+ * Full-screen apps like vim, Claude Code use alternate screen.
+ */
+export function isAlternateScreen(paneId: string, exec: ExecFn = defaultExec): boolean {
+  try {
+    return exec(`tmux display-message -p -t ${shellEscape(paneId)} '#{alternate_on}'`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Capture pane content with ANSI escape sequences preserved.
  * Uses -e flag to include color/style codes for terminal rendering.
- * Captures up to 500 lines of scrollback history (-S -500) so users
- * can scroll up in the viewer to see content that scrolled off screen.
+ *
+ * When the pane is in alternate screen mode (smcup/rmcup), captures
+ * the alternate buffer with -a. Otherwise captures 500 lines of
+ * scrollback history (-S -500).
  */
 export function capturePaneContentEscaped(
   paneId: string,
   exec: ExecFn = defaultExec,
 ): string | null {
   try {
-    return exec(`tmux capture-pane -p -e -S -500 -t ${shellEscape(paneId)}`);
+    const target = shellEscape(paneId);
+    const flag = isAlternateScreen(paneId, exec) ? "-a" : "-S -500";
+    return exec(`tmux capture-pane -p -e ${flag} -t ${target}`);
   } catch {
     return null;
   }

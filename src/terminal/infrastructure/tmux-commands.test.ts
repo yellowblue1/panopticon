@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
   capturePaneContent,
+  capturePaneContentEscaped,
+  capturePaneContentSanitized,
   getAllTmuxPanes,
   getGitBranch,
   getGitRemoteUrl,
@@ -8,6 +10,7 @@ import {
   getProcessStartTime,
   getProcessTable,
   getProjectName,
+  isAlternateScreen,
   isTmuxAvailable,
   sendInterrupt,
   startPipePane,
@@ -242,6 +245,91 @@ describe("capturePaneContent", () => {
       throw new Error("tmux error");
     };
     expect(capturePaneContent("%0", exec)).toBeNull();
+  });
+});
+
+describe("isAlternateScreen", () => {
+  it("returns true when alternate_on is 1", () => {
+    const exec = () => "1";
+    expect(isAlternateScreen("%0", exec)).toBe(true);
+  });
+
+  it("returns false when alternate_on is 0", () => {
+    const exec = () => "0";
+    expect(isAlternateScreen("%0", exec)).toBe(false);
+  });
+
+  it("returns false on tmux error", () => {
+    const exec = () => {
+      throw new Error("tmux error");
+    };
+    expect(isAlternateScreen("%0", exec)).toBe(false);
+  });
+});
+
+describe("capturePaneContentEscaped", () => {
+  it("uses -a flag when pane is in alternate screen mode", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      if (cmd.includes("display-message")) return "1";
+      return "\x1b[32malt content\x1b[0m";
+    };
+
+    const result = capturePaneContentEscaped("%0", exec);
+    expect(result).toBe("\x1b[32malt content\x1b[0m");
+    expect(commands[1]).toContain("-a");
+    expect(commands[1]).not.toContain("-S -500");
+  });
+
+  it("uses -S -500 flag when pane is NOT in alternate screen mode", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      if (cmd.includes("display-message")) return "0";
+      return "scrollback content";
+    };
+
+    const result = capturePaneContentEscaped("%0", exec);
+    expect(result).toBe("scrollback content");
+    expect(commands[1]).toContain("-S -500");
+    expect(commands[1]).not.toContain("-a");
+  });
+
+  it("escapes pane id in the command", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      if (cmd.includes("display-message")) return "0";
+      return "content";
+    };
+
+    capturePaneContentEscaped("%0", exec);
+    for (const cmd of commands) {
+      expect(cmd).toContain("'%0'");
+    }
+  });
+
+  it("returns null on tmux error", () => {
+    const exec = () => {
+      throw new Error("tmux error");
+    };
+    expect(capturePaneContentEscaped("%0", exec)).toBeNull();
+  });
+});
+
+describe("capturePaneContentSanitized", () => {
+  it("returns sanitized content from escaped capture", () => {
+    const exec = () => "\x1b[32mhello\x1b[0m world";
+    const result = capturePaneContentSanitized("%0", exec);
+    expect(result).toBe("hello world");
+  });
+
+  it("returns null when capture fails", () => {
+    const exec = () => {
+      throw new Error("tmux error");
+    };
+    expect(capturePaneContentSanitized("%0", exec)).toBeNull();
   });
 });
 
