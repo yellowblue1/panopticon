@@ -293,9 +293,13 @@ export function isAlternateScreen(paneId: string, exec: ExecFn = defaultExec): b
  * Capture pane content with ANSI escape sequences preserved.
  * Uses -e flag to include color/style codes for terminal rendering.
  *
- * When the pane is in alternate screen mode (smcup/rmcup), captures
- * the alternate buffer with -a. Otherwise captures 500 lines of
- * scrollback history (-S -500).
+ * When the pane is in alternate screen mode (smcup/rmcup), plain
+ * `capture-pane -p` already returns the visible alternate buffer.
+ * The -a flag does the *opposite*: it captures the hidden main
+ * buffer (the shell before the full-screen app started), so we
+ * must NOT use -a when alternate_on=1.
+ *
+ * In normal mode we use -S -500 to grab scrollback history.
  */
 export function capturePaneContentEscaped(
   paneId: string,
@@ -303,7 +307,7 @@ export function capturePaneContentEscaped(
 ): string | null {
   try {
     const target = shellEscape(paneId);
-    const flag = isAlternateScreen(paneId, exec) ? "-a" : "-S -500";
+    const flag = isAlternateScreen(paneId, exec) ? "" : "-S -500";
     return exec(`tmux capture-pane -p -e ${flag} -t ${target}`);
   } catch {
     return null;
