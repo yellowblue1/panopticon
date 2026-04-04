@@ -268,7 +268,7 @@ describe("isAlternateScreen", () => {
 });
 
 describe("capturePaneContentEscaped", () => {
-  it("uses -a flag when pane is in alternate screen mode", () => {
+  it("omits -a and -S flags when pane is in alternate screen mode", () => {
     const commands: string[] = [];
     const exec = (cmd: string) => {
       commands.push(cmd);
@@ -278,7 +278,7 @@ describe("capturePaneContentEscaped", () => {
 
     const result = capturePaneContentEscaped("%0", exec);
     expect(result).toBe("\x1b[32malt content\x1b[0m");
-    expect(commands[1]).toContain("-a");
+    expect(commands[1]).not.toContain("-a");
     expect(commands[1]).not.toContain("-S -500");
   });
 
