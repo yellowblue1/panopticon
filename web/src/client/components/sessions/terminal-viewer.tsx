@@ -208,6 +208,16 @@ export function TerminalViewer({
     }
   };
 
+  const handleTerminalKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      const anchor = (e.target as HTMLElement).closest("a.terminal-link");
+      if (anchor instanceof HTMLAnchorElement) {
+        e.preventDefault();
+        window.open(anchor.href, "_blank", "noopener,noreferrer");
+      }
+    }
+  };
+
   return (
     <div className={cn("relative flex flex-col", fitWidth && "pane-viewer--fit-width", className)}>
       <div
@@ -219,11 +229,11 @@ export function TerminalViewer({
       >
         {/* Safe: fancy-ansi escapes all text via escape-html; linkifyHtml only injects <a> tags from URL patterns in escaped text; source is server-controlled tmux output */}
         {processedHtml != null ? (
-          // biome-ignore lint/a11y/useKeyWithClickEvents: links inside are natively keyboard-accessible
           <pre
             className="terminal-content"
             dangerouslySetInnerHTML={{ __html: processedHtml }}
             onClick={handleTerminalClick}
+            onKeyDown={handleTerminalKeyDown}
           />
         ) : null}
       </div>

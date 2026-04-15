@@ -1,6 +1,6 @@
 import type { SlashCommand } from "@shared/types";
 import { Search, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/cn";
 
@@ -83,31 +83,37 @@ function HighlightedText({
   if (indices.length === 0) return <span className={className}>{text}</span>;
 
   const matchSet = new Set(indices);
-  const parts: ReactNode[] = [];
+  const parts: { key: string; text: string; isMatch: boolean }[] = [];
   let run = "";
+  let runStart = 0;
   let runIsMatch = false;
 
   for (let i = 0; i <= text.length; i++) {
     const isMatch = matchSet.has(i);
     if (i === text.length || isMatch !== runIsMatch) {
       if (run) {
-        parts.push(
-          runIsMatch ? (
-            <span key={i} className={highlightClassName}>
-              {run}
-            </span>
-          ) : (
-            <span key={i}>{run}</span>
-          ),
-        );
+        parts.push({ key: `${runStart}-${i}`, text: run, isMatch: runIsMatch });
       }
       run = "";
+      runStart = i;
       runIsMatch = isMatch;
     }
     if (i < text.length) run += text[i];
   }
 
-  return <span className={className}>{parts}</span>;
+  return (
+    <span className={className}>
+      {parts.map((part) =>
+        part.isMatch ? (
+          <span key={part.key} className={highlightClassName}>
+            {part.text}
+          </span>
+        ) : (
+          <span key={part.key}>{part.text}</span>
+        ),
+      )}
+    </span>
+  );
 }
 
 // --- Component ---
@@ -166,9 +172,12 @@ export function CommandPalette({
     ? [...commands]
         .sort((a, b) => a.command.localeCompare(b.command))
         .map((cmd) => ({ command: cmd, score: 0, commandIndices: [] }))
-    : (commands.map((cmd) => scoreCommand(query, cmd)).filter(Boolean) as ScoredCommand[]).sort(
-        (a, b) => b.score - a.score,
-      );
+    : commands
+        .flatMap((cmd) => {
+          const scored = scoreCommand(query, cmd);
+          return scored ? [scored] : [];
+        })
+        .sort((a, b) => b.score - a.score);
 
   // Reset selection when query changes (render-time reset)
   const prevQueryRef = useRef("");
@@ -214,7 +223,7 @@ export function CommandPalette({
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none",
         )}
         onClick={onClose}
-        aria-hidden={!isOpen}
+        aria-hidden="true"
       />
 
       {/* Panel */}
