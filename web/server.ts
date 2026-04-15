@@ -647,7 +647,7 @@ async function main() {
   if (MCP_ENABLED) {
     try {
       const claudeJsonPath = join(homedir(), ".claude.json");
-      const registered = registerMcpConfig(server.port, {
+      const registered = registerMcpConfig(server.port ?? PORT, {
         readFile: (p) => {
           try {
             return readFileSync(p, "utf-8");

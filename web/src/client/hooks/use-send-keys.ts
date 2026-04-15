@@ -12,14 +12,15 @@ interface SendKeysInput {
 export function useSendKeys() {
   return useMutation({
     mutationFn: async ({ paneId, text, raw }: SendKeysInput) => {
-      const res = await sessionsApi[":pane_id"]["send-keys"].$post({
+      const req = {
         param: { pane_id: encodeURIComponent(paneId) },
         json: { text, ...(raw ? { raw: true } : {}) },
-      });
+      };
+      const res = await sessionsApi[":pane_id"]["send-keys"].$post(req);
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error ?? "Failed to send keys");
+        throw new Error("error" in data ? data.error : "Failed to send keys");
       }
       return data;
     },

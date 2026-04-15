@@ -15,7 +15,7 @@ export function useInterrupt() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error ?? "Failed to send interrupt");
+        throw new Error("error" in data ? data.error : "Failed to send interrupt");
       }
       return data;
     },
