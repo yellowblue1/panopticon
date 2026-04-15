@@ -454,10 +454,7 @@ const app = createApp(
       if (!cwd) return null;
 
       // Reuse slug cache to avoid re-reading JSONL files
-      if (!slugCache.has(cwd)) {
-        slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
-      }
-      const slug = slugCache.get(cwd);
+      const slug = slugCache.getOrInsertComputed(cwd, (key) => findSlugForCwd(key, planDeps));
       if (!slug) return null;
 
       const content = readPlanContent(slug, planDeps);
@@ -472,10 +469,7 @@ const app = createApp(
           result[session.pane_id] = false;
           continue;
         }
-        if (!slugCache.has(cwd)) {
-          slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
-        }
-        const slug = slugCache.get(cwd);
+        const slug = slugCache.getOrInsertComputed(cwd, (key) => findSlugForCwd(key, planDeps));
         if (!slug) {
           result[session.pane_id] = false;
           continue;
@@ -488,10 +482,7 @@ const app = createApp(
       const cwd = sessionManager.getSessionCwd(paneId);
       if (!cwd) return false;
 
-      if (!slugCache.has(cwd)) {
-        slugCache.set(cwd, findSlugForCwd(cwd, planDeps));
-      }
-      const slug = slugCache.get(cwd);
+      const slug = slugCache.getOrInsertComputed(cwd, (key) => findSlugForCwd(key, planDeps));
       if (!slug) return false;
 
       const success = deletePlan(slug, planDeps);
