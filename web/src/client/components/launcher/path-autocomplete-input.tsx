@@ -34,10 +34,10 @@ export function PathAutocompleteInput({
   const { data } = useBrowsePath(debouncedValue);
   const entries = data?.entries ?? [];
 
-  // Reset selection when debounced query changes (render-time reset)
-  const prevDebouncedRef = useRef(debouncedValue);
-  if (prevDebouncedRef.current !== debouncedValue) {
-    prevDebouncedRef.current = debouncedValue;
+  // Reset selection when debounced query changes (render-time state adjustment)
+  const [prevDebounced, setPrevDebounced] = useState(debouncedValue);
+  if (prevDebounced !== debouncedValue) {
+    setPrevDebounced(debouncedValue);
     setSelectedIndex(0);
   }
 
