@@ -8,6 +8,7 @@ import { ConnectionProvider } from "@/contexts/connection-context";
 import { ReadStatusProvider } from "@/contexts/read-status-context";
 import { useFilePush } from "@/hooks/use-file-push";
 import { useSessionsStream } from "@/hooks/use-sessions-stream";
+import { useUrlPush } from "@/hooks/use-url-push";
 import { queryClient } from "@/lib/query-client";
 
 export const Route = createRootRoute({
@@ -34,7 +35,8 @@ function AppShell() {
   // Keep SSE connection active on ALL pages (not just the dashboard)
   // so session status stays up-to-date on detail pages too
   const { handleFilePush } = useFilePush();
-  useSessionsStream(handleFilePush);
+  const { handleUrlPush } = useUrlPush();
+  useSessionsStream({ onFilePush: handleFilePush, onUrlPush: handleUrlPush });
 
   return (
     <div className="font-sans bg-bg-primary text-text-primary min-h-dvh flex flex-col text-base leading-relaxed">

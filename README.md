@@ -155,6 +155,14 @@ push_file({ file_path: "/path/to/chart.png" })
 
 The file appears as a toast notification in the browser with a download button.
 
+To push a URL (useful for long URLs that break when wrapped in terminal output):
+
+```
+push_url({ url: "https://example.com/long-path?token=abc", label: "Approve access" })
+```
+
+The URL appears as a toast notification with an "Open" button that opens it in a new browser tab.
+
 ### Manual configuration
 
 If you need to customize the MCP endpoint (e.g. non-default port), add an `mcpServers` entry to `~/.claude.json`:

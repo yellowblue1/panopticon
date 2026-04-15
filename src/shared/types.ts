@@ -190,3 +190,12 @@ export interface FilePushSseEvent {
   readonly timestamp: number;
   readonly base64: string;
 }
+
+// MCP URL push types
+export interface UrlPushSseEvent {
+  readonly type: "url_push";
+  readonly url: string;
+  readonly label: string | null;
+  readonly sessionId: string | null;
+  readonly timestamp: number;
+}
