@@ -140,7 +140,7 @@ export function CommandPalette({
   const isMobile = useMediaQuery("(max-width: 639px)");
 
   // Reset state when opening (render-time state adjustment)
-  const [prevIsOpen, setPrevIsOpen] = useState(false);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   if (prevIsOpen !== isOpen) {
     setPrevIsOpen(isOpen);
     if (isOpen) {
@@ -182,7 +182,7 @@ export function CommandPalette({
         .sort((a, b) => b.score - a.score);
 
   // Reset selection when query changes (render-time state adjustment)
-  const [prevQuery, setPrevQuery] = useState("");
+  const [prevQuery, setPrevQuery] = useState(query);
   if (query !== prevQuery) {
     setPrevQuery(query);
     setSelectedIndex(0);

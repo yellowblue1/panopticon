@@ -89,7 +89,7 @@ export function TerminalViewer({
     border: DEFAULT_CHAR_WIDTH_PX,
   });
 
-  // Frozen content snapshot — updated via useLayoutEffect when at bottom.
+  // Frozen content snapshot — updated during render when at bottom.
   // When the user scrolls up, effectiveContent uses this frozen value so the
   // display doesn't shift while the user is reading scrollback.
   const [frozenContent, setFrozenContent] = useState<string | null>(null);
