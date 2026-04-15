@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/cn";
 import { linkifyHtml } from "@/lib/linkify-html";
+import { postprocessOsc8, preprocessOsc8 } from "@/lib/osc8-hyperlinks";
 import {
   type CharWidthInfo,
   filterHorizontalBorders,
@@ -165,11 +166,15 @@ export function TerminalViewer({
 
   let processedHtml: string | null = null;
   if (effectiveContent != null) {
-    let processed = effectiveContent;
+    // Pre-process OSC 8 hyperlinks before fancy-ansi (which strips them and their text)
+    const { processed: osc8Processed, urls: osc8Urls } = preprocessOsc8(effectiveContent);
+    let processed = osc8Processed;
     if (!fitWidth) {
-      processed = filterHorizontalBorders(effectiveContent, cols, charWidths);
+      processed = filterHorizontalBorders(processed, cols, charWidths);
     }
-    const html = converter.toHtml(processed);
+    let html = converter.toHtml(processed);
+    // Convert OSC 8 markers to <a> tags
+    html = postprocessOsc8(html, osc8Urls);
     // URLs are linkified everywhere; PR #N references only on the last
     // line (the status bar) to avoid false positives in scrollback history.
     const lastNl = html.lastIndexOf("\n");
