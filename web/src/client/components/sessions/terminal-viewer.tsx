@@ -83,13 +83,15 @@ export function TerminalViewer({
   const isAtBottomRef = useRef(true);
   const [fitWidth, setFitWidth] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
-  const charWidthsRef = useRef<CharWidthInfo>({
+  const [charWidths, setCharWidths] = useState<CharWidthInfo>({
     ascii: DEFAULT_CHAR_WIDTH_PX,
     border: DEFAULT_CHAR_WIDTH_PX,
   });
 
-  // Track the last rendered content so we can freeze display when scrolled up
-  const lastRenderedContentRef = useRef<string | null>(null);
+  // Frozen content snapshot — updated via useLayoutEffect when at bottom.
+  // When the user scrolls up, effectiveContent uses this frozen value so the
+  // display doesn't shift while the user is reading scrollback.
+  const [frozenContent, setFrozenContent] = useState<string | null>(null);
 
   // Track scroll position on the scroll container
   useEffect(() => {
@@ -118,7 +120,7 @@ export function TerminalViewer({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (!measured) {
-          charWidthsRef.current = measureCharWidths(container);
+          setCharWidths(measureCharWidths(container));
           measured = true;
         }
         setContainerWidth(entry.contentRect.width);
@@ -142,15 +144,20 @@ export function TerminalViewer({
     container.scrollTop = container.scrollHeight;
   }, [content, containerWidth]);
 
+  // Keep frozenContent in sync whenever we're at the bottom.
+  // useLayoutEffect fires synchronously before paint, preventing a race where
+  // the user scrolls up between a content change and the snapshot update.
+  useLayoutEffect(() => {
+    if (!showButton && content != null) {
+      setFrozenContent(content);
+    }
+  }, [showButton, content]);
+
   // Determine the effective content to render:
   // freeze display when user is scrolled up, resume on return to bottom
-  const effectiveContent = isAtBottomRef.current ? content : lastRenderedContentRef.current;
-  if (isAtBottomRef.current && content != null) {
-    lastRenderedContentRef.current = content;
-  }
+  const effectiveContent = !showButton ? content : frozenContent;
 
   // Compute derived values from effective content
-  const charWidths = charWidthsRef.current;
   const maxCharWidth = Math.max(charWidths.ascii, charWidths.border);
   const cols = calcCols(containerWidth, maxCharWidth);
   const contentWidth = effectiveContent != null ? maxContentWidth(effectiveContent) : 0;
@@ -180,7 +187,6 @@ export function TerminalViewer({
     if (container) {
       // Resume tracking by resetting isAtBottom
       isAtBottomRef.current = true;
-      lastRenderedContentRef.current = content;
       container.scrollTop = container.scrollHeight;
       setShowButton(false);
     }
