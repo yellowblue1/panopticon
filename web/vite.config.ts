@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const devPort = process.env.DEV_PORT ? Number.parseInt(process.env.DEV_PORT, 10) : 3847;
@@ -14,10 +15,9 @@ export default defineConfig({
       routesDirectory: resolve(__dirname, "src/client/routes"),
       generatedRouteTree: resolve(__dirname, "src/client/routeTree.gen.ts"),
     }),
-    react({
-      babel: {
-        plugins: ["babel-plugin-react-compiler"],
-      },
+    react(),
+    babel({
+      presets: [reactCompilerPreset()],
     }),
     tailwindcss(),
   ],
@@ -29,10 +29,7 @@ export default defineConfig({
     sourcemap: false,
   },
   resolve: {
-    alias: {
-      "@": resolve(__dirname, "./src/client"),
-      "@shared": resolve(__dirname, "../src/shared"),
-    },
+    tsconfigPaths: true,
   },
   server: {
     host,
