@@ -1,16 +1,10 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["src/shared/types.ts", "**/*.test.ts", "test-setup.ts"],
-      "project": ["src/**/*.ts", "bin/**/*.ts"],
       "ignoreDependencies": ["lint-staged"]
     },
     "web": {
-      "vite": true,
-      "entry": ["src/client/main.tsx", "**/*.test.ts"],
-      "project": ["**/*.ts", "**/*.tsx"],
-      "ignoreDependencies": ["tailwindcss"],
       "ignore": ["src/client/routeTree.gen.ts"]
     }
   }
