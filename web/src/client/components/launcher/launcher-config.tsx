@@ -1,5 +1,6 @@
+import type { LauncherConfigData } from "@shared/types";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useLauncherConfig, useUpdateLauncherConfig } from "@/hooks/use-launcher-config";
 import { cn } from "@/lib/cn";
@@ -17,19 +18,21 @@ function createEntry(value: string): ScanPathEntry {
 
 export function LauncherConfig() {
   const { data, isLoading } = useLauncherConfig();
-  const updateMutation = useUpdateLauncherConfig();
-  const [scanPaths, setScanPaths] = useState<ScanPathEntry[]>([]);
-  const [useGhq, setUseGhq] = useState(true);
-  const [isDirty, setIsDirty] = useState(false);
-  const initialized = useRef(false);
 
-  useEffect(() => {
-    if (data && "config" in data && !initialized.current) {
-      setScanPaths(data.config.scanPaths.map(createEntry));
-      setUseGhq(data.config.useGhq);
-      initialized.current = true;
-    }
-  }, [data]);
+  if (isLoading || !data || !("config" in data)) {
+    return <div className="text-sm text-text-muted py-4">Loading config...</div>;
+  }
+
+  return <LauncherConfigForm initialConfig={data.config} />;
+}
+
+function LauncherConfigForm({ initialConfig }: { initialConfig: LauncherConfigData }) {
+  const updateMutation = useUpdateLauncherConfig();
+  const [scanPaths, setScanPaths] = useState<ScanPathEntry[]>(() =>
+    initialConfig.scanPaths.map(createEntry),
+  );
+  const [useGhq, setUseGhq] = useState(initialConfig.useGhq);
+  const [isDirty, setIsDirty] = useState(false);
 
   const handlePathChange = (id: string, value: string) => {
     setScanPaths((prev) => prev.map((entry) => (entry.id === id ? { ...entry, value } : entry)));
@@ -67,10 +70,6 @@ export function LauncherConfig() {
       },
     );
   };
-
-  if (isLoading) {
-    return <div className="text-sm text-text-muted py-4">Loading config...</div>;
-  }
 
   return (
     <div className="mb-6 p-4 rounded-lg bg-bg-secondary border border-border-default">

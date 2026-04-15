@@ -48,12 +48,8 @@ function SessionDetailPage() {
     ...(hasPlan ? [{ id: "plan" as const, label: "Plan", icon: <FileText size={16} /> }] : []),
   ];
 
-  // Switch to terminal tab when plan becomes unavailable (e.g. after deletion)
-  useEffect(() => {
-    if (activeTab === "plan" && !hasPlan) {
-      setActiveTab("terminal");
-    }
-  }, [activeTab, hasPlan]);
+  // Derive effective tab: fall back to terminal when plan is unavailable
+  const effectiveTab: TabId = activeTab === "plan" && !hasPlan ? "terminal" : activeTab;
 
   // Toggle vertical-expand class on <html> to hide root header via CSS
   useEffect(() => {
@@ -107,7 +103,7 @@ function SessionDetailPage() {
           {hasPlan && (
             <SessionTabs
               tabs={tabs}
-              activeTab={activeTab}
+              activeTab={effectiveTab}
               onTabChange={(id) => setActiveTab(id as TabId)}
             />
           )}
@@ -115,7 +111,7 @@ function SessionDetailPage() {
       )}
 
       {/* Terminal content */}
-      {activeTab === "terminal" && (
+      {effectiveTab === "terminal" && (
         <div className="flex-1 flex flex-col">
           {paneLoading && (
             <div className="empty-state">
@@ -151,7 +147,7 @@ function SessionDetailPage() {
         </div>
       )}
 
-      {activeTab === "plan" && !isExpanded && hasPlan && planData?.plan && (
+      {effectiveTab === "plan" && !isExpanded && hasPlan && planData?.plan && (
         <PlanViewer
           content={planData.plan.content}
           slug={planData.plan.slug}

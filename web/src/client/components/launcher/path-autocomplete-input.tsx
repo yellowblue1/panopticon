@@ -1,6 +1,7 @@
 import { FolderOpen } from "lucide-react";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useBrowsePath } from "@/hooks/use-browse-path";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/cn";
 
 interface PathAutocompleteInputProps {
@@ -23,32 +24,25 @@ export function PathAutocompleteInput({
   placeholder,
 }: PathAutocompleteInputProps) {
   const listboxId = useId();
-  const [debouncedValue, setDebouncedValue] = useState(value);
+  const debouncedValue = useDebouncedValue(value, 300);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), 300);
-    return () => clearTimeout(timer);
-  }, [value]);
-
   const { data } = useBrowsePath(debouncedValue);
   const entries = data?.entries ?? [];
 
-  useEffect(() => {
+  // Reset selection when debounced query changes (render-time reset)
+  const prevDebouncedRef = useRef(debouncedValue);
+  if (prevDebouncedRef.current !== debouncedValue) {
+    prevDebouncedRef.current = debouncedValue;
     setSelectedIndex(0);
-  }, [debouncedValue]);
+  }
 
-  useEffect(() => {
-    if (entries.length > 0 && debouncedValue.length > 0) {
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
-  }, [entries.length, debouncedValue]);
+  // Derived visibility: user intent + data availability
+  const showDropdown = isOpen && entries.length > 0 && debouncedValue.length > 0;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -64,13 +58,12 @@ export function PathAutocompleteInput({
     const prefix = extractBrowsePrefix(value);
     const newValue = `${prefix}${entryName}/`;
     onChange(newValue);
-    setDebouncedValue(newValue);
     setIsOpen(false);
     inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (!isOpen || entries.length === 0) return;
+    if (!showDropdown) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -107,25 +100,21 @@ export function PathAutocompleteInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => {
-          if (entries.length > 0 && value.length > 0) setIsOpen(true);
-        }}
+        onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoComplete="off"
         role="combobox"
-        aria-expanded={isOpen}
+        aria-expanded={showDropdown}
         aria-controls={listboxId}
-        aria-activedescendant={
-          isOpen && entries.length > 0 ? `${listboxId}-option-${selectedIndex}` : undefined
-        }
+        aria-activedescendant={showDropdown ? `${listboxId}-option-${selectedIndex}` : undefined}
         className={cn(
           "w-full bg-bg-primary border border-border-default rounded px-2 py-1.5",
           "text-sm font-mono text-text-primary placeholder:text-text-muted",
           "focus:outline-none focus:border-accent-blue transition-colors",
         )}
       />
-      {isOpen && entries.length > 0 && (
+      {showDropdown && (
         <div
           ref={listRef}
           id={listboxId}
