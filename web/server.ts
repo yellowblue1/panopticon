@@ -17,8 +17,9 @@ import { generateSessionName, launchSession } from "../src/launcher/application/
 import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/application/manage-config";
 import { createLauncherDeps } from "../src/launcher/infrastructure/fs-operations";
 import { handleFilePush } from "../src/mcp/application/handle-file-push";
+import { handleUrlPush } from "../src/mcp/application/handle-url-push";
 import { registerMcpConfig } from "../src/mcp/application/register-config";
-import type { McpFilePushDeps } from "../src/mcp/domain/ports";
+import type { McpFilePushDeps, McpUrlPushDeps } from "../src/mcp/domain/ports";
 import {
   deletePlan,
   findSlugForCwd,
@@ -30,7 +31,12 @@ import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
-import type { FilePushSseEvent, PaneContentDiff, PaneContentFull } from "../src/shared/types";
+import type {
+  FilePushSseEvent,
+  PaneContentDiff,
+  PaneContentFull,
+  UrlPushSseEvent,
+} from "../src/shared/types";
 import { sendMessage } from "../src/terminal/application/send-message";
 import { createFileUploadDeps } from "../src/terminal/infrastructure/file-upload";
 import {
@@ -208,16 +214,20 @@ const MCP_ENABLED = process.env.PANOPTICON_MCP?.toLowerCase() !== "false";
 
 // ═══ MCP server ═══
 
-function broadcastFilePush(event: FilePushSseEvent): void {
-  const message = `data: ${JSON.stringify(event)}\n\n`;
+function broadcastSseEvent(event: FilePushSseEvent | UrlPushSseEvent): void {
+  const data = encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
   for (const client of clients) {
     try {
-      client.controller.enqueue(encoder.encode(message));
+      client.controller.enqueue(data);
     } catch {
       clients.delete(client);
     }
   }
 }
+
+const mcpUrlPushDeps: McpUrlPushDeps = {
+  broadcastUrlPush: broadcastSseEvent,
+};
 
 const mcpFilePushDeps: McpFilePushDeps = {
   readFile: (path) => {
@@ -234,7 +244,7 @@ const mcpFilePushDeps: McpFilePushDeps = {
       return -1;
     }
   },
-  broadcastFilePush,
+  broadcastFilePush: broadcastSseEvent,
 };
 
 const mcpServer = new McpServer({
@@ -270,6 +280,35 @@ mcpServer.tool(
         {
           type: "text" as const,
           text: `Pushed ${result.filename} (${result.mimeType}, ${result.size} bytes) to dashboard`,
+        },
+      ],
+    };
+  },
+);
+
+mcpServer.tool(
+  "push_url",
+  "Push a URL to the Panopticon browser dashboard so the user can open it with a single click",
+  {
+    url: z.string().describe("The URL to push (http or https)"),
+    label: z.string().optional().describe("Display label for the URL (defaults to the URL itself)"),
+    session_id: z.string().optional().describe("Panopticon session/pane ID to associate with"),
+  },
+  async ({ url, label, session_id }) => {
+    const result = handleUrlPush({ url, label, sessionId: session_id }, mcpUrlPushDeps);
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Pushed URL to dashboard: ${result.url}`,
         },
       ],
     };

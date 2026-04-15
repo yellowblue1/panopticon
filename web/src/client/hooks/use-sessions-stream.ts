@@ -1,4 +1,4 @@
-import type { FilePushSseEvent, SessionsApiResponse } from "@shared/types";
+import type { FilePushSseEvent, SessionsApiResponse, UrlPushSseEvent } from "@shared/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useConnection } from "@/contexts/connection-context";
@@ -23,7 +23,13 @@ interface PreviousSessionState {
   summaryHash: string;
 }
 
-export function useSessionsStream(onFilePush?: (event: FilePushSseEvent) => void): void {
+interface SessionsStreamCallbacks {
+  onFilePush?: (event: FilePushSseEvent) => void;
+  onUrlPush?: (event: UrlPushSseEvent) => void;
+}
+
+export function useSessionsStream(callbacks?: SessionsStreamCallbacks): void {
+  const { onFilePush, onUrlPush } = callbacks ?? {};
   const queryClient = useQueryClient();
   const { setStatus } = useConnection();
   const { batchMarkAsUnread } = useReadStatusContext();
@@ -143,6 +149,10 @@ export function useSessionsStream(onFilePush?: (event: FilePushSseEvent) => void
         if (parsed.type === "heartbeat") return;
         if (parsed.type === "file_push") {
           onFilePush?.(parsed as FilePushSseEvent);
+          return;
+        }
+        if (parsed.type === "url_push") {
+          onUrlPush?.(parsed as UrlPushSseEvent);
           return;
         }
         handleSessionsUpdate(parsed as SessionsApiResponse);
