@@ -326,7 +326,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       {/* File preview thumbnails */}
       {hasFiles && (
         <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
-          {files.map((file) => (
+          {files.map((file, index) => (
             <FilePreview
               key={`${file.name}-${file.size}-${file.lastModified}`}
               file={file}
