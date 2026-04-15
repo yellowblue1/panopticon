@@ -29,15 +29,17 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@rolldown/plugin-babel": "^0.2.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/router-plugin": "^1.159.11",
     "@types/bun": "latest",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
-    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "concurrently": "^9.1.2",
     "tailwindcss": "^4.1.18",
-    "vite": "^7.3.1"
+    "vite": "^8.0.8"
   }
 }
