@@ -89,7 +89,7 @@ export function TerminalViewer({
     border: DEFAULT_CHAR_WIDTH_PX,
   });
 
-  // Frozen content snapshot — updated via useLayoutEffect when at bottom.
+  // Frozen content snapshot — updated during render when at bottom.
   // When the user scrolls up, effectiveContent uses this frozen value so the
   // display doesn't shift while the user is reading scrollback.
   const [frozenContent, setFrozenContent] = useState<string | null>(null);
@@ -145,14 +145,11 @@ export function TerminalViewer({
     container.scrollTop = container.scrollHeight;
   }, [content, containerWidth]);
 
-  // Keep frozenContent in sync whenever we're at the bottom.
-  // useLayoutEffect fires synchronously before paint, preventing a race where
-  // the user scrolls up between a content change and the snapshot update.
-  useLayoutEffect(() => {
-    if (!showButton && content != null) {
-      setFrozenContent(content);
-    }
-  }, [showButton, content]);
+  // Keep frozenContent in sync whenever we're at the bottom (render-time state adjustment).
+  // Updates during render itself — no gap for races between content change and snapshot.
+  if (!showButton && content != null && frozenContent !== content) {
+    setFrozenContent(content);
+  }
 
   // Determine the effective content to render:
   // freeze display when user is scrolled up, resume on return to bottom
