@@ -19,10 +19,6 @@ function stripMarkdownLinks(text: string): string {
   return text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trimEnd();
 }
 
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
  * Parse the first markdown table under a given heading (h1 or h2),
  * extracting slash commands and their descriptions.
@@ -30,7 +26,7 @@ function escapeRegExp(s: string): string {
  */
 function parseCommandTable(markdown: string, heading: string): SlashCommand[] {
   const lines = markdown.split("\n");
-  const headingPattern = new RegExp(`^(#{1,2}) ${escapeRegExp(heading)}\\s*$`);
+  const headingPattern = new RegExp(`^(#{1,2}) ${RegExp.escape(heading)}\\s*$`);
   const commands: SlashCommand[] = [];
 
   let inSection = false;

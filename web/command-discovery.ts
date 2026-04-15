@@ -260,9 +260,7 @@ export function discoverAllSlashCommands(cwds: string[], homeDir?: string): Slas
     const projectDir = join(cwd, ".claude", "commands");
     for (const file of listMdFiles(projectDir)) {
       const name = basename(file, ".md");
-      if (!seen.has(name)) {
-        seen.set(name, toSlashCommand(name, "project"));
-      }
+      seen.getOrInsertComputed(name, (n) => toSlashCommand(n, "project"));
     }
   }
 
@@ -280,23 +278,17 @@ export function discoverAllSlashCommands(cwds: string[], homeDir?: string): Slas
 
   for (const file of listMdFiles(globalDir)) {
     const name = basename(file, ".md");
-    if (!seen.has(name)) {
-      seen.set(name, toSlashCommand(name, "global"));
-    }
+    seen.getOrInsertComputed(name, (n) => toSlashCommand(n, "global"));
   }
 
   for (const cmd of discoverSkillCommands(home)) {
     const name = cmd.command.slice(1);
-    if (!seen.has(name)) {
-      seen.set(name, cmd);
-    }
+    seen.getOrInsert(name, cmd);
   }
 
   for (const cmd of discoverPluginCommands(home)) {
     const name = cmd.command.slice(1);
-    if (!seen.has(name)) {
-      seen.set(name, cmd);
-    }
+    seen.getOrInsert(name, cmd);
   }
 
   return [...seen.values()].sort((a, b) => a.command.localeCompare(b.command));

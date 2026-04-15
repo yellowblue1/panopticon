@@ -1,5 +1,5 @@
 import type { SessionResponse } from "@shared/types";
-import { type GroupedSessions, groupSessions } from "./group-sessions";
+import { type GroupedSessions, groupSessions, type SessionGroup } from "./group-sessions";
 
 export interface LockedOrder {
   groups: Array<{

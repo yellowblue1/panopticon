@@ -112,6 +112,7 @@ export function SessionRow({
           <Link
             to="/sessions/$paneId"
             params={{ paneId: session.pane_id }}
+            search={{}}
             className="action-btn"
             title="View terminal"
           >

@@ -15,7 +15,7 @@ export function useSwitchClient() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error ?? "Failed to switch client");
+        throw new Error("error" in data ? data.error : "Failed to switch client");
       }
       return data;
     },

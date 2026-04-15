@@ -17,7 +17,7 @@ type TabId = "terminal" | "plan";
 
 export const Route = createFileRoute("/sessions/$paneId")({
   component: SessionDetailPage,
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { tab?: TabId } => ({
     tab: search.tab === "terminal" || search.tab === "plan" ? search.tab : undefined,
   }),
 });
