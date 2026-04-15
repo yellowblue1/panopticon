@@ -447,14 +447,29 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
 /** Renders a thumbnail preview for an attached file */
 function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
   const isImage = file.type.startsWith("image/");
-  const [src, setSrc] = useState<string | null>(null);
+  const prevFileRef = useRef<File | null>(null);
+  const srcRef = useRef<string | null>(null);
 
+  if (file !== prevFileRef.current) {
+    if (srcRef.current) {
+      URL.revokeObjectURL(srcRef.current);
+    }
+    srcRef.current = isImage ? URL.createObjectURL(file) : null;
+    prevFileRef.current = file;
+  }
+
+  const src = srcRef.current;
+
+  // Revoke object URL on unmount
   useEffect(() => {
-    if (!isImage) return;
-    const url = URL.createObjectURL(file);
-    setSrc(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file, isImage]);
+    return () => {
+      if (srcRef.current) {
+        URL.revokeObjectURL(srcRef.current);
+        srcRef.current = null;
+      }
+      prevFileRef.current = null;
+    };
+  }, []);
 
   return (
     <div className="file-preview">

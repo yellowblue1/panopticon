@@ -133,11 +133,17 @@ export function CommandPalette({
   const listRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery("(max-width: 639px)");
 
-  // Reset state and focus input when opening
+  // Reset state when opening (render-time reset)
+  const prevIsOpenRef = useRef(false);
+  if (isOpen && !prevIsOpenRef.current) {
+    setQuery("");
+    setSelectedIndex(0);
+  }
+  prevIsOpenRef.current = isOpen;
+
+  // Focus input when opening (legitimate DOM side effect)
   useEffect(() => {
     if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [isOpen]);
@@ -164,10 +170,12 @@ export function CommandPalette({
         (a, b) => b.score - a.score,
       );
 
-  // Reset selection when filter changes
-  useEffect(() => {
+  // Reset selection when query changes (render-time reset)
+  const prevQueryRef = useRef("");
+  if (query !== prevQueryRef.current) {
+    prevQueryRef.current = query;
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   const handleSelect = (cmd: SlashCommand) => {
     onExecute(cmd.command);
