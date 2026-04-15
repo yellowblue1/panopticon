@@ -66,7 +66,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     };
 
     vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
+    vv.addEventListener("scroll", update, { passive: true });
     return () => {
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
@@ -326,9 +326,9 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       {/* File preview thumbnails */}
       {hasFiles && (
         <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
-          {files.map((file, index) => (
+          {files.map((file) => (
             <FilePreview
-              key={`${file.name}-${file.size}-${index}`}
+              key={`${file.name}-${file.size}-${file.lastModified}`}
               file={file}
               onRemove={() => handleRemoveFile(index)}
             />
