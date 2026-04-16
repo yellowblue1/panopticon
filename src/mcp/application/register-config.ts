@@ -7,7 +7,7 @@ import type { McpConfigDeps } from "../domain/ports";
  *
  * @returns `true` if a new entry was written, `false` otherwise.
  */
-export function registerMcpConfig(port: number, deps: McpConfigDeps): boolean {
+export function registerMcpConfig(port: number, hostname: string, deps: McpConfigDeps): boolean {
   migrateOldConfig(deps);
 
   let config: Record<string, unknown> = {};
@@ -37,12 +37,17 @@ export function registerMcpConfig(port: number, deps: McpConfigDeps): boolean {
     mcpServers = {};
   }
 
-  // Don't overwrite if user has already configured it
-  if ("panopticon" in mcpServers) return false;
+  const expectedUrl = `http://${hostname}:${port}/mcp`;
+
+  if ("panopticon" in mcpServers) {
+    // Update URL if hostname or port changed
+    const existing = mcpServers.panopticon as Record<string, unknown> | undefined;
+    if (existing?.url === expectedUrl) return false;
+  }
 
   mcpServers.panopticon = {
     type: "http",
-    url: `http://localhost:${port}/mcp`,
+    url: expectedUrl,
   };
   config.mcpServers = mcpServers;
 

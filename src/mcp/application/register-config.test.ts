@@ -27,7 +27,7 @@ describe("registerMcpConfig", () => {
   it("creates ~/.claude.json when it does not exist", () => {
     const deps = createMockDeps();
 
-    const result = registerMcpConfig(3847, deps);
+    const result = registerMcpConfig(3847, "localhost", deps);
 
     expect(result).toBe(true);
     const written = readJson(deps.files, deps.claudeJsonPath);
@@ -42,7 +42,7 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude.json": JSON.stringify({ theme: "dark", numStartups: 5 }),
     });
 
-    const result = registerMcpConfig(3847, deps);
+    const result = registerMcpConfig(3847, "localhost", deps);
 
     expect(result).toBe(true);
     const written = readJson(deps.files, deps.claudeJsonPath);
@@ -60,7 +60,7 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude.json": JSON.stringify(existing),
     });
 
-    const result = registerMcpConfig(4000, deps);
+    const result = registerMcpConfig(4000, "localhost", deps);
 
     expect(result).toBe(true);
     const written = readJson(deps.files, deps.claudeJsonPath);
@@ -69,20 +69,33 @@ describe("registerMcpConfig", () => {
     expect(servers.panopticon.url).toBe("http://localhost:4000/mcp");
   });
 
-  it("skips registration when panopticon already exists", () => {
+  it("skips registration when panopticon URL already matches", () => {
     const existing = {
-      mcpServers: { panopticon: { type: "http", url: "http://localhost:9999/mcp" } },
+      mcpServers: { panopticon: { type: "http", url: "http://localhost:3847/mcp" } },
     };
     const deps = createMockDeps({
       "/home/test/.claude.json": JSON.stringify(existing),
     });
 
-    const result = registerMcpConfig(3847, deps);
+    const result = registerMcpConfig(3847, "localhost", deps);
 
     expect(result).toBe(false);
+  });
+
+  it("updates URL when hostname changes", () => {
+    const existing = {
+      mcpServers: { panopticon: { type: "http", url: "http://localhost:3847/mcp" } },
+    };
+    const deps = createMockDeps({
+      "/home/test/.claude.json": JSON.stringify(existing),
+    });
+
+    const result = registerMcpConfig(3847, "100.105.121.19", deps);
+
+    expect(result).toBe(true);
     const written = readJson(deps.files, deps.claudeJsonPath);
     const servers = written.mcpServers as Record<string, Record<string, unknown>>;
-    expect(servers.panopticon.url).toBe("http://localhost:9999/mcp");
+    expect(servers.panopticon.url).toBe("http://100.105.121.19:3847/mcp");
   });
 
   it("aborts without writing when ~/.claude.json contains invalid JSON", () => {
@@ -90,7 +103,7 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude.json": "not valid json{",
     });
 
-    const result = registerMcpConfig(3847, deps);
+    const result = registerMcpConfig(3847, "localhost", deps);
 
     expect(result).toBe(false);
     expect(deps.files.get(deps.claudeJsonPath)).toBe("not valid json{");
@@ -101,7 +114,7 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude.json": "[1, 2, 3]",
     });
 
-    const result = registerMcpConfig(3847, deps);
+    const result = registerMcpConfig(3847, "localhost", deps);
 
     expect(result).toBe(false);
     expect(deps.files.get(deps.claudeJsonPath)).toBe("[1, 2, 3]");
@@ -110,11 +123,21 @@ describe("registerMcpConfig", () => {
   it("reflects the given port in the URL", () => {
     const deps = createMockDeps();
 
-    registerMcpConfig(8080, deps);
+    registerMcpConfig(8080, "localhost", deps);
 
     const written = readJson(deps.files, deps.claudeJsonPath);
     const servers = written.mcpServers as Record<string, Record<string, unknown>>;
     expect(servers.panopticon.url).toBe("http://localhost:8080/mcp");
+  });
+
+  it("reflects the given hostname in the URL", () => {
+    const deps = createMockDeps();
+
+    registerMcpConfig(3847, "100.105.121.19", deps);
+
+    const written = readJson(deps.files, deps.claudeJsonPath);
+    const servers = written.mcpServers as Record<string, Record<string, unknown>>;
+    expect(servers.panopticon.url).toBe("http://100.105.121.19:3847/mcp");
   });
 
   it("migrates panopticon entry from old ~/.claude/.mcp.json", () => {
@@ -128,7 +151,7 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude/.mcp.json": JSON.stringify(oldConfig),
     });
 
-    registerMcpConfig(3847, deps);
+    registerMcpConfig(3847, "localhost", deps);
 
     const oldWritten = readJson(deps.files, deps.oldMcpJsonPath);
     const oldServers = oldWritten.mcpServers as Record<string, unknown>;
@@ -148,7 +171,7 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude/.mcp.json": JSON.stringify(oldConfig),
     });
 
-    registerMcpConfig(3847, deps);
+    registerMcpConfig(3847, "localhost", deps);
 
     expect(deps.files.has(deps.oldMcpJsonPath)).toBe(false);
   });
@@ -156,7 +179,7 @@ describe("registerMcpConfig", () => {
   it("does not fail when old file does not exist", () => {
     const deps = createMockDeps();
 
-    expect(() => registerMcpConfig(3847, deps)).not.toThrow();
-    expect(registerMcpConfig(3847, deps)).toBe(false); // second call — already registered
+    expect(() => registerMcpConfig(3847, "localhost", deps)).not.toThrow();
+    expect(registerMcpConfig(3847, "localhost", deps)).toBe(false); // second call — already registered
   });
 });
