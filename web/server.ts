@@ -634,11 +634,27 @@ async function main() {
 
   console.log(`Panopticon Web UI running at http://${server.hostname}:${server.port}`);
 
+  // Start localhost mirror when HOST is not already localhost
+  const isLocalhost = HOST === "127.0.0.1" || HOST === "localhost" || HOST === "::1";
+  if (!isLocalhost) {
+    try {
+      Bun.serve({
+        port: server.port,
+        hostname: "127.0.0.1",
+        fetch: appWithStatic.fetch,
+        idleTimeout: 255,
+      });
+      console.log(`Panopticon also listening on http://127.0.0.1:${server.port}`);
+    } catch (err: unknown) {
+      console.warn(`Could not start localhost mirror: ${(err as Error).message}`);
+    }
+  }
+
   // Auto-register MCP endpoint in ~/.claude.json
   if (MCP_ENABLED) {
     try {
       const claudeJsonPath = join(homedir(), ".claude.json");
-      const registered = registerMcpConfig(server.port ?? PORT, server.hostname, {
+      const registered = registerMcpConfig(server.port ?? PORT, {
         readFile: (p) => {
           try {
             return readFileSync(p, "utf-8");

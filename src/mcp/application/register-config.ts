@@ -2,12 +2,13 @@ import type { McpConfigDeps } from "../domain/ports";
 
 /**
  * Auto-register the Panopticon MCP endpoint in ~/.claude.json (user-scoped mcpServers).
- * Creates a new entry or updates the URL if hostname/port changed.
+ * Always uses localhost since the server guarantees a localhost listener is available
+ * (either as the primary bind address or via the dual-listen mirror).
  * Also migrates any stale entry from the old ~/.claude/.mcp.json location.
  *
  * @returns `true` if the config was written (new or updated), `false` if already up-to-date.
  */
-export function registerMcpConfig(port: number, hostname: string, deps: McpConfigDeps): boolean {
+export function registerMcpConfig(port: number, deps: McpConfigDeps): boolean {
   migrateOldConfig(deps);
 
   let config: Record<string, unknown> = {};
@@ -37,9 +38,7 @@ export function registerMcpConfig(port: number, hostname: string, deps: McpConfi
     mcpServers = {};
   }
 
-  // Wildcard bind addresses are not usable as connect targets
-  const connectHost = hostname === "0.0.0.0" || hostname === "::" ? "localhost" : hostname;
-  const expectedUrl = `http://${connectHost}:${port}/mcp`;
+  const expectedUrl = `http://localhost:${port}/mcp`;
 
   if ("panopticon" in mcpServers) {
     // Update URL if hostname or port changed
