@@ -635,7 +635,12 @@ async function main() {
   console.log(`Panopticon Web UI running at http://${server.hostname}:${server.port}`);
 
   // Start localhost mirror when HOST is not already localhost
-  const isLocalhost = HOST === "127.0.0.1" || HOST === "localhost" || HOST === "::1";
+  const isLocalhost =
+    HOST === "127.0.0.1" ||
+    HOST === "localhost" ||
+    HOST === "::1" ||
+    HOST === "0.0.0.0" ||
+    HOST === "::";
   if (!isLocalhost) {
     try {
       Bun.serve({

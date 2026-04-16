@@ -41,7 +41,7 @@ export function registerMcpConfig(port: number, deps: McpConfigDeps): boolean {
   const expectedUrl = `http://localhost:${port}/mcp`;
 
   if ("panopticon" in mcpServers) {
-    // Update URL if hostname or port changed
+    // Update URL if port changed
     const existing = mcpServers.panopticon as Record<string, unknown> | undefined;
     if (existing?.url === expectedUrl) return false;
   }
