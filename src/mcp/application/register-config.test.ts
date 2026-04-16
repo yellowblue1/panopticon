@@ -90,12 +90,12 @@ describe("registerMcpConfig", () => {
       "/home/test/.claude.json": JSON.stringify(existing),
     });
 
-    const result = registerMcpConfig(3847, "100.105.121.19", deps);
+    const result = registerMcpConfig(3847, "192.168.1.100", deps);
 
     expect(result).toBe(true);
     const written = readJson(deps.files, deps.claudeJsonPath);
     const servers = written.mcpServers as Record<string, Record<string, unknown>>;
-    expect(servers.panopticon.url).toBe("http://100.105.121.19:3847/mcp");
+    expect(servers.panopticon.url).toBe("http://192.168.1.100:3847/mcp");
   });
 
   it("aborts without writing when ~/.claude.json contains invalid JSON", () => {
@@ -133,11 +133,11 @@ describe("registerMcpConfig", () => {
   it("reflects the given hostname in the URL", () => {
     const deps = createMockDeps();
 
-    registerMcpConfig(3847, "100.105.121.19", deps);
+    registerMcpConfig(3847, "192.168.1.100", deps);
 
     const written = readJson(deps.files, deps.claudeJsonPath);
     const servers = written.mcpServers as Record<string, Record<string, unknown>>;
-    expect(servers.panopticon.url).toBe("http://100.105.121.19:3847/mcp");
+    expect(servers.panopticon.url).toBe("http://192.168.1.100:3847/mcp");
   });
 
   it("migrates panopticon entry from old ~/.claude/.mcp.json", () => {
