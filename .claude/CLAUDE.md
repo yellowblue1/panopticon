@@ -15,9 +15,10 @@ bin/cli.ts              # CLI entrypoint
 src/
   intelligence/         # Bounded context: AI summaries & action detection
   launcher/             # Bounded context: project discovery & session launching
+  mcp/                  # Bounded context: MCP server integration
   plan/                 # Bounded context: plan file discovery & viewing
   session/              # Bounded context: session lifecycle management
-  terminal/             # Bounded context: tmux & process discovery (domain + infrastructure only)
+  terminal/             # Bounded context: tmux & process discovery
   shared/               # Shared kernel: types, utilities
 web/
   server.ts             # Composition root (all DI wiring)
@@ -25,14 +26,14 @@ web/
   src/client/           # React 19 SPA
 ```
 
-Each bounded context follows `application/` / `domain/` / `infrastructure/` layout (except `terminal/`, which has no `application/` layer).
+Each bounded context follows `application/` / `domain/` / `infrastructure/` layout.
 
 ## DDD Architecture Rules (enforced by dependency-cruiser)
 
 - `domain/` must not import from `infrastructure/` or `application/`
 - Bounded contexts must not import from each other (exception: `session` may use `terminal/domain/types`)
 - `shared/` must not depend on any bounded context
-- `web/src/client/` must not import from bounded contexts (`src/(terminal|session|intelligence|plan|launcher)/`); importing `src/shared/` via `@shared/` is allowed
+- `web/src/client/` must not import from bounded contexts (`src/(terminal|session|intelligence|plan|launcher|mcp)/`); importing `src/shared/` via `@shared/` is allowed
 
 ## Quality Standards
 
