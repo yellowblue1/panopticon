@@ -163,6 +163,50 @@ describe("sendMessage", () => {
     expect(result.error).toBe("Failed to send to pane");
   });
 
+  it("returns error when sendLiteral fails on the separator space between parts", async () => {
+    const literalCalls: string[] = [];
+    const { deps, calls } = createMockDeps({
+      sendLiteral: mock((_paneId: string, text: string) => {
+        literalCalls.push(text);
+        calls.push({ kind: "sendLiteral", paneId: _paneId, payload: text });
+        return text !== " ";
+      }),
+    });
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+    const result = await sendMessage({ paneId: "%0", text: "hi", files }, deps);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Failed to send to pane");
+    expect(literalCalls).toEqual([" "]);
+    // pastePath happened, the space attempt happened, then we bailed — no
+    // text send, no Enter.
+    expect(calls.some((c) => c.kind === "pastePath")).toBe(true);
+    expect(calls.some((c) => c.kind === "sendLiteral" && c.payload === "hi")).toBe(false);
+    expect(calls.some((c) => c.kind === "sendEnter")).toBe(false);
+  });
+
+  it("returns error when sendLiteral fails on the separator space between files", async () => {
+    const { deps, calls } = createMockDeps({
+      sendLiteral: mock((_paneId: string, text: string) => {
+        calls.push({ kind: "sendLiteral", paneId: _paneId, payload: text });
+        return text !== " ";
+      }),
+    });
+    const files = [
+      { data: new ArrayBuffer(10), name: "a.png", type: "image/png" },
+      { data: new ArrayBuffer(10), name: "b.png", type: "image/png" },
+    ];
+    const result = await sendMessage({ paneId: "%0", text: "", files }, deps);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Failed to send to pane");
+    // Only the first image was pasted; the separator failed, so the second
+    // image was never attempted and Enter was not sent.
+    expect(calls.filter((c) => c.kind === "pastePath")).toHaveLength(1);
+    expect(calls.some((c) => c.kind === "sendLiteral" && c.payload === " ")).toBe(true);
+    expect(calls.some((c) => c.kind === "sendEnter")).toBe(false);
+  });
+
   it("returns error when sendLiteral fails for text", async () => {
     const { deps } = createMockDeps({ sendLiteral: mock(() => false) });
     const result = await sendMessage({ paneId: "%0", text: "hello", files: [] }, deps);

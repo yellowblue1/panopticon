@@ -24,6 +24,20 @@ export interface SendMessageResult {
   readonly uploadedFiles: readonly UploadedFile[];
 }
 
+/**
+ * Send text and optional files to a tmux pane as a single CLI message.
+ *
+ * Partial-failure contract: if any tmux primitive (`pastePath`, `sendLiteral`,
+ * `sendEnter`) fails mid-compose, the function returns `{ success: false }`
+ * immediately and does NOT attempt to roll back what was already written to
+ * the pane's input buffer. Any bracketed-paste placeholders (e.g. `[Image
+ * #N]`) and literal text written before the failure will remain in the
+ * pane's input line without a trailing Enter. Callers are expected to
+ * surface the error to the user (e.g. via a toast) so they can manually
+ * clear the input (C-u / C-c) and retry. Rollback is deliberately omitted
+ * because tmux exposes no atomic way to undo a paste-buffer insertion and a
+ * best-effort C-u could clobber pre-existing input the user had typed.
+ */
 export async function sendMessage(
   input: SendMessageInput,
   deps: SendMessageDeps,

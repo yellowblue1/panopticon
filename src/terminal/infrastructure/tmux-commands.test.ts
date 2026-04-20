@@ -459,33 +459,47 @@ describe("sendEnter", () => {
 });
 
 describe("pastePath", () => {
-  it("loads content via stdin then runs paste-buffer -p", () => {
-    const commands: string[] = [];
-    const stdinCalls: Array<{ argv: readonly string[]; input: string }> = [];
+  it("loads content via stdin then runs paste-buffer -p (in that order)", () => {
+    type Event =
+      | { kind: "stdin"; argv: readonly string[]; input: string }
+      | { kind: "exec"; cmd: string };
+    const events: Event[] = [];
     const exec = (cmd: string) => {
-      commands.push(cmd);
+      events.push({ kind: "exec", cmd });
       return "";
     };
     const execWithStdin = (argv: readonly string[], input: string) => {
-      stdinCalls.push({ argv, input });
+      events.push({ kind: "stdin", argv, input });
     };
 
     const result = pastePath("%0", "/abs/path.png", exec, execWithStdin);
     expect(result).toBe(true);
-    expect(stdinCalls).toHaveLength(1);
-    expect(stdinCalls[0].argv).toEqual(["tmux", "load-buffer", "-"]);
-    expect(stdinCalls[0].input).toBe("/abs/path.png");
-    expect(commands).toHaveLength(1);
-    expect(commands[0]).toContain("tmux paste-buffer -p");
-    expect(commands[0]).toContain("'%0'");
+    expect(events).toHaveLength(2);
+    // load-buffer MUST run before paste-buffer, otherwise tmux pastes stale
+    // buffer contents.
+    expect(events[0].kind).toBe("stdin");
+    if (events[0].kind === "stdin") {
+      expect(events[0].argv).toEqual(["tmux", "load-buffer", "-"]);
+      expect(events[0].input).toBe("/abs/path.png");
+    }
+    expect(events[1].kind).toBe("exec");
+    if (events[1].kind === "exec") {
+      expect(events[1].cmd).toContain("tmux paste-buffer -p");
+      expect(events[1].cmd).toContain("'%0'");
+    }
   });
 
-  it("returns false when load-buffer fails", () => {
-    const exec = () => "";
+  it("does not call paste-buffer when load-buffer fails", () => {
+    const execCalls: string[] = [];
+    const exec = (cmd: string) => {
+      execCalls.push(cmd);
+      return "";
+    };
     const execWithStdin = () => {
       throw new Error("load-buffer failed");
     };
     expect(pastePath("%0", "/abs/path.png", exec, execWithStdin)).toBe(false);
+    expect(execCalls).toHaveLength(0);
   });
 
   it("returns false when paste-buffer fails", () => {
