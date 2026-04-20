@@ -1,11 +1,24 @@
 import { isImageMimeType, MAX_FILES_PER_REQUEST } from "../../shared/constants";
 import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload";
 
+/**
+ * Delay after `tmux paste-buffer -p` before sending subsequent literal keys.
+ *
+ * Without this delay, characters sent immediately after a bracketed paste are
+ * absorbed by Claude Code as part of the paste payload (the terminating
+ * `ESC[201~` has not yet been processed by the client), which causes trailing
+ * text to vanish from the message. 50 ms is empirically sufficient on a
+ * local loopback; 0 ms reliably loses the text. We keep it small so perceived
+ * UX stays snappy.
+ */
+const POST_PASTE_FLUSH_MS = 50;
+
 export interface SendMessageDeps {
   pastePath: (paneId: string, content: string) => boolean;
   sendLiteral: (paneId: string, text: string) => boolean;
   sendEnter: (paneId: string) => boolean;
   saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => SaveFileResult;
+  sleep: (ms: number) => Promise<void>;
 }
 
 interface SendMessageInput {
@@ -85,10 +98,15 @@ export async function sendMessage(
   let hasPart = false;
   for (const file of savedFiles) {
     if (hasPart && !deps.sendLiteral(paneId, " ")) return fail();
-    const ok = isImageMimeType(file.mimeType)
+    const isImage = isImageMimeType(file.mimeType);
+    const ok = isImage
       ? deps.pastePath(paneId, file.savedPath)
       : deps.sendLiteral(paneId, file.savedPath);
     if (!ok) return fail();
+    // Bracketed paste needs a beat to finish flushing through the terminal
+    // emulator before we append more keys, otherwise Claude Code absorbs the
+    // next literal as part of the paste payload and drops it.
+    if (isImage) await deps.sleep(POST_PASTE_FLUSH_MS);
     hasPart = true;
   }
 

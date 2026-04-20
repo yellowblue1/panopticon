@@ -3,9 +3,10 @@ import type { SaveFileResult } from "../infrastructure/file-upload";
 import { type SendMessageDeps, sendMessage } from "./send-message";
 
 interface CallLogEntry {
-  kind: "pastePath" | "sendLiteral" | "sendEnter";
-  paneId: string;
+  kind: "pastePath" | "sendLiteral" | "sendEnter" | "sleep";
+  paneId?: string;
   payload?: string;
+  ms?: number;
 }
 
 function createMockDeps(overrides: Partial<SendMessageDeps> = {}): {
@@ -37,6 +38,10 @@ function createMockDeps(overrides: Partial<SendMessageDeps> = {}): {
         },
       }),
     ),
+    sleep: mock((ms: number) => {
+      calls.push({ kind: "sleep", ms });
+      return Promise.resolve();
+    }),
     ...overrides,
   };
   return { deps, calls };
@@ -74,11 +79,12 @@ describe("sendMessage", () => {
         paneId: "%0",
         payload: "/tmp/panopticon-uploads/123-abc-screenshot.png",
       },
+      { kind: "sleep", ms: 50 },
       { kind: "sendEnter", paneId: "%0" },
     ]);
   });
 
-  it("inserts PDF as literal path (no bracketed paste)", async () => {
+  it("inserts PDF as literal path (no bracketed paste, no flush delay)", async () => {
     const { deps, calls } = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "doc.pdf", type: "application/pdf" }];
     const result = await sendMessage({ paneId: "%0", text: "", files }, deps);
@@ -92,8 +98,10 @@ describe("sendMessage", () => {
       },
       { kind: "sendEnter", paneId: "%0" },
     ]);
-    // PDF must NOT go through bracketed paste
+    // PDF must NOT go through bracketed paste and must NOT incur the
+    // post-paste flush delay.
     expect(calls.some((c) => c.kind === "pastePath")).toBe(false);
+    expect(calls.some((c) => c.kind === "sleep")).toBe(false);
   });
 
   it("composes images, PDF, and text into a single message with one Enter", async () => {
@@ -108,8 +116,10 @@ describe("sendMessage", () => {
     expect(result.success).toBe(true);
     expect(calls).toEqual([
       { kind: "pastePath", paneId: "%0", payload: "/tmp/panopticon-uploads/123-abc-a.png" },
+      { kind: "sleep", ms: 50 },
       { kind: "sendLiteral", paneId: "%0", payload: " " },
       { kind: "pastePath", paneId: "%0", payload: "/tmp/panopticon-uploads/123-abc-b.jpg" },
+      { kind: "sleep", ms: 50 },
       { kind: "sendLiteral", paneId: "%0", payload: " " },
       { kind: "sendLiteral", paneId: "%0", payload: "/tmp/panopticon-uploads/123-abc-c.pdf" },
       { kind: "sendLiteral", paneId: "%0", payload: " " },

@@ -442,6 +442,7 @@ const app = createApp(
           sendLiteral: (pid, txt) => sendLiteral(pid, txt),
           sendEnter: (pid) => sendEnter(pid),
           saveFile: fileUploadDeps.saveFile,
+          sleep: (ms) => Bun.sleep(ms),
         },
       ),
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
