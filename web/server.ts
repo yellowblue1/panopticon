@@ -57,8 +57,11 @@ import {
   getProcessTable,
   getProjectName,
   isTmuxAvailable,
+  pastePath,
+  sendEnter,
   sendInterrupt,
   sendKeys,
+  sendLiteral,
   sendRawKey,
   startPipePane,
   stopPipePane,
@@ -435,7 +438,9 @@ const app = createApp(
       sendMessage(
         { paneId, text, files },
         {
-          sendKeys: (pid, txt) => sendKeys(pid, txt),
+          pastePath: (pid, content) => pastePath(pid, content),
+          sendLiteral: (pid, txt) => sendLiteral(pid, txt),
+          sendEnter: (pid) => sendEnter(pid),
           saveFile: fileUploadDeps.saveFile,
           sleep: (ms) => Bun.sleep(ms),
         },

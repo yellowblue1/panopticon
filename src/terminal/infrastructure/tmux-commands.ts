@@ -25,6 +25,28 @@ const defaultExec: ExecFn = (command: string) => {
 };
 
 /**
+ * Exec variant that feeds `input` to the command via stdin.
+ * Used for `tmux load-buffer -` to safely pass arbitrary bytes without
+ * quoting the payload into the shell.
+ */
+type ExecWithStdinFn = (argv: readonly string[], input: string) => void;
+
+const stdinEncoder = new TextEncoder();
+
+const defaultExecWithStdin: ExecWithStdinFn = (argv, input) => {
+  const result = Bun.spawnSync([...argv], {
+    stdin: stdinEncoder.encode(input),
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 5000,
+  });
+  if (!result.success) {
+    const stderr = result.stderr.toString().trim();
+    throw new Error(stderr || `Command failed with exit code ${result.exitCode}`);
+  }
+};
+
+/**
  * Check if tmux is available and running
  */
 export function isTmuxAvailable(exec: ExecFn = defaultExec): boolean {
@@ -214,6 +236,56 @@ export function sendKeys(paneId: string, text: string, exec: ExecFn = defaultExe
     const target = shellEscape(paneId);
     exec(`tmux send-keys -t ${target} -l ${shellEscape(text)}`);
     exec(`tmux send-keys -t ${target} Enter`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Send text to a tmux pane literally, without a trailing Enter.
+ * Used when composing a single multi-part message (e.g. image attachments +
+ * text + final Enter handled by the caller).
+ */
+export function sendLiteral(paneId: string, text: string, exec: ExecFn = defaultExec): boolean {
+  try {
+    exec(`tmux send-keys -t ${shellEscape(paneId)} -l ${shellEscape(text)}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Send a single Enter key to a tmux pane.
+ * Used to submit a message composed via sendLiteral / pastePath.
+ */
+export function sendEnter(paneId: string, exec: ExecFn = defaultExec): boolean {
+  try {
+    exec(`tmux send-keys -t ${shellEscape(paneId)} Enter`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Paste `content` into a tmux pane as a bracketed paste.
+ * Loads the content into tmux's paste buffer (via stdin, avoiding shell
+ * quoting) and then runs `paste-buffer -p` which emits the
+ * `ESC[200~ ... ESC[201~` markers. Claude Code (and any readline-style
+ * consumer) treats this as a paste, which is what lets image file paths
+ * become `[Image #N]` attachments instead of plain text.
+ */
+export function pastePath(
+  paneId: string,
+  content: string,
+  exec: ExecFn = defaultExec,
+  execWithStdin: ExecWithStdinFn = defaultExecWithStdin,
+): boolean {
+  try {
+    execWithStdin(["tmux", "load-buffer", "-"], content);
+    exec(`tmux paste-buffer -p -t ${shellEscape(paneId)}`);
     return true;
   } catch {
     return false;

@@ -1,13 +1,22 @@
-import { MAX_FILES_PER_REQUEST } from "../../shared/constants";
+import { isImageMimeType, MAX_FILES_PER_REQUEST } from "../../shared/constants";
 import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload";
 
-// CLIs like Claude Code only detect image paths when they arrive as standalone
-// inputs (with Enter). When files and text are sent together, this delay gives
-// the CLI time to process file inputs before the text arrives.
-const FILE_INPUT_DELAY_MS = 2000;
+/**
+ * Delay after `tmux paste-buffer -p` before sending subsequent literal keys.
+ *
+ * Without this delay, characters sent immediately after a bracketed paste are
+ * absorbed by Claude Code as part of the paste payload (the terminating
+ * `ESC[201~` has not yet been processed by the client), which causes trailing
+ * text to vanish from the message. 50 ms is empirically sufficient on a
+ * local loopback; 0 ms reliably loses the text. We keep it small so perceived
+ * UX stays snappy.
+ */
+const POST_PASTE_FLUSH_MS = 50;
 
 export interface SendMessageDeps {
-  sendKeys: (paneId: string, text: string) => boolean;
+  pastePath: (paneId: string, content: string) => boolean;
+  sendLiteral: (paneId: string, text: string) => boolean;
+  sendEnter: (paneId: string) => boolean;
   saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => SaveFileResult;
   sleep: (ms: number) => Promise<void>;
 }
@@ -28,6 +37,20 @@ export interface SendMessageResult {
   readonly uploadedFiles: readonly UploadedFile[];
 }
 
+/**
+ * Send text and optional files to a tmux pane as a single CLI message.
+ *
+ * Partial-failure contract: if any tmux primitive (`pastePath`, `sendLiteral`,
+ * `sendEnter`) fails mid-compose, the function returns `{ success: false }`
+ * immediately and does NOT attempt to roll back what was already written to
+ * the pane's input buffer. Any bracketed-paste placeholders (e.g. `[Image
+ * #N]`) and literal text written before the failure will remain in the
+ * pane's input line without a trailing Enter. Callers are expected to
+ * surface the error to the user (e.g. via a toast) so they can manually
+ * clear the input (C-u / C-c) and retry. Rollback is deliberately omitted
+ * because tmux exposes no atomic way to undo a paste-buffer insertion and a
+ * best-effort C-u could clobber pre-existing input the user had typed.
+ */
 export async function sendMessage(
   input: SendMessageInput,
   deps: SendMessageDeps,
@@ -60,19 +83,39 @@ export async function sendMessage(
     savedFiles.push(result.file);
   }
 
-  const inputs = [...savedFiles.map((f) => f.savedPath), ...(trimmedText ? [trimmedText] : [])];
-  for (const [i, payload] of inputs.entries()) {
-    if (i > 0) {
-      await deps.sleep(FILE_INPUT_DELAY_MS);
-    }
-    if (!deps.sendKeys(paneId, payload)) {
-      return {
-        success: false,
-        error: "Failed to send to pane",
-        uploadedFiles: savedFiles,
-      };
-    }
+  // Images use bracketed paste so Claude Code's input handler converts them
+  // into [Image #N] attachments; PDFs (and any non-image) stay as literal
+  // paths because bracketed paste does not trigger that conversion for them,
+  // and Claude Code opens them via its Read tool on submit anyway. The whole
+  // payload is composed into one line and finished with a single Enter so
+  // the CLI treats it as one message.
+  const fail = (): SendMessageResult => ({
+    success: false,
+    error: "Failed to send to pane",
+    uploadedFiles: savedFiles,
+  });
+
+  let hasPart = false;
+  for (const file of savedFiles) {
+    if (hasPart && !deps.sendLiteral(paneId, " ")) return fail();
+    const isImage = isImageMimeType(file.mimeType);
+    const ok = isImage
+      ? deps.pastePath(paneId, file.savedPath)
+      : deps.sendLiteral(paneId, file.savedPath);
+    if (!ok) return fail();
+    // Bracketed paste needs a beat to finish flushing through the terminal
+    // emulator before we append more keys, otherwise Claude Code absorbs the
+    // next literal as part of the paste payload and drops it.
+    if (isImage) await deps.sleep(POST_PASTE_FLUSH_MS);
+    hasPart = true;
   }
+
+  if (trimmedText) {
+    if (hasPart && !deps.sendLiteral(paneId, " ")) return fail();
+    if (!deps.sendLiteral(paneId, trimmedText)) return fail();
+  }
+
+  if (!deps.sendEnter(paneId)) return fail();
 
   return { success: true, uploadedFiles: savedFiles };
 }
