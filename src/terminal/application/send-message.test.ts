@@ -233,6 +233,55 @@ describe("sendMessage", () => {
     expect(result.error).toBe("Failed to send to pane");
   });
 
+  it("awaits the post-paste sleep before sending the next key (regression guard)", async () => {
+    // If a future refactor drops `await` on deps.sleep, the sleep call is
+    // still scheduled but subsequent send-keys fire synchronously, which is
+    // exactly the bug this commit fixed. We detect that by resolving the
+    // sleep via a deferred promise: no further calls should appear in the
+    // log until we manually resolve it.
+    let resolveSleep: (() => void) | undefined;
+    const sleepPromise = new Promise<void>((resolve) => {
+      resolveSleep = resolve;
+    });
+    const events: string[] = [];
+    const { deps } = createMockDeps({
+      pastePath: mock(() => {
+        events.push("pastePath");
+        return true;
+      }),
+      sendLiteral: mock((_paneId: string, text: string) => {
+        events.push(`sendLiteral(${text})`);
+        return true;
+      }),
+      sendEnter: mock(() => {
+        events.push("sendEnter");
+        return true;
+      }),
+      sleep: mock(() => {
+        events.push("sleep:start");
+        return sleepPromise;
+      }),
+    });
+
+    const files = [{ data: new ArrayBuffer(10), name: "img.png", type: "image/png" }];
+    const pending = sendMessage({ paneId: "%0", text: "after", files }, deps);
+
+    // Let microtasks settle so pastePath + sleep:start are recorded.
+    await Promise.resolve();
+    expect(events).toEqual(["pastePath", "sleep:start"]);
+
+    // Release the sleep; the remaining keys must only appear after this.
+    resolveSleep?.();
+    await pending;
+    expect(events).toEqual([
+      "pastePath",
+      "sleep:start",
+      "sendLiteral( )",
+      "sendLiteral(after)",
+      "sendEnter",
+    ]);
+  });
+
   it("returns uploaded file metadata on success", async () => {
     const { deps } = createMockDeps();
     const files = [{ data: new ArrayBuffer(10), name: "test.png", type: "image/png" }];
