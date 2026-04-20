@@ -12,7 +12,10 @@ import {
   getProjectName,
   isAlternateScreen,
   isTmuxAvailable,
+  pastePath,
+  sendEnter,
   sendInterrupt,
+  sendLiteral,
   startPipePane,
   stopPipePane,
   switchClient,
@@ -402,6 +405,95 @@ describe("switchClient", () => {
     };
 
     expect(switchClient("%99", exec)).toBe(false);
+  });
+});
+
+describe("sendLiteral", () => {
+  it("sends literal text without Enter", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    const result = sendLiteral("%0", " hello ", exec);
+    expect(result).toBe(true);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain("send-keys");
+    expect(commands[0]).toContain("-l");
+    expect(commands[0]).toContain("'%0'");
+    expect(commands[0]).toContain("' hello '");
+    expect(commands[0]).not.toContain("Enter");
+  });
+
+  it("returns false on failure", () => {
+    const exec = () => {
+      throw new Error("pane not found");
+    };
+    expect(sendLiteral("%99", "x", exec)).toBe(false);
+  });
+});
+
+describe("sendEnter", () => {
+  it("sends a single Enter key without -l", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    const result = sendEnter("%0", exec);
+    expect(result).toBe(true);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain("send-keys");
+    expect(commands[0]).toContain("Enter");
+    expect(commands[0]).not.toContain("-l");
+  });
+
+  it("returns false on failure", () => {
+    const exec = () => {
+      throw new Error("pane not found");
+    };
+    expect(sendEnter("%99", exec)).toBe(false);
+  });
+});
+
+describe("pastePath", () => {
+  it("loads content via stdin then runs paste-buffer -p", () => {
+    const commands: string[] = [];
+    const stdinCalls: Array<{ argv: readonly string[]; input: string }> = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+    const execWithStdin = (argv: readonly string[], input: string) => {
+      stdinCalls.push({ argv, input });
+    };
+
+    const result = pastePath("%0", "/abs/path.png", exec, execWithStdin);
+    expect(result).toBe(true);
+    expect(stdinCalls).toHaveLength(1);
+    expect(stdinCalls[0].argv).toEqual(["tmux", "load-buffer", "-"]);
+    expect(stdinCalls[0].input).toBe("/abs/path.png");
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain("tmux paste-buffer -p");
+    expect(commands[0]).toContain("'%0'");
+  });
+
+  it("returns false when load-buffer fails", () => {
+    const exec = () => "";
+    const execWithStdin = () => {
+      throw new Error("load-buffer failed");
+    };
+    expect(pastePath("%0", "/abs/path.png", exec, execWithStdin)).toBe(false);
+  });
+
+  it("returns false when paste-buffer fails", () => {
+    const exec = () => {
+      throw new Error("paste-buffer failed");
+    };
+    const execWithStdin = () => {};
+    expect(pastePath("%0", "/abs/path.png", exec, execWithStdin)).toBe(false);
   });
 });
 

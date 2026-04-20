@@ -1,15 +1,11 @@
-import { MAX_FILES_PER_REQUEST } from "../../shared/constants";
+import { isImageMimeType, MAX_FILES_PER_REQUEST } from "../../shared/constants";
 import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload";
 
-// CLIs like Claude Code only detect image paths when they arrive as standalone
-// inputs (with Enter). When files and text are sent together, this delay gives
-// the CLI time to process file inputs before the text arrives.
-const FILE_INPUT_DELAY_MS = 2000;
-
 export interface SendMessageDeps {
-  sendKeys: (paneId: string, text: string) => boolean;
+  pastePath: (paneId: string, content: string) => boolean;
+  sendLiteral: (paneId: string, text: string) => boolean;
+  sendEnter: (paneId: string) => boolean;
   saveFile: (data: ArrayBuffer, originalName: string, mimeType: string) => SaveFileResult;
-  sleep: (ms: number) => Promise<void>;
 }
 
 interface SendMessageInput {
@@ -60,19 +56,34 @@ export async function sendMessage(
     savedFiles.push(result.file);
   }
 
-  const inputs = [...savedFiles.map((f) => f.savedPath), ...(trimmedText ? [trimmedText] : [])];
-  for (const [i, payload] of inputs.entries()) {
-    if (i > 0) {
-      await deps.sleep(FILE_INPUT_DELAY_MS);
-    }
-    if (!deps.sendKeys(paneId, payload)) {
-      return {
-        success: false,
-        error: "Failed to send to pane",
-        uploadedFiles: savedFiles,
-      };
-    }
+  // Images use bracketed paste so Claude Code's input handler converts them
+  // into [Image #N] attachments; PDFs (and any non-image) stay as literal
+  // paths because bracketed paste does not trigger that conversion for them,
+  // and Claude Code opens them via its Read tool on submit anyway. The whole
+  // payload is composed into one line and finished with a single Enter so
+  // the CLI treats it as one message.
+  const fail = (): SendMessageResult => ({
+    success: false,
+    error: "Failed to send to pane",
+    uploadedFiles: savedFiles,
+  });
+
+  let hasPart = false;
+  for (const file of savedFiles) {
+    if (hasPart && !deps.sendLiteral(paneId, " ")) return fail();
+    const ok = isImageMimeType(file.mimeType)
+      ? deps.pastePath(paneId, file.savedPath)
+      : deps.sendLiteral(paneId, file.savedPath);
+    if (!ok) return fail();
+    hasPart = true;
   }
+
+  if (trimmedText) {
+    if (hasPart && !deps.sendLiteral(paneId, " ")) return fail();
+    if (!deps.sendLiteral(paneId, trimmedText)) return fail();
+  }
+
+  if (!deps.sendEnter(paneId)) return fail();
 
   return { success: true, uploadedFiles: savedFiles };
 }
