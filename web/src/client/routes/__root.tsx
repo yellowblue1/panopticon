@@ -5,7 +5,7 @@ import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { Toaster } from "@/components/ui/sonner";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { ConnectionProvider } from "@/contexts/connection-context";
-import { PushHistoryProvider, usePushHistory } from "@/contexts/push-history-context";
+import { PushHistoryProvider, usePushHistoryDispatch } from "@/contexts/push-history-context";
 import { ReadStatusProvider } from "@/contexts/read-status-context";
 import { useFilePush } from "@/hooks/use-file-push";
 import { useSessionsStream } from "@/hooks/use-sessions-stream";
@@ -40,7 +40,7 @@ function AppShell() {
   // so session status stays up-to-date on detail pages too
   const { handleFilePush } = useFilePush();
   const { handleUrlPush } = useUrlPush();
-  const { addFilePush, addUrlPush } = usePushHistory();
+  const { addFilePush, addUrlPush } = usePushHistoryDispatch();
   useSessionsStream({
     onFilePush: (event) => {
       const blob = base64ToBlob(event.base64, event.mimeType);
