@@ -10,7 +10,7 @@ function makeUrlEntry(id: string, timestamp: number): PushHistoryEntry {
     kind: "url",
     id,
     timestamp,
-    sessionId: null,
+    sessionId: "%0",
     url: `https://example.com/${id}`,
     label: null,
   };

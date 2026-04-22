@@ -1,5 +1,5 @@
 import { ExternalLink, FileDown, Inbox } from "lucide-react";
-import { type PushHistoryEntry, usePushHistoryEntries } from "@/contexts/push-history-context";
+import { usePushHistoryEntries } from "@/contexts/push-history-context";
 import { cn } from "@/lib/cn";
 import { formatFileSize } from "@/lib/format-file-size";
 import { formatRelativeTime } from "@/lib/format-relative-time";
@@ -19,13 +19,9 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-function isVisibleForPane(entry: PushHistoryEntry, paneId: string): boolean {
-  return entry.sessionId === null || entry.sessionId === paneId;
-}
-
 export function PushHistoryViewer({ paneId }: PushHistoryViewerProps) {
   const entries = usePushHistoryEntries();
-  const visible = entries.filter((e) => isVisibleForPane(e, paneId));
+  const visible = entries.filter((e) => e.sessionId === paneId);
 
   if (visible.length === 0) {
     return (
