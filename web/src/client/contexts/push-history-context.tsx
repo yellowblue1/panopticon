@@ -8,7 +8,7 @@ export type PushHistoryEntry =
       kind: "file";
       id: string;
       timestamp: number;
-      sessionId: string | null;
+      sessionId: string;
       filename: string;
       mimeType: string;
       size: number;
@@ -18,7 +18,7 @@ export type PushHistoryEntry =
       kind: "url";
       id: string;
       timestamp: number;
-      sessionId: string | null;
+      sessionId: string;
       url: string;
       label: string | null;
     };
@@ -46,7 +46,7 @@ export function PushHistoryProvider({ children }: { children: ReactNode }) {
   const [dispatch] = useState<PushHistoryDispatch>(() => ({
     addFilePush: (event, blob) => {
       setEntries((current) => {
-        const id = `${event.timestamp}-${event.sessionId ?? ""}-${event.filename}`;
+        const id = `${event.timestamp}-${event.sessionId}-${event.filename}`;
         if (current.some((e) => e.id === id)) return current;
         return prependCapped(current, {
           kind: "file",
@@ -62,7 +62,7 @@ export function PushHistoryProvider({ children }: { children: ReactNode }) {
     },
     addUrlPush: (event) => {
       setEntries((current) => {
-        const id = `${event.timestamp}-${event.sessionId ?? ""}-${event.url}`;
+        const id = `${event.timestamp}-${event.sessionId}-${event.url}`;
         if (current.some((e) => e.id === id)) return current;
         return prependCapped(current, {
           kind: "url",
