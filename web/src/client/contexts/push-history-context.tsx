@@ -23,68 +23,78 @@ export type PushHistoryEntry =
       label: string | null;
     };
 
-interface PushHistoryContextValue {
-  entries: PushHistoryEntry[];
+interface PushHistoryDispatch {
   addFilePush: (event: FilePushSseEvent, blob: Blob) => void;
   addUrlPush: (event: UrlPushSseEvent) => void;
 }
 
-const PushHistoryContext = createContext<PushHistoryContextValue | null>(null);
+const EntriesContext = createContext<PushHistoryEntry[] | null>(null);
+const DispatchContext = createContext<PushHistoryDispatch | null>(null);
 
 export function prependCapped(
   entries: PushHistoryEntry[],
   entry: PushHistoryEntry,
 ): PushHistoryEntry[] {
-  const next = [entry, ...entries];
-  return next.length > MAX_PUSH_HISTORY_ENTRIES ? next.slice(0, MAX_PUSH_HISTORY_ENTRIES) : next;
+  return [entry, ...entries].slice(0, MAX_PUSH_HISTORY_ENTRIES);
 }
 
 export function PushHistoryProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<PushHistoryEntry[]>([]);
 
-  const addFilePush = (event: FilePushSseEvent, blob: Blob) => {
-    setEntries((current) => {
-      const id = `${event.timestamp}-${event.filename}`;
-      if (current.some((e) => e.id === id)) return current;
-      return prependCapped(current, {
-        kind: "file",
-        id,
-        timestamp: event.timestamp,
-        sessionId: event.sessionId,
-        filename: event.filename,
-        mimeType: event.mimeType,
-        size: event.size,
-        blob,
+  // Stable dispatch object — created once so AppShell (which only reads dispatch)
+  // doesn't re-render when entries change.
+  const [dispatch] = useState<PushHistoryDispatch>(() => ({
+    addFilePush: (event, blob) => {
+      setEntries((current) => {
+        const id = `${event.timestamp}-${event.sessionId ?? ""}-${event.filename}`;
+        if (current.some((e) => e.id === id)) return current;
+        return prependCapped(current, {
+          kind: "file",
+          id,
+          timestamp: event.timestamp,
+          sessionId: event.sessionId,
+          filename: event.filename,
+          mimeType: event.mimeType,
+          size: event.size,
+          blob,
+        });
       });
-    });
-  };
-
-  const addUrlPush = (event: UrlPushSseEvent) => {
-    setEntries((current) => {
-      const id = `${event.timestamp}-${event.url}`;
-      if (current.some((e) => e.id === id)) return current;
-      return prependCapped(current, {
-        kind: "url",
-        id,
-        timestamp: event.timestamp,
-        sessionId: event.sessionId,
-        url: event.url,
-        label: event.label,
+    },
+    addUrlPush: (event) => {
+      setEntries((current) => {
+        const id = `${event.timestamp}-${event.sessionId ?? ""}-${event.url}`;
+        if (current.some((e) => e.id === id)) return current;
+        return prependCapped(current, {
+          kind: "url",
+          id,
+          timestamp: event.timestamp,
+          sessionId: event.sessionId,
+          url: event.url,
+          label: event.label,
+        });
       });
-    });
-  };
+    },
+  }));
 
   return (
-    <PushHistoryContext.Provider value={{ entries, addFilePush, addUrlPush }}>
-      {children}
-    </PushHistoryContext.Provider>
+    <DispatchContext.Provider value={dispatch}>
+      <EntriesContext.Provider value={entries}>{children}</EntriesContext.Provider>
+    </DispatchContext.Provider>
   );
 }
 
-export function usePushHistory(): PushHistoryContextValue {
-  const context = useContext(PushHistoryContext);
-  if (!context) {
-    throw new Error("usePushHistory must be used within a PushHistoryProvider");
+export function usePushHistoryEntries(): PushHistoryEntry[] {
+  const entries = useContext(EntriesContext);
+  if (entries === null) {
+    throw new Error("usePushHistoryEntries must be used within a PushHistoryProvider");
   }
-  return context;
+  return entries;
+}
+
+export function usePushHistoryDispatch(): PushHistoryDispatch {
+  const dispatch = useContext(DispatchContext);
+  if (dispatch === null) {
+    throw new Error("usePushHistoryDispatch must be used within a PushHistoryProvider");
+  }
+  return dispatch;
 }
