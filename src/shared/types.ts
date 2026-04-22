@@ -186,7 +186,7 @@ export interface FilePushSseEvent {
   readonly filename: string;
   readonly mimeType: string;
   readonly size: number;
-  readonly sessionId: string | null;
+  readonly sessionId: string;
   readonly timestamp: number;
   readonly base64: string;
 }
@@ -196,6 +196,6 @@ export interface UrlPushSseEvent {
   readonly type: "url_push";
   readonly url: string;
   readonly label: string | null;
-  readonly sessionId: string | null;
+  readonly sessionId: string;
   readonly timestamp: number;
 }

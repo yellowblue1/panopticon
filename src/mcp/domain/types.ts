@@ -1,6 +1,6 @@
 export interface FilePushRequest {
   readonly filePath: string;
-  readonly sessionId?: string;
+  readonly sessionId: string;
   readonly filename?: string;
 }
 
@@ -15,7 +15,7 @@ export interface FilePushResult {
 export interface UrlPushRequest {
   readonly url: string;
   readonly label?: string;
-  readonly sessionId?: string;
+  readonly sessionId: string;
 }
 
 export interface UrlPushResult {

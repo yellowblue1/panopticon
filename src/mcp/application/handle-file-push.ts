@@ -71,7 +71,7 @@ export function handleFilePush(request: FilePushRequest, deps: McpFilePushDeps):
     filename,
     mimeType,
     size: data.length,
-    sessionId: request.sessionId ?? null,
+    sessionId: request.sessionId,
     timestamp: Date.now(),
     base64,
   };

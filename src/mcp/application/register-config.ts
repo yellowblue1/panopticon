@@ -1,6 +1,18 @@
 import type { McpConfigDeps } from "../domain/ports";
 
 /**
+ * Header name the MCP server reads to identify the calling tmux pane.
+ */
+export const PANE_ID_HEADER_NAME = "X-Panopticon-Pane-Id";
+
+/**
+ * Header value written to the MCP config. Claude Code interpolates `${TMUX_PANE}`
+ * at request time, so the server receives the caller's actual pane id (e.g. `%42`).
+ */
+// biome-ignore lint/suspicious/noTemplateCurlyInString: literal placeholder that Claude Code interpolates at runtime
+export const PANE_ID_HEADER_VALUE_TEMPLATE = "${TMUX_PANE}";
+
+/**
  * Auto-register the Panopticon MCP endpoint in ~/.claude.json (user-scoped mcpServers).
  * Creates a new entry or updates the URL if hostname/port changed.
  * Also migrates any stale entry from the old ~/.claude/.mcp.json location.
@@ -40,16 +52,23 @@ export function registerMcpConfig(port: number, hostname: string, deps: McpConfi
   // Wildcard bind addresses are not usable as connect targets
   const connectHost = hostname === "0.0.0.0" || hostname === "::" ? "localhost" : hostname;
   const expectedUrl = `http://${connectHost}:${port}/mcp`;
+  const expectedHeaders = { [PANE_ID_HEADER_NAME]: PANE_ID_HEADER_VALUE_TEMPLATE };
 
   if ("panopticon" in mcpServers) {
-    // Update URL if hostname or port changed
-    const existing = mcpServers.panopticon as Record<string, unknown> | undefined;
-    if (existing?.url === expectedUrl) return false;
+    const existing = mcpServers.panopticon as { url?: unknown; headers?: unknown } | undefined;
+    const headers = existing?.headers;
+    const headersMatch =
+      typeof headers === "object" &&
+      headers !== null &&
+      !Array.isArray(headers) &&
+      (headers as Record<string, unknown>)[PANE_ID_HEADER_NAME] === PANE_ID_HEADER_VALUE_TEMPLATE;
+    if (existing?.url === expectedUrl && headersMatch) return false;
   }
 
   mcpServers.panopticon = {
     type: "http",
     url: expectedUrl,
+    headers: expectedHeaders,
   };
   config.mcpServers = mcpServers;
 

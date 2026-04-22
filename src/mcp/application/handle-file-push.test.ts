@@ -34,7 +34,7 @@ function captureBroadcast(): {
 describe("handleFilePush", () => {
   it("returns error when file does not exist", () => {
     const deps = createMockDeps({ getFileSize: () => -1 });
-    const result = handleFilePush({ filePath: "/missing/file.png" }, deps);
+    const result = handleFilePush({ filePath: "/missing/file.png", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("File not found");
@@ -43,7 +43,7 @@ describe("handleFilePush", () => {
 
   it("returns error when file exceeds max size", () => {
     const deps = createMockDeps({ getFileSize: () => 11 * 1024 * 1024 });
-    const result = handleFilePush({ filePath: "/big/file.png" }, deps);
+    const result = handleFilePush({ filePath: "/big/file.png", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("exceeds maximum size");
@@ -51,7 +51,7 @@ describe("handleFilePush", () => {
 
   it("returns error when file read fails", () => {
     const deps = createMockDeps({ readFile: () => null });
-    const result = handleFilePush({ filePath: "/unreadable/file.png" }, deps);
+    const result = handleFilePush({ filePath: "/unreadable/file.png", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Failed to read file");
@@ -65,7 +65,7 @@ describe("handleFilePush", () => {
       getFileSize: () => content.length,
     });
 
-    const result = handleFilePush({ filePath: "/path/to/image.png" }, deps);
+    const result = handleFilePush({ filePath: "/path/to/image.png", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(true);
     expect(result.filename).toBe("image.png");
@@ -78,14 +78,14 @@ describe("handleFilePush", () => {
     expect(event.filename).toBe("image.png");
     expect(event.mimeType).toBe("image/png");
     expect(event.base64).toBe(content.toString("base64"));
-    expect(event.sessionId).toBeNull();
+    expect(event.sessionId).toBe("%0");
   });
 
   it("uses custom filename when provided", () => {
     const { deps, getEvent } = captureBroadcast();
 
     const result = handleFilePush(
-      { filePath: "/path/to/image.png", filename: "screenshot.png" },
+      { filePath: "/path/to/image.png", filename: "screenshot.png", sessionId: "%0" },
       deps,
     );
 
@@ -93,7 +93,7 @@ describe("handleFilePush", () => {
     expect(getEvent().filename).toBe("screenshot.png");
   });
 
-  it("passes session_id through to SSE event", () => {
+  it("passes sessionId through to SSE event", () => {
     const { deps, getEvent } = captureBroadcast();
 
     handleFilePush({ filePath: "/path/to/file.txt", sessionId: "pane-42" }, deps);
@@ -110,7 +110,7 @@ describe("handleFilePush", () => {
       },
     });
 
-    handleFilePush({ filePath: "/missing.png" }, deps);
+    handleFilePush({ filePath: "/missing.png", sessionId: "%0" }, deps);
     expect(broadcastCalled).toBe(false);
   });
 });

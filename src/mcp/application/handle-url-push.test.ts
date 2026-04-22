@@ -32,7 +32,7 @@ function captureBroadcast(): {
 describe("handleUrlPush", () => {
   it("returns error for invalid URL", () => {
     const deps = createMockDeps();
-    const result = handleUrlPush({ url: "not-a-url" }, deps);
+    const result = handleUrlPush({ url: "not-a-url", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Invalid URL");
@@ -40,7 +40,7 @@ describe("handleUrlPush", () => {
 
   it("returns error for non-http protocol", () => {
     const deps = createMockDeps();
-    const result = handleUrlPush({ url: "ftp://example.com/file" }, deps);
+    const result = handleUrlPush({ url: "ftp://example.com/file", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Unsupported protocol");
@@ -49,7 +49,10 @@ describe("handleUrlPush", () => {
   it("successfully pushes an http URL", () => {
     const { deps, getEvent } = captureBroadcast();
 
-    const result = handleUrlPush({ url: "http://localhost:8080/approve?token=abc" }, deps);
+    const result = handleUrlPush(
+      { url: "http://localhost:8080/approve?token=abc", sessionId: "%0" },
+      deps,
+    );
 
     expect(result.success).toBe(true);
     expect(result.url).toBe("http://localhost:8080/approve?token=abc");
@@ -59,13 +62,13 @@ describe("handleUrlPush", () => {
     expect(event.type).toBe("url_push");
     expect(event.url).toBe("http://localhost:8080/approve?token=abc");
     expect(event.label).toBeNull();
-    expect(event.sessionId).toBeNull();
+    expect(event.sessionId).toBe("%0");
   });
 
   it("successfully pushes an https URL", () => {
     const { deps, getEvent } = captureBroadcast();
 
-    const result = handleUrlPush({ url: "https://example.com/page" }, deps);
+    const result = handleUrlPush({ url: "https://example.com/page", sessionId: "%0" }, deps);
 
     expect(result.success).toBe(true);
 
@@ -76,7 +79,10 @@ describe("handleUrlPush", () => {
   it("passes label through to SSE event", () => {
     const { deps, getEvent } = captureBroadcast();
 
-    handleUrlPush({ url: "https://example.com", label: "Approve JIT access" }, deps);
+    handleUrlPush(
+      { url: "https://example.com", label: "Approve JIT access", sessionId: "%0" },
+      deps,
+    );
 
     expect(getEvent().label).toBe("Approve JIT access");
   });
@@ -97,7 +103,7 @@ describe("handleUrlPush", () => {
       },
     });
 
-    handleUrlPush({ url: "not-a-url" }, deps);
+    handleUrlPush({ url: "not-a-url", sessionId: "%0" }, deps);
     expect(broadcastCalled).toBe(false);
   });
 });

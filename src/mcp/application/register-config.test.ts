@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import type { McpConfigDeps } from "../domain/ports";
-import { registerMcpConfig } from "./register-config";
+import {
+  PANE_ID_HEADER_NAME,
+  PANE_ID_HEADER_VALUE_TEMPLATE,
+  registerMcpConfig,
+} from "./register-config";
+
+const expectedHeaders = { [PANE_ID_HEADER_NAME]: PANE_ID_HEADER_VALUE_TEMPLATE };
 
 function createMockDeps(
   files: Record<string, string> = {},
@@ -34,6 +40,7 @@ describe("registerMcpConfig", () => {
     expect((written.mcpServers as Record<string, unknown>).panopticon).toEqual({
       type: "http",
       url: "http://localhost:3847/mcp",
+      headers: expectedHeaders,
     });
   });
 
@@ -50,6 +57,7 @@ describe("registerMcpConfig", () => {
     expect(written.numStartups).toBe(5);
     const servers = written.mcpServers as Record<string, Record<string, unknown>>;
     expect(servers.panopticon.type).toBe("http");
+    expect(servers.panopticon.headers).toEqual(expectedHeaders);
   });
 
   it("adds panopticon alongside existing MCP servers", () => {
@@ -69,9 +77,15 @@ describe("registerMcpConfig", () => {
     expect(servers.panopticon.url).toBe("http://localhost:4000/mcp");
   });
 
-  it("skips registration when panopticon URL already matches", () => {
+  it("skips registration when panopticon URL and headers already match", () => {
     const existing = {
-      mcpServers: { panopticon: { type: "http", url: "http://localhost:3847/mcp" } },
+      mcpServers: {
+        panopticon: {
+          type: "http",
+          url: "http://localhost:3847/mcp",
+          headers: expectedHeaders,
+        },
+      },
     };
     const deps = createMockDeps({
       "/home/test/.claude.json": JSON.stringify(existing),
@@ -82,9 +96,31 @@ describe("registerMcpConfig", () => {
     expect(result).toBe(false);
   });
 
-  it("updates URL when hostname changes", () => {
+  it("rewrites a legacy panopticon entry that lacks the headers field", () => {
     const existing = {
       mcpServers: { panopticon: { type: "http", url: "http://localhost:3847/mcp" } },
+    };
+    const deps = createMockDeps({
+      "/home/test/.claude.json": JSON.stringify(existing),
+    });
+
+    const result = registerMcpConfig(3847, "localhost", deps);
+
+    expect(result).toBe(true);
+    const written = readJson(deps.files, deps.claudeJsonPath);
+    const servers = written.mcpServers as Record<string, Record<string, unknown>>;
+    expect(servers.panopticon.headers).toEqual(expectedHeaders);
+  });
+
+  it("updates URL when hostname changes", () => {
+    const existing = {
+      mcpServers: {
+        panopticon: {
+          type: "http",
+          url: "http://localhost:3847/mcp",
+          headers: expectedHeaders,
+        },
+      },
     };
     const deps = createMockDeps({
       "/home/test/.claude.json": JSON.stringify(existing),
