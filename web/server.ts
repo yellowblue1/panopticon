@@ -18,7 +18,11 @@ import { getLauncherConfig, updateLauncherConfig } from "../src/launcher/applica
 import { createLauncherDeps } from "../src/launcher/infrastructure/fs-operations";
 import { handleFilePush } from "../src/mcp/application/handle-file-push";
 import { handleUrlPush } from "../src/mcp/application/handle-url-push";
-import { registerMcpConfig } from "../src/mcp/application/register-config";
+import {
+  PANE_ID_HEADER_NAME,
+  PANE_ID_HEADER_VALUE_TEMPLATE,
+  registerMcpConfig,
+} from "../src/mcp/application/register-config";
 import type { McpFilePushDeps, McpUrlPushDeps } from "../src/mcp/domain/ports";
 import {
   deletePlan,
@@ -257,17 +261,45 @@ const mcpServer = new McpServer({
 
 const mcpTransport = new StreamableHTTPTransport({ sessionIdGenerator: undefined });
 
+// Hono lowercases all request header keys (WHATWG Headers).
+const PANE_ID_HEADER_NAME_LC = PANE_ID_HEADER_NAME.toLowerCase();
+
+// Identify the calling tmux pane from the request header. Claude Code interpolates
+// ${TMUX_PANE} at request time, so a missing value (or the literal placeholder,
+// which indicates TMUX_PANE was unset at the caller) means the client is not
+// running inside tmux.
+function resolvePaneId(
+  headers: Record<string, string | string[] | undefined> | undefined,
+): string | null {
+  const raw = headers?.[PANE_ID_HEADER_NAME_LC];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  if (value === PANE_ID_HEADER_VALUE_TEMPLATE || value.trim() === "") return null;
+  return value;
+}
+
+const MISSING_PANE_ID_ERROR = `${PANE_ID_HEADER_NAME} header is missing. This tool must be called from a Claude Code session launched inside tmux.`;
+
+function missingPaneIdResponse() {
+  return {
+    content: [{ type: "text" as const, text: `Error: ${MISSING_PANE_ID_ERROR}` }],
+    isError: true,
+  };
+}
+
 mcpServer.tool(
   "push_file",
   "Push a file to the Panopticon browser dashboard for display or download",
   {
     file_path: z.string().describe("Absolute path to the file to push"),
-    session_id: z.string().optional().describe("Panopticon session/pane ID to associate with"),
     filename: z.string().optional().describe("Display name for the file (defaults to basename)"),
   },
-  async ({ file_path, session_id, filename }) => {
+  async ({ file_path, filename }, extra) => {
+    const paneId = resolvePaneId(extra.requestInfo?.headers);
+    if (!paneId) return missingPaneIdResponse();
+
     const result = handleFilePush(
-      { filePath: file_path, sessionId: session_id, filename },
+      { filePath: file_path, sessionId: paneId, filename },
       mcpFilePushDeps,
     );
 
@@ -295,10 +327,12 @@ mcpServer.tool(
   {
     url: z.string().describe("The URL to push (http or https)"),
     label: z.string().optional().describe("Display label for the URL (defaults to the URL itself)"),
-    session_id: z.string().optional().describe("Panopticon session/pane ID to associate with"),
   },
-  async ({ url, label, session_id }) => {
-    const result = handleUrlPush({ url, label, sessionId: session_id }, mcpUrlPushDeps);
+  async ({ url, label }, extra) => {
+    const paneId = resolvePaneId(extra.requestInfo?.headers);
+    if (!paneId) return missingPaneIdResponse();
+
+    const result = handleUrlPush({ url, label, sessionId: paneId }, mcpUrlPushDeps);
 
     if (!result.success) {
       return {

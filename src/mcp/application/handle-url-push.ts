@@ -26,7 +26,7 @@ export function handleUrlPush(request: UrlPushRequest, deps: McpUrlPushDeps): Ur
     type: "url_push",
     url: request.url,
     label: request.label ?? null,
-    sessionId: request.sessionId ?? null,
+    sessionId: request.sessionId,
     timestamp: Date.now(),
   };
 
