@@ -5,10 +5,12 @@ import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { Toaster } from "@/components/ui/sonner";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { ConnectionProvider } from "@/contexts/connection-context";
+import { PushHistoryProvider, usePushHistory } from "@/contexts/push-history-context";
 import { ReadStatusProvider } from "@/contexts/read-status-context";
 import { useFilePush } from "@/hooks/use-file-push";
 import { useSessionsStream } from "@/hooks/use-sessions-stream";
 import { useUrlPush } from "@/hooks/use-url-push";
+import { base64ToBlob } from "@/lib/base64-to-blob";
 import { queryClient } from "@/lib/query-client";
 
 export const Route = createRootRoute({
@@ -22,8 +24,10 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ConnectionProvider>
         <ReadStatusProvider>
-          <AppShell />
-          <Toaster />
+          <PushHistoryProvider>
+            <AppShell />
+            <Toaster />
+          </PushHistoryProvider>
         </ReadStatusProvider>
       </ConnectionProvider>
     </QueryClientProvider>
@@ -36,7 +40,18 @@ function AppShell() {
   // so session status stays up-to-date on detail pages too
   const { handleFilePush } = useFilePush();
   const { handleUrlPush } = useUrlPush();
-  useSessionsStream({ onFilePush: handleFilePush, onUrlPush: handleUrlPush });
+  const { addFilePush, addUrlPush } = usePushHistory();
+  useSessionsStream({
+    onFilePush: (event) => {
+      const blob = base64ToBlob(event.base64, event.mimeType);
+      handleFilePush(event, blob);
+      addFilePush(event, blob);
+    },
+    onUrlPush: (event) => {
+      handleUrlPush(event);
+      addUrlPush(event);
+    },
+  });
 
   return (
     <div className="font-sans bg-bg-primary text-text-primary min-h-dvh flex flex-col text-base leading-relaxed">

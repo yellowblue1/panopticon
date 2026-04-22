@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FileText, SquareTerminal } from "lucide-react";
+import { FileText, Inbox, SquareTerminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PlanViewer } from "@/components/sessions/plan-viewer";
+import { PushHistoryViewer } from "@/components/sessions/push-history-viewer";
 import { SendKeysInput } from "@/components/sessions/send-keys-input";
 import { SessionTabs } from "@/components/sessions/session-tabs";
 import { TerminalViewer } from "@/components/sessions/terminal-viewer";
@@ -13,12 +14,15 @@ import { useReadStatus } from "@/hooks/use-read-status";
 import { useSessionsQuery } from "@/hooks/use-sessions";
 import { cn } from "@/lib/cn";
 
-type TabId = "terminal" | "plan";
+type TabId = "terminal" | "plan" | "pushes";
 
 export const Route = createFileRoute("/sessions/$paneId")({
   component: SessionDetailPage,
   validateSearch: (search: Record<string, unknown>): { tab?: TabId } => ({
-    tab: search.tab === "terminal" || search.tab === "plan" ? search.tab : undefined,
+    tab:
+      search.tab === "terminal" || search.tab === "plan" || search.tab === "pushes"
+        ? search.tab
+        : undefined,
   }),
 });
 
@@ -46,6 +50,7 @@ function SessionDetailPage() {
   const tabs = [
     { id: "terminal" as const, label: "Terminal", icon: <SquareTerminal size={16} /> },
     ...(hasPlan ? [{ id: "plan" as const, label: "Plan", icon: <FileText size={16} /> }] : []),
+    { id: "pushes" as const, label: "Pushes", icon: <Inbox size={16} /> },
   ];
 
   // Derive effective tab: fall back to terminal when plan is unavailable
@@ -100,13 +105,11 @@ function SessionDetailPage() {
             </div>
           )}
 
-          {hasPlan && (
-            <SessionTabs
-              tabs={tabs}
-              activeTab={effectiveTab}
-              onTabChange={(id) => setActiveTab(id as TabId)}
-            />
-          )}
+          <SessionTabs
+            tabs={tabs}
+            activeTab={effectiveTab}
+            onTabChange={(id) => setActiveTab(id as TabId)}
+          />
         </>
       )}
 
@@ -155,6 +158,8 @@ function SessionDetailPage() {
           isDeleting={deletePlanMutation.isPending}
         />
       )}
+
+      {effectiveTab === "pushes" && !isExpanded && <PushHistoryViewer paneId={paneId} />}
     </>
   );
 }
