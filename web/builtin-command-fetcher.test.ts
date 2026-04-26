@@ -9,11 +9,9 @@ import {
   readCachedBuiltinCommands,
 } from "./builtin-command-fetcher";
 
-const SAMPLE_MARKDOWN = `# Interactive mode
+const SAMPLE_MARKDOWN = `# Commands
 
-## Built-in commands
-
-Built-in commands are shortcuts for common actions.
+Commands control Claude Code from inside a session.
 
 | Command | Purpose |
 | :--- | :--- |
@@ -22,37 +20,17 @@ Built-in commands are shortcuts for common actions.
 | \`/config\` | Open the Settings interface (Config tab) |
 | \`/cost\` | Show [token usage statistics](/en/costs#using-the-cost-command). More info. |
 | \`/model\` | Select or change the [AI model](https://example.com). Supports arrows |
+| \`/simplify [focus]\` | **[Skill](/en/skills#bundled-skills).** Review your recently changed files for code reuse, quality, and efficiency issues, then fix them. |
+| \`/batch <instruction>\` | **[Skill](/en/skills#bundled-skills).** Orchestrate large-scale changes across a codebase in parallel. |
+| \`/debug [description]\` | **[Skill](/en/skills#bundled-skills).** Troubleshoot your current Claude Code session by reading the session debug log. |
 
-### MCP prompts
+## MCP prompts
 
 MCP servers can expose prompts.
 `;
 
-const SAMPLE_MARKDOWN_NEXT_H2 = `## Built-in commands
-
-| Command | Purpose |
-| :--- | :--- |
-| \`/clear\` | Clear history |
-| \`/help\` | Get help |
-
-## Vim editor mode
-
-Some other section.
-`;
-
-const SAMPLE_MARKDOWN_H1 = `# Built-in commands
-
-Type \`/\` in Claude Code to see all available commands.
-
-| Command | Purpose |
-| :--- | :--- |
-| \`/clear\` | Clear conversation history |
-| \`/compact [instructions]\` | Compact conversation |
-| \`/help\` | Get help |
-`;
-
 describe("parseBuiltinCommands", () => {
-  it("parses standard markdown table from Built-in commands section", () => {
+  it("parses every command from the # Commands table", () => {
     const result = parseBuiltinCommands(SAMPLE_MARKDOWN);
 
     expect(result).toEqual([
@@ -61,6 +39,20 @@ describe("parseBuiltinCommands", () => {
       { command: "/config", description: "Open the Settings interface (Config tab)" },
       { command: "/cost", description: "Show token usage statistics. More info." },
       { command: "/model", description: "Select or change the AI model. Supports arrows" },
+      {
+        command: "/simplify",
+        description:
+          "Review your recently changed files for code reuse, quality, and efficiency issues, then fix them.",
+      },
+      {
+        command: "/batch",
+        description: "Orchestrate large-scale changes across a codebase in parallel.",
+      },
+      {
+        command: "/debug",
+        description:
+          "Troubleshoot your current Claude Code session by reading the session debug log.",
+      },
     ]);
   });
 
@@ -69,46 +61,26 @@ describe("parseBuiltinCommands", () => {
     expect(parseBuiltinCommands(markdown)).toEqual([]);
   });
 
-  it("stops at ### MCP prompts", () => {
-    const result = parseBuiltinCommands(SAMPLE_MARKDOWN);
-    const commands = result.map((c) => c.command);
-    expect(commands).not.toContain("/mcp__");
-  });
-
-  it("stops at next ## heading", () => {
-    const result = parseBuiltinCommands(SAMPLE_MARKDOWN_NEXT_H2);
-    expect(result).toEqual([
-      { command: "/clear", description: "Clear history" },
-      { command: "/help", description: "Get help" },
-    ]);
-  });
-
-  it("parses table under h1 Built-in commands heading", () => {
-    const result = parseBuiltinCommands(SAMPLE_MARKDOWN_H1);
-    expect(result).toEqual([
-      { command: "/clear", description: "Clear conversation history" },
-      { command: "/compact", description: "Compact conversation" },
-      { command: "/help", description: "Get help" },
-    ]);
-  });
-
-  it("stops at next h1 heading when section is h1", () => {
-    const markdown = `# Built-in commands
+  it("stops at the next ## heading (e.g. MCP prompts)", () => {
+    const markdown = `# Commands
 
 | Command | Purpose |
 | :--- | :--- |
 | \`/clear\` | Clear history |
+| \`/help\` | Get help |
 
-# Another top-level section
+## MCP prompts
 
-More content.
+| Command | Purpose |
+| :--- | :--- |
+| \`/mcp__foo__bar\` | Should not be picked up |
 `;
     const result = parseBuiltinCommands(markdown);
-    expect(result).toEqual([{ command: "/clear", description: "Clear history" }]);
+    expect(result.map((c) => c.command)).toEqual(["/clear", "/help"]);
   });
 
   it("strips [arg] and <arg> from command names", () => {
-    const markdown = `## Built-in commands
+    const markdown = `# Commands
 
 | Command | Purpose |
 | :--- | :--- |
@@ -129,7 +101,7 @@ More content.
   });
 
   it("strips markdown links from descriptions", () => {
-    const markdown = `## Built-in commands
+    const markdown = `# Commands
 
 | Command | Purpose |
 | :--- | :--- |
@@ -139,34 +111,47 @@ More content.
     expect(result[0].description).toBe("Show token usage. See guide for details.");
   });
 
-  it("returns empty array for empty table", () => {
-    const markdown = `## Built-in commands
+  it("handles escaped pipes inside command argument lists", () => {
+    const markdown = `# Commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/claude-api [migrate\\|managed-agents-onboard]\` | **[Skill](/en/skills#bundled-skills).** Load Claude API reference material. |
+| \`/voice [hold\\|tap\\|off]\` | Toggle voice dictation. |
+`;
+    const result = parseBuiltinCommands(markdown);
+    expect(result).toEqual([
+      { command: "/claude-api", description: "Load Claude API reference material." },
+      { command: "/voice", description: "Toggle voice dictation." },
+    ]);
+  });
+
+  it("strips the **[Skill](...).** prefix from bundled skill descriptions", () => {
+    const markdown = `# Commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/simplify [focus]\` | **[Skill](/en/skills#bundled-skills).** Reviews changed files. |
+`;
+    const result = parseBuiltinCommands(markdown);
+    expect(result).toEqual([{ command: "/simplify", description: "Reviews changed files." }]);
+  });
+
+  it("returns empty array for an empty table", () => {
+    const markdown = `# Commands
 
 | Command | Purpose |
 | :--- | :--- |
 
-### MCP prompts
+## MCP prompts
 `;
     expect(parseBuiltinCommands(markdown)).toEqual([]);
   });
 });
 
-const SAMPLE_SKILLS_MARKDOWN = `## Bundled skills
-
-Bundled skills ship with Claude Code and are available in every session.
-
-| Skill | Purpose |
-| :--- | :--- |
-| \`/simplify [focus]\` | Review your recently changed files for code reuse, quality, and efficiency issues, then fix them. |
-| \`/batch <instruction>\` | Orchestrate large-scale changes across a codebase in parallel. |
-| \`/debug [description]\` | Troubleshoot your current Claude Code session by reading the session debug log. |
-
-## Getting started
-`;
-
 describe("parseBundledSkills", () => {
-  it("parses bundled skills from markdown table", () => {
-    const result = parseBundledSkills(SAMPLE_SKILLS_MARKDOWN);
+  it("returns only the bundled-skill rows from the # Commands table", () => {
+    const result = parseBundledSkills(SAMPLE_MARKDOWN);
 
     expect(result).toEqual([
       {
@@ -186,52 +171,28 @@ describe("parseBundledSkills", () => {
     ]);
   });
 
-  it("returns empty array when section is missing", () => {
-    expect(parseBundledSkills("# No bundled skills here")).toEqual([]);
+  it("returns empty array when no Skill rows are present", () => {
+    const markdown = `# Commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/clear\` | Clear history |
+`;
+    expect(parseBundledSkills(markdown)).toEqual([]);
   });
 
-  it("strips markdown links from descriptions", () => {
-    const markdown = `## Bundled skills
-
-| Skill | Purpose |
-| :--- | :--- |
-| \`/foo\` | Uses [worktrees](/en/worktrees) for isolation. |
-
-## Next
-`;
-    const result = parseBundledSkills(markdown);
-    expect(result[0].description).toBe("Uses worktrees for isolation.");
-  });
-
-  it("parses skills under h1 Bundled skills heading", () => {
-    const markdown = `# Bundled skills
-
-| Skill | Purpose |
-| :--- | :--- |
-| \`/simplify\` | Reviews changed files. |
-| \`/batch <instruction>\` | Parallel changes. |
-
-# Another section
-`;
-    const result = parseBundledSkills(markdown);
-    expect(result).toEqual([
-      { command: "/simplify", description: "Reviews changed files." },
-      { command: "/batch", description: "Parallel changes." },
-    ]);
+  it("returns a subset of parseBuiltinCommands for the same input", () => {
+    const skills = parseBundledSkills(SAMPLE_MARKDOWN);
+    const all = parseBuiltinCommands(SAMPLE_MARKDOWN);
+    const allByCommand = new Map(all.map((c) => [c.command, c.description]));
+    for (const s of skills) {
+      expect(allByCommand.get(s.command)).toBe(s.description);
+    }
   });
 });
 
-function createMockFetchText(
-  commandsMd = SAMPLE_MARKDOWN,
-  skillsMd: string | null = SAMPLE_SKILLS_MARKDOWN,
-) {
-  return mock(async (url: string) => {
-    if (url.includes("skills.md")) {
-      if (skillsMd === null) throw new Error("Not found");
-      return skillsMd;
-    }
-    return commandsMd;
-  });
+function createMockFetchText(commandsMd = SAMPLE_MARKDOWN) {
+  return mock(async (_url: string) => commandsMd);
 }
 
 function createMockDeps(
@@ -249,14 +210,14 @@ function createMockDeps(
 }
 
 describe("fetchBuiltinCommands", () => {
-  it("fetches commands and bundled skills, then writes cache file", async () => {
+  it("fetches the # Commands table and writes the cache file", async () => {
     const writeFileSync = mock((_path: string, _data: string) => {});
     const mkdirSync = mock((_path: string) => {});
     const deps = createMockDeps({ writeFileSync, mkdirSync });
 
     const result = await fetchBuiltinCommands(deps);
 
-    expect(result.length).toBe(8); // 5 built-in + 3 bundled skills
+    expect(result.length).toBe(8);
     expect(result[0].command).toBe("/clear");
     expect(result.find((c) => c.command === "/simplify")).toBeTruthy();
     expect(result.find((c) => c.command === "/batch")).toBeTruthy();
@@ -266,53 +227,16 @@ describe("fetchBuiltinCommands", () => {
     expect(writtenPath).toContain("builtin-commands.json");
   });
 
-  it("deduplicates commands that appear in both sources", async () => {
-    const skillsWithDebug = `## Bundled skills
-
-| Skill | Purpose |
-| :--- | :--- |
-| \`/debug [description]\` | Troubleshoot your session. |
-
-## Next
-`;
-    const commandsWithDebug = `## Built-in commands
-
-| Command | Purpose |
-| :--- | :--- |
-| \`/debug [description]\` | Debug session |
-
-### MCP prompts
-`;
+  it("returns empty array when the docs page has no command table", async () => {
     const deps = createMockDeps({
-      fetchText: createMockFetchText(commandsWithDebug, skillsWithDebug),
-    });
-
-    const result = await fetchBuiltinCommands(deps);
-    const debugCmds = result.filter((c) => c.command === "/debug");
-    expect(debugCmds.length).toBe(1);
-    expect(debugCmds[0].description).toBe("Debug session");
-  });
-
-  it("returns commands even when skills fetch fails", async () => {
-    const deps = createMockDeps({
-      fetchText: createMockFetchText(SAMPLE_MARKDOWN, null),
-    });
-
-    const result = await fetchBuiltinCommands(deps);
-    expect(result.length).toBe(5);
-    expect(result[0].command).toBe("/clear");
-  });
-
-  it("returns empty array when both sources are empty", async () => {
-    const deps = createMockDeps({
-      fetchText: createMockFetchText("# No commands here", "# No skills here"),
+      fetchText: createMockFetchText("# No commands here\n\nnothing to see"),
     });
 
     const result = await fetchBuiltinCommands(deps);
     expect(result).toEqual([]);
   });
 
-  it("propagates fetch errors from commands endpoint", async () => {
+  it("propagates fetch errors", async () => {
     const deps = createMockDeps({
       fetchText: mock(async () => {
         throw new Error("Network error");
@@ -401,7 +325,7 @@ describe("BuiltinCommandProvider", () => {
 
     const commands = provider.getCommands();
     expect(commands).not.toBeNull();
-    expect(commands?.length).toBe(8); // 5 built-in + 3 bundled skills
+    expect(commands?.length).toBe(8);
     expect(commands?.[0].command).toBe("/clear");
     expect(commands?.find((c) => c.command === "/simplify")).toBeTruthy();
   });
@@ -412,10 +336,9 @@ describe("BuiltinCommandProvider", () => {
     const deps = createMockDeps({
       existsSync: mock(() => true),
       readFileSync: mock(() => JSON.stringify(cached)),
-      fetchText: mock(async (_url: string) => {
+      fetchText: mock(async () => {
         callCount++;
-        if (callCount > 2) throw new Error("Network error");
-        if (_url.includes("skills.md")) return SAMPLE_SKILLS_MARKDOWN;
+        if (callCount > 1) throw new Error("Network error");
         return SAMPLE_MARKDOWN;
       }),
     });
@@ -424,8 +347,7 @@ describe("BuiltinCommandProvider", () => {
     expect(provider.getCommands()).toEqual(cached);
 
     await provider.start();
-    const afterFirst = provider.getCommands();
-    expect(afterFirst?.length).toBe(8);
+    expect(provider.getCommands()?.length).toBe(8);
 
     await provider.refresh();
     expect(provider.getCommands()?.length).toBe(8);

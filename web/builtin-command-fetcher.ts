@@ -2,9 +2,18 @@ import { join } from "node:path";
 import type { SlashCommand } from "../src/shared/types";
 
 const DOCS_URL = "https://code.claude.com/docs/en/commands.md";
-const SKILLS_DOCS_URL = "https://code.claude.com/docs/en/skills.md";
 const CACHE_FILENAME = "builtin-commands.json";
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+const COMMANDS_HEADING_RE = /^#{1,2} Commands\s*$/;
+const ANY_HEADING_RE = /^#+ /;
+
+// Bundled skills are flagged in the docs table by a leading
+// `**[Skill](/en/skills#bundled-skills).** ` token. After link stripping
+// this collapses to `**Skill.** `.
+const SKILL_PREFIX_RE = /^\*\*Skill\.\*\*\s*/;
+
+const COMMAND_NAME_RE = /`(\/\S+?)(?:\s+[[<][^\]>]*[\]>])*`/;
 
 export interface BuiltinCommandFetcherDeps {
   fetchText: (url: string) => Promise<string>;
@@ -19,34 +28,43 @@ function stripMarkdownLinks(text: string): string {
   return text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trimEnd();
 }
 
+// In GitHub-flavored markdown tables, `\|` is the escape for a literal pipe
+// inside a cell. We must split on unescaped pipes only, then unescape.
+function splitTableRow(line: string): string[] {
+  return line
+    .split(/(?<!\\)\|/)
+    .map((c) => c.replace(/\\\|/g, "|").trim())
+    .filter((c) => c.length > 0);
+}
+
+interface ParsedRow {
+  command: string;
+  description: string;
+  isSkill: boolean;
+}
+
 /**
- * Parse the first markdown table under a given heading (h1 or h2),
- * extracting slash commands and their descriptions.
- * Stops at the next heading of equal or higher level.
+ * Walk the markdown once, yielding rows from the first table that follows the
+ * `# Commands` heading. Stops at any heading after that table, which excludes
+ * the separate `## MCP prompts` table.
  */
-function parseCommandTable(markdown: string, heading: string): SlashCommand[] {
+function* iterCommandRows(markdown: string): Generator<ParsedRow> {
   const lines = markdown.split("\n");
-  const headingPattern = new RegExp(`^(#{1,2}) ${RegExp.escape(heading)}\\s*$`);
-  const commands: SlashCommand[] = [];
 
   let inSection = false;
-  let sectionLevel = 0;
   let inTable = false;
   let separatorSeen = false;
+  let sawAnyTable = false;
 
   for (const line of lines) {
     if (!inSection) {
-      const headingMatch = line.match(headingPattern);
-      if (headingMatch) {
-        inSection = true;
-        sectionLevel = headingMatch[1].length;
-      }
+      if (COMMANDS_HEADING_RE.test(line)) inSection = true;
       continue;
     }
 
-    const nextHeading = line.match(/^(#+) /);
-    if (nextHeading && nextHeading[1].length <= sectionLevel) {
-      break;
+    if (ANY_HEADING_RE.test(line)) {
+      if (sawAnyTable) break;
+      continue;
     }
 
     if (!line.startsWith("|")) {
@@ -57,6 +75,7 @@ function parseCommandTable(markdown: string, heading: string): SlashCommand[] {
 
     if (!inTable) {
       inTable = true;
+      sawAnyTable = true;
       separatorSeen = false;
       continue; // skip header row
     }
@@ -66,57 +85,49 @@ function parseCommandTable(markdown: string, heading: string): SlashCommand[] {
       continue; // skip separator row
     }
 
-    const cells = line
-      .split("|")
-      .map((c) => c.trim())
-      .filter((c) => c.length > 0);
+    const cells = splitTableRow(line);
     if (cells.length < 2) continue;
 
-    const commandMatch = cells[0].match(/`(\/\S+?)(?:\s+[[<][^\]>]*[\]>])*`/);
+    const commandMatch = cells[0].match(COMMAND_NAME_RE);
     if (!commandMatch) continue;
 
-    commands.push({
-      command: commandMatch[1],
-      description: stripMarkdownLinks(cells[1]),
-    });
+    const rawDescription = stripMarkdownLinks(cells[1]);
+    const isSkill = SKILL_PREFIX_RE.test(rawDescription);
+    const description = isSkill ? rawDescription.replace(SKILL_PREFIX_RE, "") : rawDescription;
+
+    yield { command: commandMatch[1], description, isSkill };
   }
-
-  return commands;
-}
-
-export function parseBuiltinCommands(markdown: string): SlashCommand[] {
-  return parseCommandTable(markdown, "Built-in commands");
-}
-
-export function parseBundledSkills(markdown: string): SlashCommand[] {
-  return parseCommandTable(markdown, "Bundled skills");
 }
 
 /**
- * Fetch built-in commands and bundled skills from official docs,
- * then write combined result to file cache.
+ * Parse all commands listed in the official `# Commands` reference table.
+ * The table mixes built-in commands and bundled skills; both are returned.
+ */
+export function parseBuiltinCommands(markdown: string): SlashCommand[] {
+  const result: SlashCommand[] = [];
+  for (const row of iterCommandRows(markdown)) {
+    result.push({ command: row.command, description: row.description });
+  }
+  return result;
+}
+
+/** Filter `parseBuiltinCommands` to bundled-skill rows only. */
+export function parseBundledSkills(markdown: string): SlashCommand[] {
+  const result: SlashCommand[] = [];
+  for (const row of iterCommandRows(markdown)) {
+    if (row.isSkill) result.push({ command: row.command, description: row.description });
+  }
+  return result;
+}
+
+/**
+ * Fetch the `# Commands` reference and write the result to file cache.
  */
 export async function fetchBuiltinCommands(
   deps: BuiltinCommandFetcherDeps,
 ): Promise<SlashCommand[]> {
-  const [docsResult, skillsResult] = await Promise.allSettled([
-    deps.fetchText(DOCS_URL),
-    deps.fetchText(SKILLS_DOCS_URL),
-  ]);
-
-  if (docsResult.status === "rejected") throw docsResult.reason;
-
-  const commands = parseBuiltinCommands(docsResult.value);
-
-  if (skillsResult.status === "fulfilled") {
-    const bundled = parseBundledSkills(skillsResult.value);
-    const seen = new Set(commands.map((c) => c.command));
-    for (const cmd of bundled) {
-      if (!seen.has(cmd.command)) {
-        commands.push(cmd);
-      }
-    }
-  }
+  const docs = await deps.fetchText(DOCS_URL);
+  const commands = parseBuiltinCommands(docs);
 
   if (commands.length > 0) {
     const cachePath = join(deps.cacheDir, CACHE_FILENAME);
@@ -127,15 +138,13 @@ export async function fetchBuiltinCommands(
   return commands;
 }
 
-/**
- * Read cached built-in commands from file. Returns null if unavailable.
- */
+/** Read cached built-in commands from file. Returns null if unavailable. */
 export function readCachedBuiltinCommands(deps: BuiltinCommandFetcherDeps): SlashCommand[] | null {
   const cachePath = join(deps.cacheDir, CACHE_FILENAME);
   if (!deps.existsSync(cachePath)) return null;
 
   const raw = deps.readFileSync(cachePath);
-  // File cache is an external I/O boundary — parse errors are expected for corrupted files
+  // File cache is an external I/O boundary -- parse errors are expected for corrupted files
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
