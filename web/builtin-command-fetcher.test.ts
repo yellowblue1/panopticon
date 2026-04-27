@@ -1,11 +1,10 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 import type { SlashCommand } from "../src/shared/types";
 import {
   type BuiltinCommandFetcherDeps,
   BuiltinCommandProvider,
   fetchBuiltinCommands,
   parseBuiltinCommands,
-  parseBundledSkills,
   readCachedBuiltinCommands,
 } from "./builtin-command-fetcher";
 
@@ -137,6 +136,47 @@ describe("parseBuiltinCommands", () => {
     expect(result).toEqual([{ command: "/simplify", description: "Reviews changed files." }]);
   });
 
+  it("strips Skill prefixes that omit the trailing period", () => {
+    const markdown = `# Commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/foo\` | **[Skill](/en/skills#bundled-skills)** Foo description. |
+`;
+    const result = parseBuiltinCommands(markdown);
+    expect(result).toEqual([{ command: "/foo", description: "Foo description." }]);
+  });
+
+  it("strips MDX comments like {/* max-version: ... */} from descriptions", () => {
+    const markdown = `# Commands
+
+| Command | Purpose |
+| :--- | :--- |
+| \`/pr-comments [PR]\` | {/* max-version: 2.1.90 */}Removed in v2.1.91. Ask Claude directly. |
+| \`/vim\` | {/* max-version: 2.1.91 */}Removed in v2.1.92. To toggle modes, use /config. |
+`;
+    const result = parseBuiltinCommands(markdown);
+    expect(result).toEqual([
+      { command: "/pr-comments", description: "Removed in v2.1.91. Ask Claude directly." },
+      {
+        command: "/vim",
+        description: "Removed in v2.1.92. To toggle modes, use /config.",
+      },
+    ]);
+  });
+
+  it("tolerates leading whitespace on table rows", () => {
+    const markdown = `# Commands
+
+  | Command | Purpose |
+  | :--- | :--- |
+  | \`/clear\` | Clear history |
+  | \`/help\` | Get help |
+`;
+    const result = parseBuiltinCommands(markdown);
+    expect(result.map((c) => c.command)).toEqual(["/clear", "/help"]);
+  });
+
   it("returns empty array for an empty table", () => {
     const markdown = `# Commands
 
@@ -146,48 +186,6 @@ describe("parseBuiltinCommands", () => {
 ## MCP prompts
 `;
     expect(parseBuiltinCommands(markdown)).toEqual([]);
-  });
-});
-
-describe("parseBundledSkills", () => {
-  it("returns only the bundled-skill rows from the # Commands table", () => {
-    const result = parseBundledSkills(SAMPLE_MARKDOWN);
-
-    expect(result).toEqual([
-      {
-        command: "/simplify",
-        description:
-          "Review your recently changed files for code reuse, quality, and efficiency issues, then fix them.",
-      },
-      {
-        command: "/batch",
-        description: "Orchestrate large-scale changes across a codebase in parallel.",
-      },
-      {
-        command: "/debug",
-        description:
-          "Troubleshoot your current Claude Code session by reading the session debug log.",
-      },
-    ]);
-  });
-
-  it("returns empty array when no Skill rows are present", () => {
-    const markdown = `# Commands
-
-| Command | Purpose |
-| :--- | :--- |
-| \`/clear\` | Clear history |
-`;
-    expect(parseBundledSkills(markdown)).toEqual([]);
-  });
-
-  it("returns a subset of parseBuiltinCommands for the same input", () => {
-    const skills = parseBundledSkills(SAMPLE_MARKDOWN);
-    const all = parseBuiltinCommands(SAMPLE_MARKDOWN);
-    const allByCommand = new Map(all.map((c) => [c.command, c.description]));
-    for (const s of skills) {
-      expect(allByCommand.get(s.command)).toBe(s.description);
-    }
   });
 });
 
@@ -342,15 +340,61 @@ describe("BuiltinCommandProvider", () => {
         return SAMPLE_MARKDOWN;
       }),
     });
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      provider = new BuiltinCommandProvider(deps);
+      expect(provider.getCommands()).toEqual(cached);
 
-    provider = new BuiltinCommandProvider(deps);
-    expect(provider.getCommands()).toEqual(cached);
+      await provider.start();
+      expect(provider.getCommands()?.length).toBe(8);
 
-    await provider.start();
-    expect(provider.getCommands()?.length).toBe(8);
+      await provider.refresh();
+      expect(provider.getCommands()?.length).toBe(8);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 
-    await provider.refresh();
-    expect(provider.getCommands()?.length).toBe(8);
+  it("warns and keeps cached commands when fetch returns 0 rows", async () => {
+    const cached: SlashCommand[] = [{ command: "/help", description: "Help" }];
+    const deps = createMockDeps({
+      existsSync: mock(() => true),
+      readFileSync: mock(() => JSON.stringify(cached)),
+      fetchText: mock(async () => "# Some other page\n\nNo commands here."),
+    });
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      provider = new BuiltinCommandProvider(deps);
+      await provider.refresh();
+
+      expect(provider.getCommands()).toEqual(cached);
+      expect(warnSpy).toHaveBeenCalled();
+      const message = warnSpy.mock.calls[0]?.[0];
+      expect(typeof message === "string" && message.includes("0 rows")).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("warns when the fetch itself rejects", async () => {
+    const deps = createMockDeps({
+      existsSync: mock(() => false),
+      fetchText: mock(async () => {
+        throw new Error("boom");
+      }),
+    });
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      provider = new BuiltinCommandProvider(deps);
+      await provider.refresh();
+
+      expect(provider.getCommands()).toBeNull();
+      expect(warnSpy).toHaveBeenCalled();
+      const message = warnSpy.mock.calls[0]?.[0];
+      expect(typeof message === "string" && message.includes("fetch failed")).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it("stop clears the timer", () => {
