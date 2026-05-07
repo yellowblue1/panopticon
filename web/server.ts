@@ -9,8 +9,10 @@ import { detectPaneActions } from "../src/intelligence/application/detect-action
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
 import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
 import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
+import { TtlCache } from "../src/intelligence/infrastructure/cache";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
 import { bootstrapGeminiEnv } from "../src/intelligence/infrastructure/gemini-config";
+import { createSqliteCacheStore } from "../src/intelligence/infrastructure/sqlite-cache-store";
 import { browsePath as browsePathFn } from "../src/launcher/application/browse-path";
 import { discoverProjects } from "../src/launcher/application/discover-projects";
 import { generateSessionName, launchSession } from "../src/launcher/application/launch-session";
@@ -37,6 +39,7 @@ import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infras
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
 import type {
   FilePushSseEvent,
+  PaneAction,
   PaneContentDiff,
   PaneContentFull,
   UrlPushSseEvent,
@@ -109,12 +112,24 @@ const geminiBackend = bootstrapGeminiEnv();
 const summaryGenerateContent = geminiBackend ? createGenerateContentFn("gemini-2.5-flash") : null;
 const actionGenerateContent = geminiBackend ? createGenerateContentFn("gemini-2.5-flash") : null;
 
+const summaryCache = new TtlCache<string>({
+  store: createSqliteCacheStore<string>({ tableName: "summaries" }),
+  tag: "Gemini Summary",
+});
+
+const actionCache = new TtlCache<PaneAction>({
+  store: createSqliteCacheStore<PaneAction>({ tableName: "actions" }),
+  tag: "Gemini Actions",
+});
+
 const summaryDeps: SummaryDeps = {
   generateContent: summaryGenerateContent ?? (async () => null),
+  cache: summaryCache,
 };
 
 const actionDeps: ActionDeps = {
   generateContent: actionGenerateContent ?? (async () => null),
+  cache: actionCache,
 };
 
 const sessionManagerDeps: SessionManagerDeps = {

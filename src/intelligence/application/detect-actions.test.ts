@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
   mockGenerateContent,
   mockGenerateContentEmpty,
@@ -6,17 +6,14 @@ import {
 } from "../../__tests__";
 import type { PaneAction } from "../../shared/types";
 import type { ActionDeps, GenerateContentFn } from "../domain/ports";
-import { clearActionCache, getInflightSize } from "../infrastructure/action-cache";
+import { TtlCache } from "../infrastructure/cache";
 import { detectPaneActions } from "./detect-actions";
 
 describe("detect-actions", () => {
   describe("detectPaneActions", () => {
     const mockDeps = (generateContent: GenerateContentFn): ActionDeps => ({
       generateContent,
-    });
-
-    beforeEach(() => {
-      clearActionCache();
+      cache: new TtlCache<PaneAction>(),
     });
 
     it("returns yesno action on successful API response", async () => {
@@ -93,9 +90,10 @@ describe("detect-actions", () => {
           callCount++;
           return '{"type":"yesno"}';
         };
+        const deps = mockDeps(countingFn);
 
-        const result1 = await detectPaneActions("same content", mockDeps(countingFn));
-        const result2 = await detectPaneActions("same content", mockDeps(countingFn));
+        const result1 = await detectPaneActions("same content", deps);
+        const result2 = await detectPaneActions("same content", deps);
 
         expect(result1).toEqual({ type: "yesno" });
         expect(result2).toEqual({ type: "yesno" });
@@ -108,22 +106,24 @@ describe("detect-actions", () => {
           callCount++;
           return '{"type":"none"}';
         };
+        const deps = mockDeps(countingFn);
 
-        await detectPaneActions("content A", mockDeps(countingFn));
-        await detectPaneActions("content B", mockDeps(countingFn));
+        await detectPaneActions("content A", deps);
+        await detectPaneActions("content B", deps);
 
         expect(callCount).toBe(2);
       });
 
-      it("does not cache when API returns error", async () => {
+      it("does not cache when API throws", async () => {
         let callCount = 0;
         const countingErrorFn: GenerateContentFn = async () => {
           callCount++;
           throw new Error("API error");
         };
+        const deps = mockDeps(countingErrorFn);
 
-        await detectPaneActions("content", mockDeps(countingErrorFn));
-        await detectPaneActions("content", mockDeps(countingErrorFn));
+        await detectPaneActions("content", deps);
+        await detectPaneActions("content", deps);
 
         expect(callCount).toBe(2);
       });
@@ -133,7 +133,7 @@ describe("detect-actions", () => {
       it("concurrent calls with same content only make one API call", async () => {
         let callCount = 0;
         let resolveResponse!: (value: string | null) => void;
-        const delayedFn: GenerateContentFn = async () => {
+        const delayedFn: GenerateContentFn = () => {
           callCount++;
           return new Promise<string | null>((resolve) => {
             resolveResponse = resolve;
@@ -154,16 +154,6 @@ describe("detect-actions", () => {
         expect(r1).toEqual({ type: "yesno" });
         expect(r2).toEqual({ type: "yesno" });
         expect(r3).toEqual({ type: "yesno" });
-      });
-
-      it("in-flight entry is cleaned up after request completes", async () => {
-        await detectPaneActions("content", mockDeps(mockGenerateContent('{"type":"yesno"}')));
-        expect(getInflightSize()).toBe(0);
-      });
-
-      it("in-flight entry is cleaned up after request fails", async () => {
-        await detectPaneActions("content", mockDeps(mockGenerateContentError()));
-        expect(getInflightSize()).toBe(0);
       });
     });
   });
