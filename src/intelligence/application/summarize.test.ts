@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
   mockGenerateContent,
   mockGenerateContentAuthError,
@@ -7,7 +7,7 @@ import {
 } from "../../__tests__";
 import type { GenerateContentFn, SummaryDeps } from "../domain/ports";
 import { buildConversationPrompt } from "../domain/prompts";
-import { clearSummaryCache, getInflightSize } from "../infrastructure/summary-cache";
+import { TtlCache } from "../infrastructure/cache";
 import { generatePaneSummary } from "./summarize";
 
 describe("summarize", () => {
@@ -46,10 +46,7 @@ describe("summarize", () => {
   describe("generatePaneSummary", () => {
     const mockDeps = (generateContent: GenerateContentFn): SummaryDeps => ({
       generateContent,
-    });
-
-    beforeEach(() => {
-      clearSummaryCache();
+      cache: new TtlCache<string>(),
     });
 
     it("returns summary on successful API response", async () => {
@@ -107,9 +104,10 @@ describe("summarize", () => {
           callCount++;
           return "Cached summary";
         };
+        const deps = mockDeps(countingFn);
 
-        const result1 = await generatePaneSummary("same content", mockDeps(countingFn));
-        const result2 = await generatePaneSummary("same content", mockDeps(countingFn));
+        const result1 = await generatePaneSummary("same content", deps);
+        const result2 = await generatePaneSummary("same content", deps);
 
         expect(result1).toBe("Cached summary");
         expect(result2).toBe("Cached summary");
@@ -122,22 +120,24 @@ describe("summarize", () => {
           callCount++;
           return "Summary";
         };
+        const deps = mockDeps(countingFn);
 
-        await generatePaneSummary("content A", mockDeps(countingFn));
-        await generatePaneSummary("content B", mockDeps(countingFn));
+        await generatePaneSummary("content A", deps);
+        await generatePaneSummary("content B", deps);
 
         expect(callCount).toBe(2);
       });
 
-      it("does not cache when API returns error", async () => {
+      it("does not cache when API throws", async () => {
         let callCount = 0;
         const countingErrorFn: GenerateContentFn = async () => {
           callCount++;
           throw new Error("API error");
         };
+        const deps = mockDeps(countingErrorFn);
 
-        const result1 = await generatePaneSummary("content", mockDeps(countingErrorFn));
-        const result2 = await generatePaneSummary("content", mockDeps(countingErrorFn));
+        const result1 = await generatePaneSummary("content", deps);
+        const result2 = await generatePaneSummary("content", deps);
 
         expect(result1).toBeNull();
         expect(result2).toBeNull();
@@ -150,9 +150,10 @@ describe("summarize", () => {
           callCount++;
           return null;
         };
+        const deps = mockDeps(countingEmptyFn);
 
-        await generatePaneSummary("content", mockDeps(countingEmptyFn));
-        await generatePaneSummary("content", mockDeps(countingEmptyFn));
+        await generatePaneSummary("content", deps);
+        await generatePaneSummary("content", deps);
 
         expect(callCount).toBe(2);
       });
@@ -162,7 +163,7 @@ describe("summarize", () => {
       it("concurrent calls with same content only make one API call", async () => {
         let callCount = 0;
         let resolveResponse!: (value: string | null) => void;
-        const delayedFn: GenerateContentFn = async () => {
+        const delayedFn: GenerateContentFn = () => {
           callCount++;
           return new Promise<string | null>((resolve) => {
             resolveResponse = resolve;
@@ -175,7 +176,6 @@ describe("summarize", () => {
         const p2 = generatePaneSummary("same content", deps);
         const p3 = generatePaneSummary("same content", deps);
 
-        // Resolve the single API call
         resolveResponse("Deduped summary");
 
         const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
@@ -205,26 +205,10 @@ describe("summarize", () => {
         expect(r2).toBe("Summary");
       });
 
-      it("in-flight entry is cleaned up after request completes", async () => {
-        const deps = mockDeps(mockGenerateContent("Summary"));
-
-        await generatePaneSummary("content", deps);
-
-        expect(getInflightSize()).toBe(0);
-      });
-
-      it("in-flight entry is cleaned up after request fails", async () => {
-        const deps = mockDeps(mockGenerateContentError());
-
-        await generatePaneSummary("content", deps);
-
-        expect(getInflightSize()).toBe(0);
-      });
-
       it("concurrent calls all get null when API fails", async () => {
         let callCount = 0;
         let rejectResponse!: (reason: Error) => void;
-        const delayedFn: GenerateContentFn = async () => {
+        const delayedFn: GenerateContentFn = () => {
           callCount++;
           return new Promise<string | null>((_resolve, reject) => {
             rejectResponse = reject;
@@ -236,7 +220,6 @@ describe("summarize", () => {
         const p1 = generatePaneSummary("same content", deps);
         const p2 = generatePaneSummary("same content", deps);
 
-        // Reject the single API call
         rejectResponse(new Error("API error"));
 
         const [r1, r2] = await Promise.all([p1, p2]);

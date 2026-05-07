@@ -1,7 +1,10 @@
 /**
  * Generic TTL cache with LRU eviction, in-flight request deduplication,
  * and optional persistent backing store (L2).
- * Used by both summary and action caches to avoid duplicate Gemini API calls.
+ *
+ * The {@link TtlCache.fetch} method is the intended public entry point: it
+ * memoises an idempotent async computation by content key, dedupes concurrent
+ * callers, persists successes, and never caches failures.
  */
 
 interface CacheEntry<T> {
@@ -29,13 +32,75 @@ export interface PersistentStore<T> {
   close(): void;
 }
 
+interface TtlCacheOptions<T> {
+  /** Optional L2 persistent backing store. */
+  store?: PersistentStore<T>;
+  /** Optional log tag. When set, fetch() logs cache/dedup/fetch events under this tag. */
+  tag?: string;
+}
+
 export class TtlCache<T> {
   private cache = new Map<string, CacheEntry<T>>();
-  private inflight = new Map<string, Promise<T>>();
+  private inflight = new Map<string, Promise<T | null>>();
   private persistentStore: PersistentStore<T> | null;
+  private readonly tag: string | null;
 
-  constructor(persistentStore?: PersistentStore<T>) {
-    this.persistentStore = persistentStore ?? null;
+  constructor(options: TtlCacheOptions<T> = {}) {
+    this.persistentStore = options.store ?? null;
+    this.tag = options.tag ?? null;
+  }
+
+  /**
+   * Memoise an async computation by content key.
+   *
+   * - Cache hit → return cached value, do not call fetcher.
+   * - Inflight hit → await the in-flight promise, do not call fetcher.
+   * - Otherwise → call fetcher, register the promise as inflight, await, clean up.
+   *
+   * The fetcher returns either a value to cache (T) or `null` meaning
+   * "do not cache; the next caller will retry." Errors thrown from the fetcher
+   * are swallowed and treated identically to a `null` return.
+   */
+  async fetch(content: string, fetcher: () => Promise<T | null>): Promise<T | null> {
+    const cached = this.getCached(content);
+    if (cached !== null) {
+      this.log(`Cache hit (input: ${content.length} chars)`);
+      return cached;
+    }
+
+    const existing = this.getInflightRequest(content);
+    if (existing !== null) {
+      this.log(`Dedup hit (input: ${content.length} chars)`);
+      return existing;
+    }
+
+    const startedAt = Date.now();
+    this.log(`Fetching (input: ${content.length} chars)`);
+
+    const promise = (async (): Promise<T | null> => {
+      try {
+        const value = await fetcher();
+        const elapsedMs = Date.now() - startedAt;
+        if (value === null) {
+          this.log(`Fetch returned null (${elapsedMs}ms)`);
+          return null;
+        }
+        this.setCached(content, value);
+        this.log(`Fetched (${elapsedMs}ms)`);
+        return value;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "unknown error";
+        this.log(`Fetch error (${Date.now() - startedAt}ms): ${message}`);
+        return null;
+      }
+    })();
+
+    this.setInflightRequest(content, promise);
+    try {
+      return await promise;
+    } finally {
+      this.deleteInflightRequest(content);
+    }
   }
 
   /**
@@ -87,44 +152,40 @@ export class TtlCache<T> {
     this.persistentStore?.set(key, value);
   }
 
-  /**
-   * Get an in-flight request promise for the given content.
-   * Returns null if no request is currently in-flight.
-   */
-  getInflightRequest(content: string): Promise<T> | null {
+  private getInflightRequest(content: string): Promise<T | null> | null {
     const key = computeCacheKey(content);
     return this.inflight.get(key) ?? null;
   }
 
-  /**
-   * Register an in-flight request promise, keyed by content.
-   * The caller must call deleteInflightRequest in a finally block.
-   */
-  setInflightRequest(content: string, promise: Promise<T>): void {
+  private setInflightRequest(content: string, promise: Promise<T | null>): void {
     const key = computeCacheKey(content);
     this.inflight.set(key, promise);
   }
 
-  /** Remove an in-flight request entry after the request completes or fails. */
-  deleteInflightRequest(content: string): void {
+  private deleteInflightRequest(content: string): void {
     const key = computeCacheKey(content);
     this.inflight.delete(key);
   }
 
-  /** Clear all cached entries and in-flight requests. Used for test isolation. */
+  /** Clear all cached entries and in-flight requests. */
   clear(): void {
     this.cache.clear();
     this.inflight.clear();
     this.persistentStore?.clear();
   }
 
-  /** Get the number of cached entries. Used for test assertions. */
+  /** Number of cached entries. Useful for tests. */
   get cacheSize(): number {
     return this.cache.size;
   }
 
-  /** Get the number of in-flight requests. Used for test assertions. */
+  /** Number of in-flight requests. Useful for tests. */
   get inflightSize(): number {
     return this.inflight.size;
+  }
+
+  private log(message: string): void {
+    if (this.tag === null) return;
+    console.log(`${new Date().toISOString()} [${this.tag}] ${message}`);
   }
 }
