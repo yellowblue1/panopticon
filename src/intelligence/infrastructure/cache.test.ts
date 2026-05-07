@@ -210,7 +210,7 @@ describe("TtlCache", () => {
       expect(cache.inflightSize).toBe(0);
     });
 
-    it("clears the in-flight slot after the fetch fails", async () => {
+    it("clears the in-flight slot after the fetcher throws", async () => {
       const cache = new TtlCache<string>();
       await cache.fetch("content", async () => {
         throw new Error("boom");

@@ -1,3 +1,5 @@
+import type { Cache } from "../domain/ports";
+
 /**
  * Generic TTL cache with LRU eviction, in-flight request deduplication,
  * and optional persistent backing store (L2).
@@ -39,7 +41,7 @@ interface TtlCacheOptions<T> {
   tag?: string;
 }
 
-export class TtlCache<T> {
+export class TtlCache<T> implements Cache<T> {
   private cache = new Map<string, CacheEntry<T>>();
   private inflight = new Map<string, Promise<T | null>>();
   private persistentStore: PersistentStore<T> | null;
@@ -62,14 +64,16 @@ export class TtlCache<T> {
    * are swallowed and treated identically to a `null` return.
    */
   async fetch(content: string, fetcher: () => Promise<T | null>): Promise<T | null> {
-    const cached = this.getCached(content);
+    const key = computeCacheKey(content);
+
+    const cached = this.lookupByKey(key);
     if (cached !== null) {
       this.log(`Cache hit (input: ${content.length} chars)`);
       return cached;
     }
 
-    const existing = this.getInflightRequest(content);
-    if (existing !== null) {
+    const existing = this.inflight.get(key);
+    if (existing !== undefined) {
       this.log(`Dedup hit (input: ${content.length} chars)`);
       return existing;
     }
@@ -85,7 +89,7 @@ export class TtlCache<T> {
           this.log(`Fetch returned null (${elapsedMs}ms)`);
           return null;
         }
-        this.setCached(content, value);
+        this.storeByKey(key, value);
         this.log(`Fetched (${elapsedMs}ms)`);
         return value;
       } catch (err) {
@@ -95,11 +99,11 @@ export class TtlCache<T> {
       }
     })();
 
-    this.setInflightRequest(content, promise);
+    this.inflight.set(key, promise);
     try {
       return await promise;
     } finally {
-      this.deleteInflightRequest(content);
+      this.inflight.delete(key);
     }
   }
 
@@ -109,28 +113,7 @@ export class TtlCache<T> {
    * On in-memory miss, falls through to persistent store (L2) if available.
    */
   getCached(content: string, nowFn: () => number = Date.now): T | null {
-    const key = computeCacheKey(content);
-    const entry = this.cache.get(key);
-
-    if (entry) {
-      if (nowFn() - entry.createdAt > CACHE_TTL_MS) {
-        this.cache.delete(key);
-      } else {
-        return entry.value;
-      }
-    }
-
-    // L2: Check persistent store on in-memory miss
-    if (this.persistentStore) {
-      const persisted = this.persistentStore.get(key);
-      if (persisted !== null) {
-        // Promote to in-memory hot cache
-        this.cache.set(key, { value: persisted, createdAt: Date.now() });
-        return persisted;
-      }
-    }
-
-    return null;
+    return this.lookupByKey(computeCacheKey(content), nowFn);
   }
 
   /**
@@ -139,32 +122,7 @@ export class TtlCache<T> {
    * Writes through to persistent store if available.
    */
   setCached(content: string, value: T): void {
-    const key = computeCacheKey(content);
-
-    if (this.cache.size >= MAX_CACHE_SIZE && !this.cache.has(key)) {
-      const oldest = this.cache.keys().next().value;
-      if (oldest !== undefined) {
-        this.cache.delete(oldest);
-      }
-    }
-
-    this.cache.set(key, { value, createdAt: Date.now() });
-    this.persistentStore?.set(key, value);
-  }
-
-  private getInflightRequest(content: string): Promise<T | null> | null {
-    const key = computeCacheKey(content);
-    return this.inflight.get(key) ?? null;
-  }
-
-  private setInflightRequest(content: string, promise: Promise<T | null>): void {
-    const key = computeCacheKey(content);
-    this.inflight.set(key, promise);
-  }
-
-  private deleteInflightRequest(content: string): void {
-    const key = computeCacheKey(content);
-    this.inflight.delete(key);
+    this.storeByKey(computeCacheKey(content), value);
   }
 
   /** Clear all cached entries and in-flight requests. */
@@ -182,6 +140,41 @@ export class TtlCache<T> {
   /** Number of in-flight requests. Useful for tests. */
   get inflightSize(): number {
     return this.inflight.size;
+  }
+
+  private lookupByKey(key: string, nowFn: () => number = Date.now): T | null {
+    const entry = this.cache.get(key);
+
+    if (entry) {
+      if (nowFn() - entry.createdAt > CACHE_TTL_MS) {
+        this.cache.delete(key);
+      } else {
+        return entry.value;
+      }
+    }
+
+    if (this.persistentStore) {
+      const persisted = this.persistentStore.get(key);
+      if (persisted !== null) {
+        // Promote L2 hit into the L1 hot cache.
+        this.cache.set(key, { value: persisted, createdAt: Date.now() });
+        return persisted;
+      }
+    }
+
+    return null;
+  }
+
+  private storeByKey(key: string, value: T): void {
+    if (this.cache.size >= MAX_CACHE_SIZE && !this.cache.has(key)) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest !== undefined) {
+        this.cache.delete(oldest);
+      }
+    }
+
+    this.cache.set(key, { value, createdAt: Date.now() });
+    this.persistentStore?.set(key, value);
   }
 
   private log(message: string): void {

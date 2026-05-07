@@ -21,12 +21,18 @@ export async function detectPaneActions(content: string, deps: ActionDeps): Prom
       responseMimeType: "application/json",
     });
     if (!text) return null;
+    let parsed: unknown;
     try {
-      const parsed: unknown = JSON.parse(text);
-      return isValidPaneAction(parsed) ? parsed : null;
+      parsed = JSON.parse(text);
     } catch {
+      console.warn(`${new Date().toISOString()} [Gemini Actions] Invalid JSON: ${text}`);
       return null;
     }
+    if (!isValidPaneAction(parsed)) {
+      console.warn(`${new Date().toISOString()} [Gemini Actions] Invalid action shape: ${text}`);
+      return null;
+    }
+    return parsed;
   });
 
   return result ?? DEFAULT_ACTION;
