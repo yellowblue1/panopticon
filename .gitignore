@@ -2,5 +2,27 @@ node_modules
 dist
 coverage
 .env
+.env.local
+.env.*.local
 *.log
 .DS_Store
+
+# Secrets / credentials
+*.key
+*.pem
+
+# Workspace build artifacts
+web/dist
+web/node_modules
+web/coverage
+
+# Caches
+.cache
+*.tsbuildinfo
+
+# Editor / IDE
+.vscode
+.idea
+
+# Per-user Claude Code state
+.claude/settings.local.json
