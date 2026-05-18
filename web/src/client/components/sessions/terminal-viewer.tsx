@@ -136,6 +136,7 @@ export function TerminalViewer({
   // ensuring the scroll position is correct before the user sees anything.
   // Depends on both content AND containerWidth because the rendered HTML changes
   // when containerWidth updates (mobile border filtering uses cols derived from it).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: containerWidth is referenced indirectly via the cols-derived border filter; removing it would skip re-scroll on viewport resize
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || content == null) return;
@@ -228,6 +229,7 @@ export function TerminalViewer({
         {processedHtml != null ? (
           <pre
             className="terminal-content"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML produced by fancy-ansi (escape-html escaped) + linkifyHtml (controlled <a> injection) over server-controlled tmux output
             dangerouslySetInnerHTML={{ __html: processedHtml }}
             onClick={handleTerminalClick}
             onKeyDown={handleTerminalKeyDown}

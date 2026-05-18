@@ -1,6 +1,7 @@
 // Shared types for client/server communication
 // These types are used in API requests and responses
 
+/** @public */
 export type SessionStatus = "busy" | "waiting";
 
 export type AgentType = "claude" | "codex";
