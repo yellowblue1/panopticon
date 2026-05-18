@@ -1,9 +1,6 @@
 // Shared types for client/server communication
 // These types are used in API requests and responses
 
-/** @public */
-export type SessionStatus = "busy" | "waiting";
-
 export type AgentType = "claude" | "codex";
 
 export interface SessionResponse {
@@ -11,7 +8,7 @@ export interface SessionResponse {
   project_name: string;
   git_branch: string | null;
   github_repo_url: string | null;
-  status: SessionStatus;
+  status: "busy" | "waiting";
   summary: string | null;
   tmux_target: string;
   tmux_session_name: string;
