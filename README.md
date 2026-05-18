@@ -200,4 +200,4 @@ Please report security vulnerabilities **privately** rather than via a public is
 
 ## License
 
-[MIT](./LICENSE) © yellowblue1
+[MIT](./LICENSE) © 2026 Akira Sosa
