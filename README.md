@@ -1,5 +1,7 @@
 # Panopticon
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 Monitoring dashboard for Claude Code and Codex sessions running in tmux. Auto-discovers AI coding sessions, tracks activity in real time, generates AI summaries with Gemini 2.5 Flash, and serves a live dashboard on localhost:3847.
 
 ## Features
@@ -9,12 +11,13 @@ Monitoring dashboard for Claude Code and Codex sessions running in tmux. Auto-di
 - **AI summaries** — generates concise session summaries using Gemini 2.5 Flash when a session is idle
 - **Action detection** — identifies what type of input the agent expects (yes/no, choices, free-text, or none)
 - **Live dashboard** — Server-Sent Events push updates to the React UI in real time
-- **Terminal viewer** — renders full ANSI output with clickable URLs; send keystrokes directly from the browser
+- **Terminal viewer** — renders full ANSI output with clickable URLs (including OSC 8 escape sequences); send keystrokes directly from the browser
 - **Session launcher** — discover projects and launch AI sessions from the dashboard
 - **Plan viewer** — browse and manage Claude Code plan files
 - **Command palette** — slash command discovery from installed plugins and built-in commands
 - **Session grouping** — visual grouping of orchestrator and worktree child sessions with unseen progress indicators
 - **MCP file push** — Claude Code can push generated files (images, PDFs, etc.) directly to the browser via an embedded MCP endpoint
+- **Push history** — a Pushes tab on each session keeps a chronological log of every `push_file` / `push_url` event so downloads remain reachable after the toast dismisses
 - **Remote access** — reach the dashboard from any device via Tailscale
 
 ## Quick Start
@@ -109,6 +112,7 @@ bun run depcruise    # Dependency architecture check
 src/
   intelligence/   # AI summarization, action detection
   launcher/       # project discovery & session launching
+  mcp/            # MCP server integration (push_file, push_url)
   plan/           # plan file discovery & viewing
   session/        # session lifecycle & state machine
   terminal/       # tmux operations, process discovery
@@ -181,3 +185,19 @@ If you need to customize the MCP endpoint (e.g. non-default port), add an `mcpSe
 > **Note:** `~/.claude.json` contains other Claude Code settings. Only add or modify the `mcpServers.panopticon` entry.
 
 Panopticon will not overwrite an existing `panopticon` entry.
+
+## Contributing
+
+Issues and pull requests are welcome. For bugs and feature requests, please open a [GitHub issue](https://github.com/yellowblue1/panopticon/issues). For larger changes, opening an issue first to discuss the approach is appreciated.
+
+Run `bun run lint` and `bun test` before sending a PR — the pre-commit hook (`husky` + `lint-staged`) will run Biome on staged files automatically.
+
+## Security
+
+Please report security vulnerabilities **privately** rather than via a public issue.
+
+<!-- TODO(maintainer): replace this paragraph with a real reporting contact (private email or GitHub Security Advisory) before public launch. -->
+
+## License
+
+[MIT](./LICENSE) © yellowblue1
