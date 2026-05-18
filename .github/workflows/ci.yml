@@ -65,3 +65,21 @@ jobs:
       - name: Run dependency cruiser
         run: bun run depcruise
 
+  lockfile-drift:
+    name: Lockfile drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies (regenerates lockfile if drifted)
+        run: bun install
+
+      - name: Fail if lockfile or manifests changed
+        run: |
+          if ! git diff --exit-code bun.lock package.json web/package.json; then
+            echo "::error::bun.lock is out of sync with package.json. Run 'bun install' locally and commit the updated bun.lock."
+            exit 1
+          fi
+
