@@ -73,13 +73,53 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - name: Install dependencies (regenerates lockfile if drifted)
-        run: bun install
+      # Catches deps added/removed/upgraded in package.json without regenerating
+      # bun.lock — frozen install fails when resolved versions no longer satisfy
+      # the declared constraints.
+      - name: Verify resolved versions still satisfy package.json
+        run: bun install --frozen-lockfile
 
-      - name: Fail if lockfile or manifests changed
+      # Catches the subtler drift mode that frozen-lockfile misses: declared
+      # ranges or overrides widened in package.json but bun.lock's recorded
+      # workspace metadata not refreshed (resolved versions still satisfy, so
+      # frozen-lockfile passes, but the lockfile's stored constraints go stale).
+      # This is what slipped through main between PRs #160 and #162.
+      #
+      # Scope: root workspace dependencies/devDependencies + root overrides.
+      # The web/ workspace is intentionally NOT checked here because main
+      # currently carries pre-existing drift from PR #164 (bun update rewrote
+      # ranges in web/package.json but bun.lock's workspaces.web section was
+      # not refreshed). Once that drift is fixed in a follow-up, extend this
+      # check to iterate all workspaces.
+      - name: Verify bun.lock metadata matches package.json
         run: |
-          if ! git diff --exit-code bun.lock package.json web/package.json; then
-            echo "::error::bun.lock is out of sync with package.json. Run 'bun install' locally and commit the updated bun.lock."
-            exit 1
-          fi
+          bun -e '
+            const fs = require("fs");
+            const stripTrailingCommas = (s) => s.replace(/,(\s*[}\]])/g, "$1");
+            const lock = JSON.parse(stripTrailingCommas(fs.readFileSync("bun.lock", "utf8")));
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const norm = (o) => JSON.stringify(o ?? {}, Object.keys(o ?? {}).sort());
+            const fields = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+            const rootLock = lock.workspaces[""];
+            let ok = true;
+            for (const field of fields) {
+              if (norm(pkg[field]) !== norm(rootLock[field])) {
+                console.error("Root " + field + " differs between package.json and bun.lock:");
+                console.error("  package.json: " + norm(pkg[field]));
+                console.error("  bun.lock:     " + norm(rootLock[field]));
+                ok = false;
+              }
+            }
+            if (norm(pkg.overrides) !== norm(lock.overrides)) {
+              console.error("overrides differ between package.json and bun.lock:");
+              console.error("  package.json: " + norm(pkg.overrides));
+              console.error("  bun.lock:     " + norm(lock.overrides));
+              ok = false;
+            }
+            if (!ok) {
+              console.error("::error::bun.lock metadata is out of sync with package.json. Run \"bun install\" locally and commit the updated bun.lock.");
+              process.exit(1);
+            }
+            console.log("bun.lock root metadata matches package.json.");
+          '
 
