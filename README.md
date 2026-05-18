@@ -192,12 +192,25 @@ Issues and pull requests are welcome. For bugs and feature requests, please open
 
 Run `bun run lint` and `bun test` before sending a PR — the pre-commit hook (`husky` + `lint-staged`) will run Biome on staged files automatically.
 
+## Privacy & Data
+
+Panopticon sends tmux pane content to Google's Gemini API for AI features:
+
+- **Summaries** — up to 4 000 characters of the most recent Claude Code conversation log per session, sent to `gemini-2.5-flash` to generate the short status line shown in the dashboard.
+- **Action detection** — up to 1 000 characters of the visible (ANSI-sanitized) tmux pane, sent to `gemini-2.5-flash` to classify what input the agent is waiting for (yes/no, choices, free text, or none).
+
+Anything visible in a tracked tmux pane at sampling time is eligible to be sent — including secrets, file contents, or terminal output you did not intend to share with a third party.
+
+No telemetry, analytics, or other external endpoints are contacted.
+
+**To run panopticon without any Gemini outbound:** leave `GOOGLE_API_KEY`, `GEMINI_API_KEY`, and `GOOGLE_GENAI_USE_VERTEXAI` all unset. The dashboard, terminal viewer, session launcher, and MCP push feature work without AI; summaries and action detection are silently skipped.
+
+**To disable the MCP endpoint** (separate from AI features), set `PANOPTICON_MCP=false`.
+
 ## Security
 
-Please report security vulnerabilities **privately** rather than via a public issue.
-
-<!-- TODO(maintainer): replace this paragraph with a real reporting contact (private email or GitHub Security Advisory) before public launch. -->
+Security vulnerabilities should be reported privately via [GitHub Security Advisories](https://github.com/yellowblue1/panopticon/security/advisories/new). See [SECURITY.md](./SECURITY.md) for details.
 
 ## License
 
-[MIT](./LICENSE) © 2026 Akira Sosa
+[MIT](./LICENSE) © 2026 Yellow Blue Inc.
