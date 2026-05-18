@@ -194,16 +194,21 @@ Run `bun run lint` and `bun test` before sending a PR — the pre-commit hook (`
 
 ## Privacy & Data
 
-Panopticon sends tmux pane content to Google's Gemini API for AI features:
+Panopticon sends tmux pane content to Google's Gemini API for AI features. Both Claude Code and Codex sessions use the same path:
 
-- **Summaries** — up to 4 000 characters of the most recent Claude Code conversation log per session, sent to `gemini-2.5-flash` to generate the short status line shown in the dashboard.
+- **Summaries** — up to 4 000 characters of the most recent (ANSI-sanitized) tmux pane content per session, sent to `gemini-2.5-flash` to generate the short status line shown in the dashboard.
 - **Action detection** — up to 1 000 characters of the visible (ANSI-sanitized) tmux pane, sent to `gemini-2.5-flash` to classify what input the agent is waiting for (yes/no, choices, free text, or none).
 
 Anything visible in a tracked tmux pane at sampling time is eligible to be sent — including secrets, file contents, or terminal output you did not intend to share with a third party.
 
 No telemetry, analytics, or other external endpoints are contacted.
 
-**To run panopticon without any Gemini outbound:** leave `GOOGLE_API_KEY`, `GEMINI_API_KEY`, and `GOOGLE_GENAI_USE_VERTEXAI` all unset. The dashboard, terminal viewer, session launcher, and MCP push feature work without AI; summaries and action detection are silently skipped.
+**To run panopticon without any Gemini outbound:**
+
+1. Leave `GOOGLE_API_KEY`, `GEMINI_API_KEY`, and `GOOGLE_GENAI_USE_VERTEXAI` all unset.
+2. **gcloud users:** panopticon also auto-enables Vertex AI when `gcloud config get-value project` returns a project (a backward-compatibility fallback). To suppress this, run `gcloud config unset project` or invoke panopticon in a shell where `gcloud` is not on `PATH`.
+
+The dashboard, terminal viewer, session launcher, and MCP push feature work without AI; summaries and action detection are silently skipped.
 
 **To disable the MCP endpoint** (separate from AI features), set `PANOPTICON_MCP=false`.
 
