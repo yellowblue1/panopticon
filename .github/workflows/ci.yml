@@ -65,3 +65,60 @@ jobs:
       - name: Run dependency cruiser
         run: bun run depcruise
 
+  lockfile-drift:
+    name: Lockfile drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      # Catches deps added/removed/upgraded in package.json without regenerating
+      # bun.lock — frozen install fails when resolved versions no longer satisfy
+      # the declared constraints.
+      - name: Verify resolved versions still satisfy package.json
+        run: bun install --frozen-lockfile
+
+      # Catches the subtler drift mode that frozen-lockfile misses: declared
+      # ranges or overrides widened in package.json but bun.lock's recorded
+      # workspace metadata not refreshed (resolved versions still satisfy, so
+      # frozen-lockfile passes, but the lockfile's stored constraints go stale).
+      # This is what slipped through main between PRs #160 and #162, and what
+      # PR #164 also did to web/package.json (healed by this PR's lockfile
+      # regen).
+      - name: Verify bun.lock metadata matches package.json
+        run: |
+          bun -e '
+            const fs = require("fs");
+            const stripTrailingCommas = (s) => s.replace(/,(\s*[}\]])/g, "$1");
+            const lock = JSON.parse(stripTrailingCommas(fs.readFileSync("bun.lock", "utf8")));
+            const norm = (o) => JSON.stringify(o ?? {}, Object.keys(o ?? {}).sort());
+            const fields = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+            let ok = true;
+            for (const wsPath of Object.keys(lock.workspaces)) {
+              const pkgPath = wsPath === "" ? "package.json" : wsPath + "/package.json";
+              const wsPkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+              const wsLock = lock.workspaces[wsPath];
+              for (const field of fields) {
+                if (norm(wsPkg[field]) !== norm(wsLock[field])) {
+                  console.error("Workspace \"" + (wsPath || ".") + "\" " + field + " differs between " + pkgPath + " and bun.lock:");
+                  console.error("  " + pkgPath + ": " + norm(wsPkg[field]));
+                  console.error("  bun.lock:     " + norm(wsLock[field]));
+                  ok = false;
+                }
+              }
+            }
+            const rootPkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (norm(rootPkg.overrides) !== norm(lock.overrides)) {
+              console.error("Root overrides differ between package.json and bun.lock:");
+              console.error("  package.json: " + norm(rootPkg.overrides));
+              console.error("  bun.lock:     " + norm(lock.overrides));
+              ok = false;
+            }
+            if (!ok) {
+              console.error("::error::bun.lock metadata is out of sync with package.json. Run \"bun install\" locally and commit the updated bun.lock.");
+              process.exit(1);
+            }
+            console.log("bun.lock metadata matches package.json across all workspaces.");
+          '
+
