@@ -910,3 +910,172 @@ describe("HTTP methods", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("MCP host validation (DNS-rebinding mitigation)", () => {
+  it("rejects /mcp requests with a non-loopback Host header", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "evil.com" },
+    });
+
+    expect(res.status).toBe(403);
+    expect(mcpCalled).toBe(false);
+  });
+
+  it("allows /mcp requests with Host: 127.0.0.1:PORT", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "127.0.0.1:3847" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("allows /mcp requests with Host: localhost:PORT", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "localhost:3847" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("does not affect dashboard routes when Host is non-loopback", async () => {
+    const deps = createMockDeps();
+    const app = createApp(deps);
+
+    const res = await app.request("/api/sessions", {
+      headers: { Host: "evil.com" },
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("allows /mcp requests with Host: [::1]:PORT (IPv6 loopback)", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "[::1]:3847" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("allows /mcp requests with mixed-case Host: LOCALHOST", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "LOCALHOST:3847" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("rejects /mcp requests with an empty Host header", async () => {
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => c.json({ ok: true }),
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "" },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects /mcp requests with a suffix-attack Host: 127.0.0.1.evil.com", async () => {
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => c.json({ ok: true }),
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "127.0.0.1.evil.com" },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects /mcp requests with a trailing-garbage Host: localhost:3847evil", async () => {
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => c.json({ ok: true }),
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "localhost:3847evil" },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("intercepts GET /mcp (middleware is method-agnostic)", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "GET",
+      headers: { Host: "evil.com" },
+    });
+
+    expect(res.status).toBe(403);
+    expect(mcpCalled).toBe(false);
+  });
+});

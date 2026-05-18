@@ -39,14 +39,38 @@ export interface ActionDeps {
   cache: Cache<PaneAction>;
 }
 
-const VALID_ACTION_TYPES = new Set(["choices", "yesno", "freeform", "none"]);
+function isChoiceOption(
+  value: unknown,
+): value is { label: string; value: string; autoEnter: boolean } {
+  if (typeof value !== "object" || value === null) return false;
+  const opt = value as Record<string, unknown>;
+  return (
+    typeof opt.label === "string" &&
+    typeof opt.value === "string" &&
+    typeof opt.autoEnter === "boolean"
+  );
+}
 
 /**
  * Validate that a parsed object is a valid PaneAction.
+ *
+ * Bounds what malformed Gemini output can flow downstream even if a partial
+ * prompt-injection succeeds at the language level: shape mismatches are
+ * rejected here and the caller falls back to `{type: "none"}`.
  */
 export function isValidPaneAction(parsed: unknown): parsed is PaneAction {
   if (typeof parsed !== "object" || parsed === null) return false;
   const obj = parsed as Record<string, unknown>;
   if (typeof obj.type !== "string") return false;
-  return VALID_ACTION_TYPES.has(obj.type);
+  switch (obj.type) {
+    case "choices":
+      return Array.isArray(obj.options) && obj.options.every(isChoiceOption);
+    case "freeform":
+      return typeof obj.placeholder === "string";
+    case "yesno":
+    case "none":
+      return true;
+    default:
+      return false;
+  }
 }

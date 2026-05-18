@@ -24,10 +24,10 @@ describe("summarize", () => {
       expect(prompt).toContain("15 words or less");
     });
 
-    it("includes the content at the end", () => {
+    it("includes the content inside the terminal_output delimited block", () => {
       const content = "[user]: Help me fix a bug\n\n[assistant]: Done.";
       const prompt = buildConversationPrompt(content);
-      expect(prompt.endsWith(content)).toBe(true);
+      expect(prompt).toContain(`<terminal_output>\n${content}\n</terminal_output>`);
     });
 
     it("mentions terminal output context", () => {

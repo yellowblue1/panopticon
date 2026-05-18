@@ -29,6 +29,28 @@ Out of scope:
 
 Only the latest commit on `main` is supported. Panopticon has no release tags yet; fixes ship as soon as they merge.
 
+## Defense in Depth
+
+The following request-boundary defenses limit blast radius if an upstream
+component is compromised or coerced:
+
+- The MCP endpoint at `/mcp` binds to loopback by default and additionally
+  enforces a `Host`-header loopback check. This mitigates DNS-rebinding
+  attacks: a malicious page in the user's browser cannot use a rebound
+  hostname to reach `push_file` and exfiltrate arbitrary local files, since
+  the browser still sends the attacker hostname in the `Host` header.
+  Note: this `Host` check applies only to `/mcp`. Dashboard routes under
+  `/api/*` rely on the loopback bind plus Origin-based CORS, which DNS
+  rebinding can defeat; do not run panopticon on a machine where untrusted
+  users can drive the local browser to an attacker-controlled page.
+- Tmux pane content sent to Gemini for summaries and action detection is
+  wrapped in `<terminal_output>` XML tags with an explicit framing
+  instruction that tells the model to treat the contents as opaque data,
+  not as instructions. Any literal closing tag in the content is
+  neutralized to prevent delimiter-injection breakout. The action-detection
+  response is then validated against the strict `PaneAction` shape before
+  being returned to the dashboard.
+
 ## Supply-Chain Protections
 
 The repository applies the following baseline protections:
