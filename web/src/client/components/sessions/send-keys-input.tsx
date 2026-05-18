@@ -74,6 +74,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   }, []);
 
   // Auto-resize textarea to fit content (up to ~5 lines)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: text triggers re-measurement of textarea.scrollHeight after React updates the DOM; removing it would break auto-resize on input
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;

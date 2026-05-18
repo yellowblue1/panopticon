@@ -202,5 +202,6 @@ export function useSessionsStream(callbacks?: SessionsStreamCallbacks): void {
       }
       clearStalenessCheck();
     };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler memoizes connectSSE and clearStalenessCheck so the effect runs once on mount; manual useCallback is forbidden by project rules (see .claude/rules/typescript.md)
   }, [connectSSE, clearStalenessCheck]);
 }

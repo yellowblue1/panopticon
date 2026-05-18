@@ -483,8 +483,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
       const body = await c.req.json().catch(() => null);
       if (
-        !body ||
-        !body.config ||
+        !body?.config ||
         !Array.isArray(body.config.scanPaths) ||
         typeof body.config.useGhq !== "boolean"
       ) {

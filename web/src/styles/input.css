@@ -112,10 +112,6 @@ body {
   border-left-color: transparent;
 }
 
-.sessions-table tbody tr:not(.read) .project-name {
-  @apply font-semibold;
-}
-
 /* Session grouping — orchestrator / worktree hierarchy */
 .row-orchestrator {
   border-left: 3px solid var(--color-accent-blue);
@@ -123,10 +119,6 @@ body {
 
 .row-worktree-child {
   border-left: 3px solid var(--color-border-muted);
-}
-
-.row-worktree-child .col-project {
-  padding-left: 32px;
 }
 
 .worktree-indent {
@@ -808,10 +800,6 @@ html.vertical-expand [data-app-shell] {
     border-left: 3px solid var(--color-border-muted);
   }
 
-  .row-worktree-child .col-project {
-    padding-left: 0;
-  }
-
   .sessions-table tbody tr.orphan-group-header {
     display: flex;
     align-items: center;
@@ -821,5 +809,26 @@ html.vertical-expand [data-app-shell] {
   .sessions-table tbody tr.orphan-group-header td {
     padding: 0;
     border: none;
+  }
+}
+
+/* ============================================
+   Descendant overrides
+   Placed after responsive breakpoints so source
+   order matches specificity (satisfies
+   lint/style/noDescendingSpecificity).
+   ============================================ */
+
+.sessions-table tbody tr:not(.read) .project-name {
+  @apply font-semibold;
+}
+
+.row-worktree-child .col-project {
+  padding-left: 32px;
+}
+
+@media (max-width: 639px) {
+  .row-worktree-child .col-project {
+    padding-left: 0;
   }
 }
