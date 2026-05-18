@@ -39,6 +39,10 @@ component is compromised or coerced:
   attacks: a malicious page in the user's browser cannot use a rebound
   hostname to reach `push_file` and exfiltrate arbitrary local files, since
   the browser still sends the attacker hostname in the `Host` header.
+  Note: this `Host` check applies only to `/mcp`. Dashboard routes under
+  `/api/*` rely on the loopback bind plus Origin-based CORS, which DNS
+  rebinding can defeat; do not run panopticon on a machine where untrusted
+  users can drive the local browser to an attacker-controlled page.
 - Tmux pane content sent to Gemini for summaries and action detection is
   wrapped in `<terminal_output>` XML tags with an explicit framing
   instruction that tells the model to treat the contents as opaque data,

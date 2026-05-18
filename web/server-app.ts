@@ -47,12 +47,15 @@ import type { SendMessageResult } from "../src/terminal/application/send-message
  * treats the request as same-origin). The browser still sends the
  * attacker hostname in the `Host` header, so loopback-only validation
  * here closes the gap and prevents arbitrary file reads via push_file.
+ *
+ * The pattern accepts the IPv4 and IPv6 loopback hostnames; `Host`
+ * values are compared case-insensitively per RFC 3986.
  */
-const LOOPBACK_HOST_PATTERN = /^(localhost|127\.0\.0\.1)(:\d+)?$/;
+const LOOPBACK_HOST_PATTERN = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
 function loopbackHostOnly(): MiddlewareHandler {
   return async (c, next) => {
-    const host = c.req.header("host") ?? "";
+    const host = (c.req.header("host") ?? "").toLowerCase();
     if (!LOOPBACK_HOST_PATTERN.test(host)) {
       return c.json({ error: "Forbidden host" }, 403);
     }
