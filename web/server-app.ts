@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
@@ -38,6 +38,27 @@ import type {
   SwitchClientResponse,
 } from "../src/shared/types";
 import type { SendMessageResult } from "../src/terminal/application/send-message";
+
+/**
+ * DNS-rebinding mitigation for the MCP endpoint.
+ *
+ * A malicious page in the user's browser can rebind its hostname to
+ * 127.0.0.1, defeating Origin-based CORS (after the rebind the browser
+ * treats the request as same-origin). The browser still sends the
+ * attacker hostname in the `Host` header, so loopback-only validation
+ * here closes the gap and prevents arbitrary file reads via push_file.
+ */
+const LOOPBACK_HOST_PATTERN = /^(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+function loopbackHostOnly(): MiddlewareHandler {
+  return async (c, next) => {
+    const host = c.req.header("host") ?? "";
+    if (!LOOPBACK_HOST_PATTERN.test(host)) {
+      return c.json({ error: "Forbidden host" }, 403);
+    }
+    return next();
+  };
+}
 
 /**
  * Dependencies for the app factory.
@@ -536,6 +557,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
     })
 
     // MCP endpoint (Streamable HTTP transport)
+    .use("/mcp", loopbackHostOnly())
     .all("/mcp", async (c) => {
       if (!deps.handleMcpRequest) {
         return c.json({ error: "MCP not available" }, 501);

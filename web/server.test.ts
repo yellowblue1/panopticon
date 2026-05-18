@@ -910,3 +910,73 @@ describe("HTTP methods", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("MCP host validation (DNS-rebinding mitigation)", () => {
+  it("rejects /mcp requests with a non-loopback Host header", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "evil.com" },
+    });
+
+    expect(res.status).toBe(403);
+    expect(mcpCalled).toBe(false);
+  });
+
+  it("allows /mcp requests with Host: 127.0.0.1:PORT", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "127.0.0.1:3847" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("allows /mcp requests with Host: localhost:PORT", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "localhost:3847" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("does not affect dashboard routes when Host is non-loopback", async () => {
+    const deps = createMockDeps();
+    const app = createApp(deps);
+
+    const res = await app.request("/api/sessions", {
+      headers: { Host: "evil.com" },
+    });
+
+    expect(res.status).toBe(200);
+  });
+});
