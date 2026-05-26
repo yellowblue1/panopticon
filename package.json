@@ -42,7 +42,7 @@
     "dependency-cruiser": "^17.4.0",
     "husky": "^9.1.7",
     "knip": "^6.12.2",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.5",
     "msw": "^2.14.6",
     "type-coverage": "^2.29.7",
     "typescript": "^6.0.3"
