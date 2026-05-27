@@ -61,7 +61,12 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     if (base !== null) {
       worktreeSessions.push({ session, baseCwd: base });
     } else {
-      orchestratorByCwd.getOrInsert(session.cwd, []).push(session);
+      const arr = orchestratorByCwd.get(session.cwd);
+      if (arr) {
+        arr.push(session);
+      } else {
+        orchestratorByCwd.set(session.cwd, [session]);
+      }
     }
   }
 
@@ -75,9 +80,19 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
 
     if (orchestrator && orchestrator.project_name === session.project_name) {
       usedOrchestratorCwds.add(baseCwd);
-      groupsByBaseCwd.getOrInsert(baseCwd, { orchestrator, children: [] }).children.push(session);
+      const existing = groupsByBaseCwd.get(baseCwd);
+      if (existing) {
+        existing.children.push(session);
+      } else {
+        groupsByBaseCwd.set(baseCwd, { orchestrator, children: [session] });
+      }
     } else {
-      orphansByBaseCwd.getOrInsert(baseCwd, []).push(session);
+      const orphans = orphansByBaseCwd.get(baseCwd);
+      if (orphans) {
+        orphans.push(session);
+      } else {
+        orphansByBaseCwd.set(baseCwd, [session]);
+      }
     }
   }
 
