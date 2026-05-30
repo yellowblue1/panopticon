@@ -24,6 +24,7 @@ import {
   PANE_ID_HEADER_NAME,
   PANE_ID_HEADER_VALUE_TEMPLATE,
   registerMcpConfig,
+  resolveMcpConnectHost,
 } from "../src/mcp/application/register-config";
 import type { McpFilePushDeps, McpUrlPushDeps } from "../src/mcp/domain/ports";
 import {
@@ -633,7 +634,7 @@ const app = createApp(
       }
     },
   },
-  { restrictCors: true },
+  { restrictCors: true, mcpAllowedHost: resolveMcpConnectHost(HOST) },
 );
 
 // Add static file serving and SPA fallback (only when dist/ exists)
