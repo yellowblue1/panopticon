@@ -1131,6 +1131,27 @@ describe("MCP host validation (DNS-rebinding mitigation)", () => {
     expect(res.status).toBe(403);
   });
 
+  it("accepts a bare IPv6 mcpAllowedHost and matches the bracketed Host header", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    // Symmetric counterpart of the bracketed test below: bare and bracketed
+    // operator inputs must produce the same allowlist alternative.
+    const app = createApp(deps, { mcpAllowedHost: "fd7a::5" });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "[fd7a::5]:3848" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
   it("accepts a bracketed IPv6 mcpAllowedHost and matches the bracketed Host header", async () => {
     let mcpCalled = false;
     const deps = createMockDeps({

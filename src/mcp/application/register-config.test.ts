@@ -4,6 +4,7 @@ import {
   PANE_ID_HEADER_NAME,
   PANE_ID_HEADER_VALUE_TEMPLATE,
   registerMcpConfig,
+  resolveMcpConnectHost,
 } from "./register-config";
 
 const expectedHeaders = { [PANE_ID_HEADER_NAME]: PANE_ID_HEADER_VALUE_TEMPLATE };
@@ -217,5 +218,42 @@ describe("registerMcpConfig", () => {
 
     expect(() => registerMcpConfig(3847, "localhost", deps)).not.toThrow();
     expect(registerMcpConfig(3847, "localhost", deps)).toBe(false); // second call — already registered
+  });
+});
+
+describe("resolveMcpConnectHost", () => {
+  it("maps the IPv4 wildcard to localhost", () => {
+    expect(resolveMcpConnectHost("0.0.0.0")).toBe("localhost");
+  });
+
+  it("maps the IPv6 wildcard to localhost", () => {
+    expect(resolveMcpConnectHost("::")).toBe("localhost");
+  });
+
+  it("passes through a concrete IPv4 host unchanged", () => {
+    expect(resolveMcpConnectHost("100.105.121.19")).toBe("100.105.121.19");
+  });
+
+  it("passes through localhost unchanged", () => {
+    expect(resolveMcpConnectHost("localhost")).toBe("localhost");
+  });
+
+  it("brackets a bare IPv6 literal so the URL stays well-formed", () => {
+    expect(resolveMcpConnectHost("::1")).toBe("[::1]");
+    expect(resolveMcpConnectHost("fd7a::5")).toBe("[fd7a::5]");
+  });
+
+  it("does not double-bracket an already-bracketed IPv6 literal", () => {
+    expect(resolveMcpConnectHost("[fd7a::5]")).toBe("[fd7a::5]");
+  });
+});
+
+describe("registerMcpConfig with IPv6 hostnames", () => {
+  it("writes a bracketed IPv6 URL for a bare IPv6 bind hostname", () => {
+    const deps = createMockDeps();
+    registerMcpConfig(3848, "::1", deps);
+    const config = readJson(deps.files, "/home/test/.claude.json");
+    const servers = config.mcpServers as Record<string, { url: string }>;
+    expect(servers.panopticon.url).toBe("http://[::1]:3848/mcp");
   });
 });

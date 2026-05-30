@@ -39,6 +39,12 @@ import type {
 } from "../src/shared/types";
 import type { SendMessageResult } from "../src/terminal/application/send-message";
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
 /**
  * DNS-rebinding mitigation for the MCP endpoint.
  *
@@ -54,16 +60,9 @@ import type { SendMessageResult } from "../src/terminal/application/send-message
  * same address the dashboard is served from. A rebinding attack still
  * carries the attacker's domain in `Host`, which is not in the allowlist.
  * `Host` values are compared case-insensitively per RFC 3986.
- */
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-
-/**
- * `allowedHost` must already be a connect-target hostname
- * (see resolveMcpConnectHost). Wildcards must be mapped to loopback by the
+ *
+ * `allowedHost` must already be a connect-target hostname (see
+ * resolveMcpConnectHost). Wildcards must be mapped to loopback by the
  * caller; this guard does not re-do that mapping.
  */
 function mcpHostGuard(allowedHost?: string): MiddlewareHandler {
