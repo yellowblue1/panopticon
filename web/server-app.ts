@@ -39,24 +39,46 @@ import type {
 } from "../src/shared/types";
 import type { SendMessageResult } from "../src/terminal/application/send-message";
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
 /**
  * DNS-rebinding mitigation for the MCP endpoint.
  *
  * A malicious page in the user's browser can rebind its hostname to
  * 127.0.0.1, defeating Origin-based CORS (after the rebind the browser
  * treats the request as same-origin). The browser still sends the
- * attacker hostname in the `Host` header, so loopback-only validation
- * here closes the gap and prevents arbitrary file reads via push_file.
+ * attacker hostname in the `Host` header, so a `Host` allowlist here
+ * closes the gap and prevents arbitrary file reads via push_file.
  *
- * The pattern accepts the IPv4 and IPv6 loopback hostnames; `Host`
- * values are compared case-insensitively per RFC 3986.
+ * The allowlist always accepts the IPv4/IPv6 loopback hostnames, plus the
+ * server's own configured bind host when it is non-loopback (e.g. a
+ * Tailscale IP) — otherwise the MCP endpoint would be unreachable on the
+ * same address the dashboard is served from. A rebinding attack still
+ * carries the attacker's domain in `Host`, which is not in the allowlist.
+ * `Host` values are compared case-insensitively per RFC 3986.
+ *
+ * `allowedHost` must already be a connect-target hostname (see
+ * resolveMcpConnectHost). Wildcards must be mapped to loopback by the
+ * caller; this guard does not re-do that mapping.
  */
-const LOOPBACK_HOST_PATTERN = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-
-function loopbackHostOnly(): MiddlewareHandler {
+function mcpHostGuard(allowedHost?: string): MiddlewareHandler {
+  const alternatives = ["localhost", "127\\.0\\.0\\.1", "\\[::1\\]"];
+  // Strip optional surrounding brackets so a bracketed IPv6 input
+  // ("[fd7a::5]") and a bare one ("fd7a::5") produce the same alternative.
+  const extra = allowedHost?.toLowerCase().replace(/^\[(.*)\]$/, "$1");
+  if (extra && !LOOPBACK_HOSTS.has(extra)) {
+    // IPv6 literals appear bracketed in the Host header; everything else
+    // appears bare.
+    alternatives.push(extra.includes(":") ? `\\[${escapeRegExp(extra)}\\]` : escapeRegExp(extra));
+  }
+  const allowedHostPattern = new RegExp(`^(${alternatives.join("|")})(:\\d+)?$`);
   return async (c, next) => {
     const host = (c.req.header("host") ?? "").toLowerCase();
-    if (!LOOPBACK_HOST_PATTERN.test(host)) {
+    if (!allowedHostPattern.test(host)) {
       return c.json({ error: "Forbidden host" }, 403);
     }
     return next();
@@ -133,13 +155,15 @@ export interface SseClient {
  */
 interface AppOptions {
   restrictCors?: boolean;
+  /** Non-loopback bind host to additionally allow on the /mcp endpoint. */
+  mcpAllowedHost?: string;
 }
 
 /**
  * Creates a Hono app with injected dependencies.
  */
 export function createApp(deps: AppDeps, options: AppOptions = {}) {
-  const { restrictCors = true } = options;
+  const { restrictCors = true, mcpAllowedHost } = options;
 
   const app = new Hono()
     .use("/*", secureHeaders())
@@ -560,7 +584,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
     })
 
     // MCP endpoint (Streamable HTTP transport)
-    .use("/mcp", loopbackHostOnly())
+    .use("/mcp", mcpHostGuard(mcpAllowedHost))
     .all("/mcp", async (c) => {
       if (!deps.handleMcpRequest) {
         return c.json({ error: "MCP not available" }, 501);

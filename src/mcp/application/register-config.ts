@@ -1,6 +1,20 @@
 import type { McpConfigDeps } from "../domain/ports";
 
 /**
+ * Map a server bind hostname to the host clients should connect on.
+ * Wildcard binds (`0.0.0.0`, `::`) are not valid as a connect target —
+ * loopback is the safe substitute. Bare IPv6 literals get bracketed so the
+ * resulting URL is well-formed (`http://[::1]:port` not `http://::1:port`).
+ * Exported so the MCP host allowlist in the HTTP layer can stay in lockstep
+ * with the URL registered here.
+ */
+export function resolveMcpConnectHost(hostname: string): string {
+  if (hostname === "0.0.0.0" || hostname === "::") return "localhost";
+  if (hostname.includes(":") && !hostname.startsWith("[")) return `[${hostname}]`;
+  return hostname;
+}
+
+/**
  * Header name the MCP server reads to identify the calling tmux pane.
  */
 export const PANE_ID_HEADER_NAME = "X-Panopticon-Pane-Id";
@@ -49,9 +63,7 @@ export function registerMcpConfig(port: number, hostname: string, deps: McpConfi
     mcpServers = {};
   }
 
-  // Wildcard bind addresses are not usable as connect targets
-  const connectHost = hostname === "0.0.0.0" || hostname === "::" ? "localhost" : hostname;
-  const expectedUrl = `http://${connectHost}:${port}/mcp`;
+  const expectedUrl = `http://${resolveMcpConnectHost(hostname)}:${port}/mcp`;
   const expectedHeaders = { [PANE_ID_HEADER_NAME]: PANE_ID_HEADER_VALUE_TEMPLATE };
 
   if ("panopticon" in mcpServers) {

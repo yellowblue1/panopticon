@@ -1078,4 +1078,98 @@ describe("MCP host validation (DNS-rebinding mitigation)", () => {
     expect(res.status).toBe(403);
     expect(mcpCalled).toBe(false);
   });
+
+  it("allows /mcp requests matching the configured non-loopback bind host", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps, { mcpAllowedHost: "100.105.121.19" });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "100.105.121.19:3848" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("still rejects a non-loopback Host that differs from the configured host", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    const app = createApp(deps, { mcpAllowedHost: "100.105.121.19" });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "evil.com" },
+    });
+
+    expect(res.status).toBe(403);
+    expect(mcpCalled).toBe(false);
+  });
+
+  it("rejects a suffix-attack against the configured host", async () => {
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => c.json({ ok: true }),
+    });
+    const app = createApp(deps, { mcpAllowedHost: "100.105.121.19" });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "100.105.121.19.evil.com" },
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("accepts a bare IPv6 mcpAllowedHost and matches the bracketed Host header", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    // Symmetric counterpart of the bracketed test below: bare and bracketed
+    // operator inputs must produce the same allowlist alternative.
+    const app = createApp(deps, { mcpAllowedHost: "fd7a::5" });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "[fd7a::5]:3848" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
+
+  it("accepts a bracketed IPv6 mcpAllowedHost and matches the bracketed Host header", async () => {
+    let mcpCalled = false;
+    const deps = createMockDeps({
+      handleMcpRequest: async (c) => {
+        mcpCalled = true;
+        return c.json({ ok: true });
+      },
+    });
+    // Operator may write the IPv6 host either bracketed or bare; the guard
+    // must produce the same alternative in both cases.
+    const app = createApp(deps, { mcpAllowedHost: "[fd7a::5]" });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { Host: "[fd7a::5]:3848" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mcpCalled).toBe(true);
+  });
 });
