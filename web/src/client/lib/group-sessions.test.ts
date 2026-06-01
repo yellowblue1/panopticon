@@ -98,6 +98,71 @@ describe("groupSessions", () => {
     expect(result.ungrouped.map((s) => s.pane_id)).toEqual(expect.arrayContaining(["%0", "%1"]));
   });
 
+  it("picks the lowest tmux_target as orchestrator when multiple sessions share a cwd", () => {
+    // Reproduces the agent-factory case: 1.1 is the real orchestrator, 1.2 is
+    // an unrelated session in the same base cwd, and 2.1 is the worker for
+    // 1.1. Insertion order puts 1.2 first, but the heuristic must still pick
+    // 1.1 so the worker is grouped under the right parent and 1.2 falls to
+    // ungrouped.
+    const sessions = [
+      makeSession({
+        pane_id: "%1",
+        tmux_target: "agent-factory:1.2",
+        cwd: "/home/user/agent-factory",
+        last_activity: "2026-05-31T00:03:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%0",
+        tmux_target: "agent-factory:1.1",
+        cwd: "/home/user/agent-factory",
+        last_activity: "2026-05-31T00:02:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%2",
+        tmux_target: "agent-factory:2.1",
+        cwd: "/home/user/agent-factory-worktrees/feat-x",
+        last_activity: "2026-05-31T00:01:00.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].orchestrator?.tmux_target).toBe("agent-factory:1.1");
+    expect(result.groups[0].children).toHaveLength(1);
+    expect(result.groups[0].children[0].tmux_target).toBe("agent-factory:2.1");
+    expect(result.ungrouped).toHaveLength(1);
+    expect(result.ungrouped[0].tmux_target).toBe("agent-factory:1.2");
+  });
+
+  it("orders tmux_target naturally so 1.10 sorts after 1.2", () => {
+    const sessions = [
+      makeSession({
+        pane_id: "%0",
+        tmux_target: "p:1.10",
+        cwd: "/home/user/p",
+        last_activity: "2026-05-31T00:03:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%1",
+        tmux_target: "p:1.2",
+        cwd: "/home/user/p",
+        last_activity: "2026-05-31T00:02:00.000Z",
+      }),
+      makeSession({
+        pane_id: "%2",
+        tmux_target: "p:2.1",
+        cwd: "/home/user/p-worktrees/feat",
+        last_activity: "2026-05-31T00:01:00.000Z",
+      }),
+    ];
+
+    const result = groupSessions(sessions);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].orchestrator?.tmux_target).toBe("p:1.2");
+    expect(result.ungrouped).toHaveLength(1);
+    expect(result.ungrouped[0].tmux_target).toBe("p:1.10");
+  });
+
   it("uses one session as orchestrator and keeps duplicates ungrouped", () => {
     const sessions = [
       makeSession({
