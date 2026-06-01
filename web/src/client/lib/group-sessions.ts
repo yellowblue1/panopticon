@@ -45,6 +45,17 @@ function byActivityThenPaneId(a: SessionResponse, b: SessionResponse): number {
 }
 
 /**
+ * Natural-numeric compare on tmux_target ("session:window.pane"), so the
+ * lowest-numbered pane wins regardless of digit count (1.1 < 1.2 < 1.10).
+ * Used as a heuristic for picking the orchestrator when multiple sessions
+ * share a base cwd: tmux assigns lower window/pane indices to earlier-created
+ * panes, and the orchestrator is typically created before its workers.
+ */
+function byTmuxTarget(a: SessionResponse, b: SessionResponse): number {
+  return a.tmux_target.localeCompare(b.tmux_target, undefined, { numeric: true });
+}
+
+/**
  * Group sessions by orchestrator/worktree relationship.
  *
  * 1. Classify each session as potential orchestrator or worktree child
@@ -68,6 +79,13 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
         orchestratorByCwd.set(session.cwd, [session]);
       }
     }
+  }
+
+  // Sort same-cwd candidates so the lowest-numbered pane wins the orchestrator
+  // role. Sort is stable, so sessions with identical tmux_targets fall back to
+  // insertion order (the previous behaviour).
+  for (const candidates of orchestratorByCwd.values()) {
+    candidates.sort(byTmuxTarget);
   }
 
   const groupsByBaseCwd = new Map<string, SessionGroup>();
