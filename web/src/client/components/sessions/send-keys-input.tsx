@@ -29,11 +29,11 @@ const RAW_KEY_BUTTONS: { key: string; label: string; title: string }[] = [
   { key: "Up", label: "↑", title: "Send Up arrow key" },
   { key: "Down", label: "↓", title: "Send Down arrow key" },
   { key: "Right", label: "→", title: "Send Right arrow key" },
-  ...["1", "2", "3", "4", "5"].map((digit) => ({
-    key: digit,
-    label: digit,
-    title: `Send ${digit} key`,
-  })),
+  { key: "1", label: "1", title: "Send 1 key" },
+  { key: "2", label: "2", title: "Send 2 key" },
+  { key: "3", label: "3", title: "Send 3 key" },
+  { key: "4", label: "4", title: "Send 4 key" },
+  { key: "5", label: "5", title: "Send 5 key" },
 ];
 
 export function SendKeysInput({ paneId }: SendKeysInputProps) {

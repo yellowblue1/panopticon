@@ -16,6 +16,7 @@ import {
   sendEnter,
   sendInterrupt,
   sendLiteral,
+  sendRawKey,
   startPipePane,
   stopPipePane,
   switchClient,
@@ -548,5 +549,54 @@ describe("sendInterrupt", () => {
     };
 
     expect(sendInterrupt("%99", exec)).toBe(false);
+  });
+});
+
+describe("sendRawKey", () => {
+  it("sends a named key without -l (literal) so tmux interprets it", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    expect(sendRawKey("%0", "Left", exec)).toBe(true);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain("send-keys");
+    expect(commands[0]).not.toContain("-l");
+    expect(commands[0]).toContain("'Left'");
+  });
+
+  it("sends a single digit as one quoted argument (not a repeat-count)", () => {
+    // A lone digit must reach tmux as the key argument '1', not be consumed as
+    // a `-N` repeat count, so AskUserQuestion choice prompts receive the digit.
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    sendRawKey("%0", "1", exec);
+    expect(commands[0]).toContain("'1'");
+    expect(commands[0]).not.toContain("-N");
+  });
+
+  it("escapes the pane id", () => {
+    const commands: string[] = [];
+    const exec = (cmd: string) => {
+      commands.push(cmd);
+      return "";
+    };
+
+    sendRawKey("%0", "Right", exec);
+    expect(commands[0]).toContain("'%0'");
+  });
+
+  it("returns false on failure", () => {
+    const exec = () => {
+      throw new Error("pane not found");
+    };
+
+    expect(sendRawKey("%99", "Up", exec)).toBe(false);
   });
 });
