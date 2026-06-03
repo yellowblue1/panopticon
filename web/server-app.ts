@@ -22,8 +22,6 @@ import type {
   LauncherConfigData,
   LauncherConfigResponse,
   LaunchResponse,
-  PaneAction,
-  PaneActionsResponse,
   PaneContentFull,
   PaneContentResponse,
   PlanResponse,
@@ -96,7 +94,6 @@ export interface AppDeps {
   switchClient?: (paneId: string) => boolean;
   sendInterrupt?: (paneId: string) => boolean;
   capturePaneContent?: (paneId: string) => string | null;
-  detectPaneActions?: (content: string) => Promise<PaneAction>;
 
   // Auth status
   geminiBackend?: GeminiBackend | null;
@@ -355,38 +352,6 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         content,
         timestamp: Date.now(),
       } satisfies PaneContentResponse);
-    })
-
-    // GET /api/sessions/:pane_id/actions
-    .get("/api/sessions/:pane_id/actions", async (c) => {
-      if (!deps.capturePaneContent || !deps.detectPaneActions) {
-        return c.json(
-          {
-            pane_id: c.req.param("pane_id"),
-            action: { type: "none" } as PaneAction,
-            timestamp: Date.now(),
-          } satisfies PaneActionsResponse,
-          501,
-        );
-      }
-
-      const paneId = c.req.param("pane_id");
-      const content = deps.capturePaneContent(paneId);
-
-      if (content === null) {
-        return c.json({
-          pane_id: paneId,
-          action: { type: "none" } as PaneAction,
-          timestamp: Date.now(),
-        } satisfies PaneActionsResponse);
-      }
-
-      const action = await deps.detectPaneActions(content);
-      return c.json({
-        pane_id: paneId,
-        action,
-        timestamp: Date.now(),
-      } satisfies PaneActionsResponse);
     })
 
     // GET /api/sessions/:pane_id/plan

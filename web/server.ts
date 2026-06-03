@@ -5,9 +5,8 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { serveStatic } from "hono/bun";
 import { z } from "zod";
-import { detectPaneActions } from "../src/intelligence/application/detect-actions";
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
-import type { ActionDeps, SummaryDeps } from "../src/intelligence/domain/ports";
+import type { SummaryDeps } from "../src/intelligence/domain/ports";
 import { hasAuthError } from "../src/intelligence/infrastructure/auth-error-state";
 import { TtlCache } from "../src/intelligence/infrastructure/cache";
 import { createGenerateContentFn } from "../src/intelligence/infrastructure/gemini-client";
@@ -40,7 +39,6 @@ import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infras
 import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
 import type {
   FilePushSseEvent,
-  PaneAction,
   PaneContentDiff,
   PaneContentFull,
   UrlPushSseEvent,
@@ -52,7 +50,6 @@ import {
   getMonitoredProcesses,
   matchProcessesToPanes,
 } from "../src/terminal/infrastructure/process-matching";
-import { sanitizePaneContent } from "../src/terminal/infrastructure/sanitize";
 import {
   capturePaneContent,
   capturePaneContentEscaped,
@@ -109,28 +106,17 @@ const builtinCommandProvider = new BuiltinCommandProvider({
 
 const geminiBackend = bootstrapGeminiEnv();
 
-// Create separate generateContent functions per use case (only if Gemini is configured)
+// Create generateContent function for summaries (only if Gemini is configured)
 const summaryGenerateContent = geminiBackend ? createGenerateContentFn("gemini-2.5-flash") : null;
-const actionGenerateContent = geminiBackend ? createGenerateContentFn("gemini-2.5-flash") : null;
 
 const summaryCache = new TtlCache<string>({
   store: createSqliteCacheStore<string>({ tableName: "summaries" }),
   tag: "Gemini Summary",
 });
 
-const actionCache = new TtlCache<PaneAction>({
-  store: createSqliteCacheStore<PaneAction>({ tableName: "actions" }),
-  tag: "Gemini Actions",
-});
-
 const summaryDeps: SummaryDeps = {
   generateContent: summaryGenerateContent ?? (async () => null),
   cache: summaryCache,
-};
-
-const actionDeps: ActionDeps = {
-  generateContent: actionGenerateContent ?? (async () => null),
-  cache: actionCache,
 };
 
 const sessionManagerDeps: SessionManagerDeps = {
@@ -497,10 +483,6 @@ const app = createApp(
       ),
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
     capturePaneContent: capturePaneContentEscaped,
-    detectPaneActions: async (rawContent: string) => {
-      const sanitized = sanitizePaneContent(rawContent);
-      return detectPaneActions(sanitized, actionDeps);
-    },
     geminiBackend,
     isAiAvailable: geminiBackend !== null,
     getGeminiAuthError: hasAuthError,

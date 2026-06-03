@@ -89,19 +89,6 @@ export interface InterruptResponse {
   error?: string;
 }
 
-// Action detection types for dynamic action buttons
-export type PaneAction =
-  | { type: "choices"; options: { label: string; value: string; autoEnter: boolean }[] }
-  | { type: "yesno" }
-  | { type: "freeform"; placeholder: string }
-  | { type: "none" };
-
-export interface PaneActionsResponse {
-  pane_id: string;
-  action: PaneAction;
-  timestamp: number;
-}
-
 // Plan viewer types
 export interface PlanResponse {
   pane_id: string;
