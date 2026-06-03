@@ -16,6 +16,26 @@ interface SendKeysInputProps {
   paneId: string;
 }
 
+/**
+ * Raw tmux keys sent verbatim via handleRawKey (no Enter appended).
+ * Arrows and 1-5 let users navigate and pick options in AskUserQuestion-style
+ * choice prompts. Keys with distinct handlers (C-c interrupt, AI detect) stay
+ * out of this list.
+ */
+const RAW_KEY_BUTTONS: { key: string; label: string; title: string }[] = [
+  { key: "Escape", label: "Esc", title: "Send Escape key (vi normal mode)" },
+  { key: "i", label: "i", title: "Send i key (vi insert mode)" },
+  { key: "Left", label: "←", title: "Send Left arrow key" },
+  { key: "Up", label: "↑", title: "Send Up arrow key" },
+  { key: "Down", label: "↓", title: "Send Down arrow key" },
+  { key: "Right", label: "→", title: "Send Right arrow key" },
+  { key: "1", label: "1", title: "Send 1 key" },
+  { key: "2", label: "2", title: "Send 2 key" },
+  { key: "3", label: "3", title: "Send 3 key" },
+  { key: "4", label: "4", title: "Send 4 key" },
+  { key: "5", label: "5", title: "Send 5 key" },
+];
+
 export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -238,42 +258,18 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           {isDetecting ? "..." : "\u{1F9E0}"}
         </button>
         {!isMobile && <span className="text-xs text-text-muted">Keys:</span>}
-        <button
-          type="button"
-          className="quick-action-btn"
-          onClick={() => handleRawKey("Escape")}
-          disabled={isPending}
-          title="Send Escape key (vi normal mode)"
-        >
-          Esc
-        </button>
-        <button
-          type="button"
-          className="quick-action-btn"
-          onClick={() => handleRawKey("i")}
-          disabled={isPending}
-          title="Send i key (vi insert mode)"
-        >
-          i
-        </button>
-        <button
-          type="button"
-          className="quick-action-btn"
-          onClick={() => handleRawKey("Up")}
-          disabled={isPending}
-          title="Send Up arrow key"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          className="quick-action-btn"
-          onClick={() => handleRawKey("Down")}
-          disabled={isPending}
-          title="Send Down arrow key"
-        >
-          ↓
-        </button>
+        {RAW_KEY_BUTTONS.map(({ key, label, title }) => (
+          <button
+            key={key}
+            type="button"
+            className="quick-action-btn"
+            onClick={() => handleRawKey(key)}
+            disabled={isPending}
+            title={title}
+          >
+            {label}
+          </button>
+        ))}
         <button
           type="button"
           className="quick-action-btn"
