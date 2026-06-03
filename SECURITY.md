@@ -14,7 +14,7 @@ This policy covers the `panopticon` repository. Panopticon runs entirely on a us
 
 - An HTTP + Server-Sent Events dashboard bound to `127.0.0.1:3847` by default (overridable via `HOST` / `PORT`).
 - An embedded MCP endpoint that accepts `push_file` and `push_url` payloads from local Claude Code sessions.
-- Outbound calls to Google's Gemini API carrying tmux pane content for AI summaries and action detection.
+- Outbound calls to Google's Gemini API carrying tmux pane content for AI summaries.
 - Read access to the local filesystem for project discovery, Claude Code JSONL session history, and plan files.
 
 In scope: anything that allows network egress beyond Gemini, lateral movement to other localhost services, code execution from MCP or HTTP request boundaries, exfiltration of secrets visible in tmux panes, or unauthorized reads of files outside the directories panopticon legitimately needs.
