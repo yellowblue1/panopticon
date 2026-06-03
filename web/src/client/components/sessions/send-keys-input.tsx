@@ -259,6 +259,15 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         <button
           type="button"
           className="quick-action-btn"
+          onClick={() => handleRawKey("Left")}
+          disabled={isPending}
+          title="Send Left arrow key"
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          className="quick-action-btn"
           onClick={() => handleRawKey("Up")}
           disabled={isPending}
           title="Send Up arrow key"
@@ -274,6 +283,28 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         >
           ↓
         </button>
+        <button
+          type="button"
+          className="quick-action-btn"
+          onClick={() => handleRawKey("Right")}
+          disabled={isPending}
+          title="Send Right arrow key"
+        >
+          →
+        </button>
+        {/* Number keys for answering AskUserQuestion-style choice prompts */}
+        {["1", "2", "3", "4", "5"].map((digit) => (
+          <button
+            key={digit}
+            type="button"
+            className="quick-action-btn"
+            onClick={() => handleRawKey(digit)}
+            disabled={isPending}
+            title={`Send ${digit} key`}
+          >
+            {digit}
+          </button>
+        ))}
         <button
           type="button"
           className="quick-action-btn"
