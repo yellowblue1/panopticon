@@ -17,8 +17,8 @@ interface SendKeysInputProps {
 /**
  * Raw tmux keys sent verbatim via handleRawKey (no Enter appended).
  * Arrows and 1-5 let users navigate and pick options in AskUserQuestion-style
- * choice prompts. Keys with distinct handlers (C-c interrupt, AI detect) stay
- * out of this list.
+ * choice prompts. Keys with distinct handlers (C-c interrupt) stay out of
+ * this list.
  */
 const RAW_KEY_BUTTONS: { key: string; label: string; title: string }[] = [
   { key: "Escape", label: "Esc", title: "Send Escape key (vi normal mode)" },

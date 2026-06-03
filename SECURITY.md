@@ -43,13 +43,11 @@ component is compromised or coerced:
   `/api/*` rely on the loopback bind plus Origin-based CORS, which DNS
   rebinding can defeat; do not run panopticon on a machine where untrusted
   users can drive the local browser to an attacker-controlled page.
-- Tmux pane content sent to Gemini for summaries and action detection is
-  wrapped in `<terminal_output>` XML tags with an explicit framing
-  instruction that tells the model to treat the contents as opaque data,
-  not as instructions. Any literal closing tag in the content is
-  neutralized to prevent delimiter-injection breakout. The action-detection
-  response is then validated against the strict `PaneAction` shape before
-  being returned to the dashboard.
+- Tmux pane content sent to Gemini for summaries is wrapped in
+  `<terminal_output>` XML tags with an explicit framing instruction that
+  tells the model to treat the contents as opaque data, not as instructions.
+  Any literal closing tag in the content is neutralized to prevent
+  delimiter-injection breakout.
 
 ## Supply-Chain Protections
 
