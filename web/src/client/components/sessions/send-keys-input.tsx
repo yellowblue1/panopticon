@@ -1,9 +1,7 @@
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, MAX_FILES_PER_REQUEST } from "@shared/constants";
-import type { PaneAction } from "@shared/types";
 import { Camera, FileText, Paperclip, Send, X } from "lucide-react";
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useActionDetection } from "@/hooks/use-action-detection";
 import { useInterrupt } from "@/hooks/use-interrupt";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSendKeys } from "@/hooks/use-send-keys";
@@ -19,8 +17,8 @@ interface SendKeysInputProps {
 /**
  * Raw tmux keys sent verbatim via handleRawKey (no Enter appended).
  * Arrows and 1-5 let users navigate and pick options in AskUserQuestion-style
- * choice prompts. Keys with distinct handlers (C-c interrupt, AI detect) stay
- * out of this list.
+ * choice prompts. Keys with distinct handlers (C-c interrupt) stay out of
+ * this list.
  */
 const RAW_KEY_BUTTONS: { key: string; label: string; title: string }[] = [
   { key: "Escape", label: "Esc", title: "Send Escape key (vi normal mode)" },
@@ -47,7 +45,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const sendKeys = useSendKeys();
   const sendMessage = useSendMessage();
   const interrupt = useInterrupt();
-  const { action, isDetecting, detect, clear } = useActionDetection(paneId);
   const isMobile = useMediaQuery("(max-width: 639px)");
   const { data: slashCommandsData } = useSlashCommands();
   const slashCommands = slashCommandsData?.commands ?? [];
@@ -157,34 +154,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       return;
     }
 
-    // If choices are shown with a "Type something" option, select it first
-    const typeOption =
-      action.type === "choices" ? action.options.find((o) => !o.autoEnter) : undefined;
-
-    if (typeOption) {
-      // 1) Send raw key to select "Type something", 2) wait, 3) send text
-      clear();
-      sendKeys.mutate(
-        { paneId, text: typeOption.value, raw: true },
-        {
-          onSuccess: () => {
-            setTimeout(() => {
-              sendKeys.mutate(
-                { paneId, text: trimmed },
-                {
-                  onSuccess: () => {
-                    setText("");
-                    inputRef.current?.focus();
-                  },
-                },
-              );
-            }, 500);
-          },
-        },
-      );
-      return;
-    }
-
     sendKeys.mutate(
       { paneId, text: trimmed },
       {
@@ -208,18 +177,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     }
   };
 
-  /** Send text with Enter (y, n, etc.) and hide action buttons */
-  const handleQuickAction = (value: string) => {
-    sendKeys.mutate(
-      { paneId, text: value },
-      {
-        onSuccess: () => {
-          clear();
-          inputRef.current?.focus();
-        },
-      },
-    );
-  };
   /** Morphing action button: "/" when empty (opens palette), Send when has content */
   const handleActionButton = () => {
     if (hasText || hasFiles) {
@@ -248,15 +205,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
     <div ref={barRef} className="send-keys-bar">
       {/* Raw key buttons — right-aligned for thumb reachability */}
       <div className="flex items-center gap-2 mb-2 justify-end">
-        <button
-          type="button"
-          className="quick-action-btn !text-xl !leading-none"
-          onClick={() => detect()}
-          disabled={isDetecting}
-          title="Detect actions with AI"
-        >
-          {isDetecting ? "..." : "\u{1F9E0}"}
-        </button>
         {!isMobile && <span className="text-xs text-text-muted">Keys:</span>}
         {RAW_KEY_BUTTONS.map(({ key, label, title }) => (
           <button
@@ -316,9 +264,6 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         isPending={isPending}
         commands={slashCommands}
       />
-
-      {/* Dynamic AI-detected actions */}
-      <DynamicActions action={action} onQuickAction={handleQuickAction} isPending={isPending} />
 
       {/* File preview thumbnails */}
       {hasFiles && (
@@ -399,15 +344,7 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
           onFocus={handleInputFocus}
           enterKeyHint="send"
           rows={1}
-          placeholder={
-            action.type === "freeform"
-              ? action.placeholder
-              : action.type === "choices" && action.options.some((o) => !o.autoEnter)
-                ? "Type here (auto-selects 'Type something')"
-                : hasFiles
-                  ? "Add instructions..."
-                  : "Send text to terminal..."
-          }
+          placeholder={hasFiles ? "Add instructions..." : "Send text to terminal..."}
           disabled={isPending}
           className={cn(
             "flex-1 bg-bg-secondary border border-border-default rounded-lg px-3 py-2",
@@ -468,67 +405,4 @@ function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
       </button>
     </div>
   );
-}
-
-/** Renders dynamic buttons based on AI-detected action type */
-function DynamicActions({
-  action,
-  onQuickAction,
-  isPending,
-}: {
-  action: PaneAction;
-  onQuickAction: (value: string) => void;
-  isPending: boolean;
-}) {
-  if (action.type === "none") return null;
-
-  if (action.type === "yesno") {
-    return (
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs text-text-muted">Answer:</span>
-        <button
-          type="button"
-          className="quick-action-btn"
-          onClick={() => onQuickAction("y")}
-          disabled={isPending}
-        >
-          Yes
-        </button>
-        <button
-          type="button"
-          className="quick-action-btn"
-          onClick={() => onQuickAction("n")}
-          disabled={isPending}
-        >
-          No
-        </button>
-      </div>
-    );
-  }
-
-  if (action.type === "choices") {
-    // Hide "Type something" options — handled automatically by the text input
-    const visibleOptions = action.options.filter((o) => o.autoEnter);
-    if (visibleOptions.length === 0) return null;
-
-    return (
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <span className="text-xs text-text-muted">Options:</span>
-        {visibleOptions.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            className="quick-action-btn"
-            onClick={() => onQuickAction(opt.value)}
-            disabled={isPending}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  // "freeform" type: placeholder is set on the input, no extra buttons needed
-  return null;
 }

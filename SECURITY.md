@@ -14,7 +14,7 @@ This policy covers the `panopticon` repository. Panopticon runs entirely on a us
 
 - An HTTP + Server-Sent Events dashboard bound to `127.0.0.1:3847` by default (overridable via `HOST` / `PORT`).
 - An embedded MCP endpoint that accepts `push_file` and `push_url` payloads from local Claude Code sessions.
-- Outbound calls to Google's Gemini API carrying tmux pane content for AI summaries and action detection.
+- Outbound calls to Google's Gemini API carrying tmux pane content for AI summaries.
 - Read access to the local filesystem for project discovery, Claude Code JSONL session history, and plan files.
 
 In scope: anything that allows network egress beyond Gemini, lateral movement to other localhost services, code execution from MCP or HTTP request boundaries, exfiltration of secrets visible in tmux panes, or unauthorized reads of files outside the directories panopticon legitimately needs.
@@ -43,13 +43,11 @@ component is compromised or coerced:
   `/api/*` rely on the loopback bind plus Origin-based CORS, which DNS
   rebinding can defeat; do not run panopticon on a machine where untrusted
   users can drive the local browser to an attacker-controlled page.
-- Tmux pane content sent to Gemini for summaries and action detection is
-  wrapped in `<terminal_output>` XML tags with an explicit framing
-  instruction that tells the model to treat the contents as opaque data,
-  not as instructions. Any literal closing tag in the content is
-  neutralized to prevent delimiter-injection breakout. The action-detection
-  response is then validated against the strict `PaneAction` shape before
-  being returned to the dashboard.
+- Tmux pane content sent to Gemini for summaries is wrapped in
+  `<terminal_output>` XML tags with an explicit framing instruction that
+  tells the model to treat the contents as opaque data, not as instructions.
+  Any literal closing tag in the content is neutralized to prevent
+  delimiter-injection breakout.
 
 ## Supply-Chain Protections
 

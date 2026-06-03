@@ -17,7 +17,6 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     switchClient: () => true,
     sendInterrupt: () => true,
     capturePaneContent: () => null,
-    detectPaneActions: async () => ({ type: "none" }),
     geminiBackend: "vertex-ai",
     isAiAvailable: true,
     getGeminiAuthError: () => false,
@@ -536,79 +535,6 @@ describe("Hono API endpoints", () => {
       expect(json.content).toBeNull();
       expect(json.seq).toBe(0);
       reader.cancel();
-    });
-  });
-
-  describe("GET /api/sessions/:pane_id/actions", () => {
-    it("returns detected action when pane content is available", async () => {
-      const deps = createMockDeps({
-        capturePaneContent: () => "Do you want to proceed? (y/n)",
-        detectPaneActions: async () => ({ type: "yesno" }),
-      });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/sessions/%250/actions");
-
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.pane_id).toBe("%0");
-      expect(data.action.type).toBe("yesno");
-      expect(data.timestamp).toBeGreaterThan(0);
-    });
-
-    it("returns choices action with options", async () => {
-      const deps = createMockDeps({
-        capturePaneContent: () => "1. Option A\n2. Option B",
-        detectPaneActions: async () => ({
-          type: "choices",
-          options: [
-            { label: "1", value: "1", autoEnter: true },
-            { label: "2", value: "2", autoEnter: true },
-          ],
-        }),
-      });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/sessions/%250/actions");
-
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.action.type).toBe("choices");
-      expect(data.action.options).toHaveLength(2);
-    });
-
-    it("returns none when pane content is null", async () => {
-      const deps = createMockDeps({
-        capturePaneContent: () => null,
-        detectPaneActions: async () => ({ type: "yesno" }),
-      });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/sessions/%250/actions");
-
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.action.type).toBe("none");
-    });
-
-    it("returns 501 when detectPaneActions is not provided", async () => {
-      const deps = createMockDeps({ detectPaneActions: undefined });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/sessions/%250/actions");
-
-      expect(res.status).toBe(501);
-      const data = await res.json();
-      expect(data.action.type).toBe("none");
-    });
-
-    it("returns 501 when capturePaneContent is not provided", async () => {
-      const deps = createMockDeps({ capturePaneContent: undefined });
-      const app = createApp(deps);
-
-      const res = await app.request("/api/sessions/%250/actions");
-
-      expect(res.status).toBe(501);
     });
   });
 
