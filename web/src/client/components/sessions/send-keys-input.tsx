@@ -203,8 +203,10 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
 
   return (
     <div ref={barRef} className="send-keys-bar">
-      {/* Raw key buttons — right-aligned for thumb reachability */}
-      <div className="flex items-center gap-2 mb-2 justify-end">
+      {/* Raw key buttons — right-aligned for thumb reachability.
+          flex-wrap so narrow screens wrap to extra rows instead of clipping
+          buttons off-screen (which previously hid e.g. the left-arrow). */}
+      <div className="flex flex-wrap items-center gap-2 mb-2 justify-end">
         {!isMobile && <span className="text-xs text-text-muted">Keys:</span>}
         {RAW_KEY_BUTTONS.map(({ key, label, title }) => (
           <button
