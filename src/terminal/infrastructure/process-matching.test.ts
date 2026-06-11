@@ -68,6 +68,15 @@ describe("isMonitoredBinary", () => {
   it("rejects node running codex launcher script", () => {
     expect(isMonitoredBinary("node /opt/homebrew/bin/codex")).toBe(false);
   });
+
+  it("matches codex-acp adapter binary (crux-acp workers)", () => {
+    expect(
+      isMonitoredBinary(
+        "/tmp/bunx-1001-@zed-industries/codex-acp@latest/node_modules/@zed-industries/codex-acp-linux-x64/bin/codex-acp",
+      ),
+    ).toBe(true);
+    expect(isMonitoredBinary("codex-acp -c approval_policy=on-failure")).toBe(true);
+  });
 });
 
 describe("getMonitoredProcesses", () => {
@@ -131,6 +140,18 @@ describe("getMonitoredProcesses", () => {
     expect(processes[0]).toEqual({ pid: 100, ppid: 1234, binaryName: "claude" });
     expect(processes[1]).toEqual({ pid: 200, ppid: 5678, binaryName: "codex" });
   });
+
+  it("carries the controlling tty through when present", () => {
+    const processTable: ProcessInfo[] = [
+      { pid: 100, ppid: 1234, command: "claude", tty: "pts/3" },
+      { pid: 200, ppid: 1, command: "codex-acp" },
+    ];
+
+    const processes = getMonitoredProcesses(processTable);
+    expect(processes).toHaveLength(2);
+    expect(processes[0]).toEqual({ pid: 100, ppid: 1234, binaryName: "claude", tty: "pts/3" });
+    expect(processes[1]).toEqual({ pid: 200, ppid: 1, binaryName: "codex-acp" });
+  });
 });
 
 describe("buildTmuxTarget", () => {
@@ -141,6 +162,7 @@ describe("buildTmuxTarget", () => {
       session_name: "main",
       window_index: 2,
       pane_index: 1,
+      pane_tty: "/dev/pts/0",
     };
     expect(buildTmuxTarget(pane)).toBe("main:2.1");
   });
@@ -156,6 +178,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        pane_tty: "/dev/pts/0",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -180,6 +203,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        pane_tty: "/dev/pts/0",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -206,6 +230,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        pane_tty: "/dev/pts/0",
       },
       {
         pane_id: "%1",
@@ -213,6 +238,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "work",
         window_index: 1,
         pane_index: 0,
+        pane_tty: "/dev/pts/1",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -237,6 +263,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        pane_tty: "/dev/pts/0",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -262,6 +289,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        pane_tty: "/dev/pts/0",
       },
     ];
 
@@ -269,5 +297,80 @@ describe("matchProcessesToPanes", () => {
     const result = matchProcessesToPanes(processes, panes, []);
     expect(result.size).toBe(1);
     expect(result.has("%0")).toBe(true);
+  });
+
+  it("matches orphaned process (reparented to init) via controlling tty", () => {
+    // codex-acp launched via bunx in pane %0; the bunx wrapper exited,
+    // so codex-acp got reparented to init (ppid=1) but kept its tty.
+    const processes: MonitoredProcess[] = [
+      { pid: 2000, ppid: 1, binaryName: "codex-acp", tty: "pts/13" },
+    ];
+    const panes: TmuxPane[] = [
+      {
+        pane_id: "%0",
+        pane_pid: 1000,
+        session_name: "main",
+        window_index: 0,
+        pane_index: 0,
+        pane_tty: "/dev/pts/13",
+      },
+    ];
+    const processTable: ProcessInfo[] = [
+      { pid: 1000, ppid: 1, command: "-zsh", tty: "pts/13" },
+      { pid: 2000, ppid: 1, command: "codex-acp", tty: "pts/13" },
+    ];
+
+    const result = matchProcessesToPanes(processes, panes, processTable);
+    expect(result.size).toBe(1);
+    expect(result.get("%0")?.process.pid).toBe(2000);
+  });
+
+  it("does not let tty fallback overwrite an ancestor-walk match", () => {
+    // Pane %0 has a properly-parented claude AND an orphaned codex-acp on the same tty
+    const processes: MonitoredProcess[] = [
+      { pid: 3000, ppid: 1, binaryName: "codex-acp", tty: "pts/0" },
+      { pid: 100, ppid: 1000, binaryName: "claude", tty: "pts/0" },
+    ];
+    const panes: TmuxPane[] = [
+      {
+        pane_id: "%0",
+        pane_pid: 1000,
+        session_name: "main",
+        window_index: 0,
+        pane_index: 0,
+        pane_tty: "/dev/pts/0",
+      },
+    ];
+    const processTable: ProcessInfo[] = [
+      { pid: 1000, ppid: 1, command: "-bash", tty: "pts/0" },
+      { pid: 100, ppid: 1000, command: "claude", tty: "pts/0" },
+      { pid: 3000, ppid: 1, command: "codex-acp", tty: "pts/0" },
+    ];
+
+    const result = matchProcessesToPanes(processes, panes, processTable);
+    expect(result.size).toBe(1);
+    expect(result.get("%0")?.process.pid).toBe(100);
+  });
+
+  it("does not match orphaned process without a controlling tty", () => {
+    // Truly headless codex-acp (spawned by a detached worker) has no tty
+    const processes: MonitoredProcess[] = [{ pid: 2000, ppid: 1, binaryName: "codex-acp" }];
+    const panes: TmuxPane[] = [
+      {
+        pane_id: "%0",
+        pane_pid: 1000,
+        session_name: "main",
+        window_index: 0,
+        pane_index: 0,
+        pane_tty: "/dev/pts/0",
+      },
+    ];
+    const processTable: ProcessInfo[] = [
+      { pid: 1000, ppid: 1, command: "-bash", tty: "pts/0" },
+      { pid: 2000, ppid: 1, command: "codex-acp" },
+    ];
+
+    const result = matchProcessesToPanes(processes, panes, processTable);
+    expect(result.size).toBe(0);
   });
 });

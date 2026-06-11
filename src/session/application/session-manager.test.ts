@@ -41,6 +41,7 @@ function createMockDeps(overrides: Partial<SessionManagerDeps> = {}): {
       session_name: "main",
       window_index: 0,
       pane_index: 0,
+      pane_tty: "/dev/pts/0",
     },
   ];
   const defaultProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000, binaryName: "claude" }];
@@ -129,6 +130,18 @@ describe("SessionManager", () => {
     it("exposes agent_type from binaryName in session response", () => {
       const { deps } = createMockDeps({
         getMonitoredProcesses: () => [{ pid: 2000, ppid: 1000, binaryName: "codex" }],
+      });
+      manager = new SessionManager(deps);
+      manager.start();
+
+      const sessions = manager.getSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].agent_type).toBe("codex");
+    });
+
+    it("maps codex-acp binary to codex agent_type", () => {
+      const { deps } = createMockDeps({
+        getMonitoredProcesses: () => [{ pid: 2000, ppid: 1000, binaryName: "codex-acp" }],
       });
       manager = new SessionManager(deps);
       manager.start();
@@ -1594,6 +1607,7 @@ describe("SessionManager", () => {
           session_name: "main",
           window_index: 0,
           pane_index: 0,
+          pane_tty: "/dev/pts/0",
         },
       ];
       let currentProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000, binaryName: "claude" }];
@@ -1637,6 +1651,7 @@ describe("SessionManager", () => {
           session_name: "main",
           window_index: 0,
           pane_index: 1,
+          pane_tty: "/dev/pts/1",
         },
       ];
       currentProcesses = [{ pid: 3000, ppid: 1001, binaryName: "claude" }];

@@ -64,20 +64,21 @@ export function isTmuxAvailable(exec: ExecFn = defaultExec): boolean {
 export function getAllTmuxPanes(exec: ExecFn = defaultExec): TmuxPane[] {
   try {
     const output = exec(
-      "tmux list-panes -a -F '#{pane_id} #{pane_pid} #{session_name} #{window_index} #{pane_index}'",
+      "tmux list-panes -a -F '#{pane_id} #{pane_pid} #{session_name} #{window_index} #{pane_index} #{pane_tty}'",
     );
     return output
       .split("\n")
       .filter(Boolean)
       .map((line) => {
         const parts = line.split(" ");
-        if (parts.length < 5) return null;
+        if (parts.length < 6) return null;
         return {
           pane_id: parts[0],
           pane_pid: Number.parseInt(parts[1], 10),
           session_name: parts[2],
           window_index: Number.parseInt(parts[3], 10),
           pane_index: Number.parseInt(parts[4], 10),
+          pane_tty: parts[5],
         };
       })
       .filter((p): p is TmuxPane => p !== null && !Number.isNaN(p.pane_pid));
@@ -92,18 +93,21 @@ export function getAllTmuxPanes(exec: ExecFn = defaultExec): TmuxPane[] {
  */
 export function getProcessTable(exec: ExecFn = defaultExec): ProcessInfo[] {
   try {
-    const output = exec("ps -eo pid,ppid,command");
+    const output = exec("ps -eo pid,ppid,tty,command");
     return output
       .split("\n")
       .slice(1) // skip header line
       .filter(Boolean)
-      .map((line) => {
+      .map((line): ProcessInfo | null => {
         const parts = line.trim().split(/\s+/);
-        if (parts.length < 3) return null;
+        if (parts.length < 4) return null;
         const pid = Number.parseInt(parts[0], 10);
         const ppid = Number.parseInt(parts[1], 10);
         if (Number.isNaN(pid) || Number.isNaN(ppid)) return null;
-        return { pid, ppid, command: parts.slice(2).join(" ") };
+        // ps prints "?" (Linux) or "??" (macOS) when there is no controlling terminal
+        const rawTty = parts[2];
+        const tty = /^\?+$/.test(rawTty) ? undefined : rawTty;
+        return { pid, ppid, command: parts.slice(3).join(" "), tty };
       })
       .filter((p): p is ProcessInfo => p !== null);
   } catch {

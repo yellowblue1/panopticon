@@ -38,7 +38,8 @@ describe("isTmuxAvailable", () => {
 
 describe("getAllTmuxPanes", () => {
   it("parses tmux list-panes output correctly", () => {
-    const exec = () => "%0 1234 main 0 0\n%1 5678 work 1 0\n%2 9012 work 1 1";
+    const exec = () =>
+      "%0 1234 main 0 0 /dev/pts/0\n%1 5678 work 1 0 /dev/pts/1\n%2 9012 work 1 1 /dev/pts/2";
     const panes = getAllTmuxPanes(exec);
 
     expect(panes).toHaveLength(3);
@@ -48,6 +49,7 @@ describe("getAllTmuxPanes", () => {
       session_name: "main",
       window_index: 0,
       pane_index: 0,
+      pane_tty: "/dev/pts/0",
     });
     expect(panes[1]).toEqual({
       pane_id: "%1",
@@ -55,6 +57,7 @@ describe("getAllTmuxPanes", () => {
       session_name: "work",
       window_index: 1,
       pane_index: 0,
+      pane_tty: "/dev/pts/1",
     });
   });
 
@@ -66,7 +69,7 @@ describe("getAllTmuxPanes", () => {
   });
 
   it("skips malformed lines", () => {
-    const exec = () => "%0 1234 main 0 0\nbadline\n%1 5678 work 1 0";
+    const exec = () => "%0 1234 main 0 0 /dev/pts/0\nbadline\n%1 5678 work 1 0 /dev/pts/1";
     const panes = getAllTmuxPanes(exec);
     expect(panes).toHaveLength(2);
   });
@@ -81,25 +84,36 @@ describe("getProcessTable", () => {
   it("parses ps output into ProcessInfo array", () => {
     const exec = () =>
       [
-        "  PID  PPID COMMAND",
-        "  100  1234 claude",
-        "  200  5678 nvim /Users/test/.claude/CLAUDE.md",
-        "  300     1 /Applications/Claude.app/Contents/MacOS/Claude",
+        "  PID  PPID TT       COMMAND",
+        "  100  1234 pts/0    claude",
+        "  200  5678 pts/1    nvim /Users/test/.claude/CLAUDE.md",
+        "  300     1 ?        /Applications/Claude.app/Contents/MacOS/Claude",
       ].join("\n");
 
     const table = getProcessTable(exec);
     expect(table).toHaveLength(3);
-    expect(table[0]).toEqual({ pid: 100, ppid: 1234, command: "claude" });
+    expect(table[0]).toEqual({ pid: 100, ppid: 1234, command: "claude", tty: "pts/0" });
     expect(table[1]).toEqual({
       pid: 200,
       ppid: 5678,
       command: "nvim /Users/test/.claude/CLAUDE.md",
+      tty: "pts/1",
     });
     expect(table[2]).toEqual({
       pid: 300,
       ppid: 1,
       command: "/Applications/Claude.app/Contents/MacOS/Claude",
+      tty: undefined,
     });
+  });
+
+  it("treats macOS '??' tty column as no controlling terminal", () => {
+    const exec = () =>
+      ["  PID  PPID TT       COMMAND", "  100     1 ??       codex-acp"].join("\n");
+
+    const table = getProcessTable(exec);
+    expect(table).toHaveLength(1);
+    expect(table[0]).toEqual({ pid: 100, ppid: 1, command: "codex-acp", tty: undefined });
   });
 
   it("returns empty array on failure", () => {

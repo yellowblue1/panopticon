@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compareWithHysteresis } from "../../shared/sort";
 import type { AgentType, SessionResponse } from "../../shared/types";
-import type { SessionState } from "../../terminal/domain/types";
+import type { SessionState, TmuxPane } from "../../terminal/domain/types";
 import type { SessionManagerDeps, SessionManagerOptions } from "../domain/ports";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
@@ -220,13 +220,7 @@ export class SessionManager {
   private createSession(
     paneId: string,
     processPid: number,
-    pane: {
-      session_name: string;
-      window_index: number;
-      pane_index: number;
-      pane_pid: number;
-      pane_id: string;
-    },
+    pane: TmuxPane,
     binaryName: string,
   ): boolean {
     const cwd = this.deps.getProcessCwd(processPid);
@@ -235,7 +229,7 @@ export class SessionManager {
     this.sessions.set(paneId, {
       pane_id: paneId,
       process_pid: processPid,
-      agent_type: binaryName as AgentType,
+      agent_type: toAgentType(binaryName),
       cwd,
       project_name: this.deps.getProjectName(cwd),
       git_branch: this.deps.getGitBranch(cwd),
@@ -574,6 +568,14 @@ export class SessionManager {
   private notifyChange(): void {
     this.onChangeCallback?.();
   }
+}
+
+/**
+ * Map a monitored binary name to its agent type.
+ * "codex-acp" is the ACP adapter wrapping Codex, so it surfaces as "codex".
+ */
+function toAgentType(binaryName: string): AgentType {
+  return binaryName === "claude" ? "claude" : "codex";
 }
 
 /**
