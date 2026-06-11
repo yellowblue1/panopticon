@@ -1,7 +1,5 @@
-import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
-
-// codex-acp: headless Codex spawned by crux-acp workers (ACP adapter binary)
-const MONITORED_BINARIES = new Set(["claude", "codex", "codex-acp"]);
+import type { MonitoredBinary, MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
+import { MONITORED_BINARY_AGENT_TYPES } from "../domain/types";
 
 /**
  * Extract the binary name from a command string.
@@ -12,14 +10,18 @@ function extractBinaryName(command: string): string {
   return firstWord.split("/").pop() || "";
 }
 
+function isMonitoredBinaryName(name: string): name is MonitoredBinary {
+  return Object.hasOwn(MONITORED_BINARY_AGENT_TYPES, name);
+}
+
 /**
  * Check if a command string is a monitored coding-agent binary.
- * Matches the actual binary name (case-sensitive) for any entry in MONITORED_BINARIES,
- * not processes that happen to have the name in their arguments or paths.
+ * Matches the actual binary name (case-sensitive), not processes that
+ * happen to have the name in their arguments or paths.
  */
 /** @internal Exported for testing only */
 export function isMonitoredBinary(command: string): boolean {
-  return MONITORED_BINARIES.has(extractBinaryName(command));
+  return isMonitoredBinaryName(extractBinaryName(command));
 }
 
 /**
@@ -28,14 +30,13 @@ export function isMonitoredBinary(command: string): boolean {
  * editors with config paths, and other false positives.
  */
 export function getMonitoredProcesses(processTable: ProcessInfo[]): MonitoredProcess[] {
-  return processTable
-    .filter((p) => isMonitoredBinary(p.command))
-    .map((p) => ({
-      pid: p.pid,
-      ppid: p.ppid,
-      binaryName: extractBinaryName(p.command),
-      ...(p.tty !== undefined && { tty: p.tty }),
-    }));
+  const result: MonitoredProcess[] = [];
+  for (const p of processTable) {
+    const binaryName = extractBinaryName(p.command);
+    if (!isMonitoredBinaryName(binaryName)) continue;
+    result.push({ pid: p.pid, ppid: p.ppid, binaryName, tty: p.tty });
+  }
+  return result;
 }
 
 /**
@@ -50,7 +51,7 @@ export function buildTmuxTarget(pane: TmuxPane): string {
  * ps tty ("pts/12") values compare equal.
  */
 function normalizeTty(tty: string): string {
-  return tty.replace(/^\/dev\//, "");
+  return tty.startsWith("/dev/") ? tty.slice("/dev/".length) : tty;
 }
 
 /**

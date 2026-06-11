@@ -31,10 +31,24 @@ export interface TmuxPane {
   pane_tty: string;
 }
 
+/**
+ * Single source of truth for which agent binaries are monitored and how
+ * each surfaces in the dashboard. Process discovery filters on the keys;
+ * session creation reads the agent type from the values.
+ */
+export const MONITORED_BINARY_AGENT_TYPES = {
+  claude: "claude",
+  codex: "codex",
+  // ACP adapter binary wrapping Codex (spawned via bunx by crux-acp workers)
+  "codex-acp": "codex",
+} as const satisfies Record<string, AgentType>;
+
+export type MonitoredBinary = keyof typeof MONITORED_BINARY_AGENT_TYPES;
+
 export interface MonitoredProcess {
   pid: number;
   ppid: number;
-  binaryName: string;
+  binaryName: MonitoredBinary;
   /** Controlling terminal (e.g. "pts/12"); absent when the process has none */
   tty?: string;
 }

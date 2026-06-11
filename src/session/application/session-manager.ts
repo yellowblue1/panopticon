@@ -3,8 +3,9 @@ import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compareWithHysteresis } from "../../shared/sort";
-import type { AgentType, SessionResponse } from "../../shared/types";
-import type { SessionState, TmuxPane } from "../../terminal/domain/types";
+import type { SessionResponse } from "../../shared/types";
+import type { MonitoredBinary, SessionState, TmuxPane } from "../../terminal/domain/types";
+import { MONITORED_BINARY_AGENT_TYPES } from "../../terminal/domain/types";
 import type { SessionManagerDeps, SessionManagerOptions } from "../domain/ports";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
@@ -221,7 +222,7 @@ export class SessionManager {
     paneId: string,
     processPid: number,
     pane: TmuxPane,
-    binaryName: string,
+    binaryName: MonitoredBinary,
   ): boolean {
     const cwd = this.deps.getProcessCwd(processPid);
     if (!cwd) return false;
@@ -229,7 +230,7 @@ export class SessionManager {
     this.sessions.set(paneId, {
       pane_id: paneId,
       process_pid: processPid,
-      agent_type: toAgentType(binaryName),
+      agent_type: MONITORED_BINARY_AGENT_TYPES[binaryName],
       cwd,
       project_name: this.deps.getProjectName(cwd),
       git_branch: this.deps.getGitBranch(cwd),
@@ -568,14 +569,6 @@ export class SessionManager {
   private notifyChange(): void {
     this.onChangeCallback?.();
   }
-}
-
-/**
- * Map a monitored binary name to its agent type.
- * "codex-acp" is the ACP adapter wrapping Codex, so it surfaces as "codex".
- */
-function toAgentType(binaryName: string): AgentType {
-  return binaryName === "claude" ? "claude" : "codex";
 }
 
 /**
