@@ -325,6 +325,32 @@ describe("matchProcessesToPanes", () => {
     expect(result.get("%0")?.process.pid).toBe(2000);
   });
 
+  it("keeps the first ancestor-walk match when two processes resolve to the same pane", () => {
+    const processes: MonitoredProcess[] = [
+      { pid: 100, ppid: 1000, binaryName: "claude" },
+      { pid: 200, ppid: 1000, binaryName: "codex" },
+    ];
+    const panes: TmuxPane[] = [
+      {
+        pane_id: "%0",
+        pane_pid: 1000,
+        session_name: "main",
+        window_index: 0,
+        pane_index: 0,
+        pane_tty: "/dev/pts/0",
+      },
+    ];
+    const processTable: ProcessInfo[] = [
+      { pid: 1000, ppid: 1, command: "-bash" },
+      { pid: 100, ppid: 1000, command: "claude" },
+      { pid: 200, ppid: 1000, command: "codex" },
+    ];
+
+    const result = matchProcessesToPanes(processes, panes, processTable);
+    expect(result.size).toBe(1);
+    expect(result.get("%0")?.process.pid).toBe(100);
+  });
+
   it("does not let tty fallback overwrite an ancestor-walk match", () => {
     // Pane %0 has a properly-parented claude AND an orphaned codex-acp on the same tty
     const processes: MonitoredProcess[] = [

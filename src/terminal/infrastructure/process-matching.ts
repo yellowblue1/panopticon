@@ -97,7 +97,11 @@ export function matchProcessesToPanes(
 
       const pane = paneByPid.get(currentPid);
       if (pane) {
-        result.set(pane.pane_id, { process: proc, pane });
+        // First match wins: keeps the chosen process stable across polls
+        // (ps is pid-ordered), matching the fallback phase's precedence rule.
+        if (!result.has(pane.pane_id)) {
+          result.set(pane.pane_id, { process: proc, pane });
+        }
         matched = true;
         break;
       }

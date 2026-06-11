@@ -39,7 +39,7 @@ describe("isTmuxAvailable", () => {
 describe("getAllTmuxPanes", () => {
   it("parses tmux list-panes output correctly", () => {
     const exec = () =>
-      "%0 1234 main 0 0 /dev/pts/0\n%1 5678 work 1 0 /dev/pts/1\n%2 9012 work 1 1 /dev/pts/2";
+      "%0 1234 /dev/pts/0 0 0 main\n%1 5678 /dev/pts/1 1 0 work\n%2 9012 /dev/pts/2 1 1 work";
     const panes = getAllTmuxPanes(exec);
 
     expect(panes).toHaveLength(3);
@@ -61,6 +61,21 @@ describe("getAllTmuxPanes", () => {
     });
   });
 
+  it("parses session names containing spaces", () => {
+    const exec = () => "%0 1234 /dev/pts/0 2 1 my project session";
+    const panes = getAllTmuxPanes(exec);
+
+    expect(panes).toHaveLength(1);
+    expect(panes[0]).toEqual({
+      pane_id: "%0",
+      pane_pid: 1234,
+      session_name: "my project session",
+      window_index: 2,
+      pane_index: 1,
+      pane_tty: "/dev/pts/0",
+    });
+  });
+
   it("returns empty array when tmux fails", () => {
     const exec = () => {
       throw new Error("tmux error");
@@ -69,7 +84,7 @@ describe("getAllTmuxPanes", () => {
   });
 
   it("skips malformed lines", () => {
-    const exec = () => "%0 1234 main 0 0 /dev/pts/0\nbadline\n%1 5678 work 1 0 /dev/pts/1";
+    const exec = () => "%0 1234 /dev/pts/0 0 0 main\nbadline\n%1 5678 /dev/pts/1 1 0 work";
     const panes = getAllTmuxPanes(exec);
     expect(panes).toHaveLength(2);
   });
