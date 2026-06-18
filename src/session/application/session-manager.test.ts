@@ -137,6 +137,22 @@ describe("SessionManager", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].agent_type).toBe("codex");
     });
+
+    it("falls back to pane_pid cwd when monitored process cwd is unreadable", () => {
+      // nori-cli runs hardened, so /proc/<pid>/cwd is permission-denied; the
+      // pane shell (pane_pid) shares the user's cwd and is always readable.
+      const { deps } = createMockDeps({
+        getMonitoredProcesses: () => [{ pid: 2000, ppid: 1000, binaryName: "nori" }],
+        getProcessCwd: (pid) => (pid === 1000 ? "/home/user/project" : null),
+      });
+      manager = new SessionManager(deps);
+      manager.start();
+
+      const sessions = manager.getSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].agent_type).toBe("nori");
+      expect(sessions[0].cwd).toBe("/home/user/project");
+    });
   });
 
   describe("idle detection via pipe-pane", () => {

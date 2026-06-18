@@ -68,6 +68,23 @@ describe("isMonitoredBinary", () => {
   it("rejects node running codex launcher script", () => {
     expect(isMonitoredBinary("node /opt/homebrew/bin/codex")).toBe(false);
   });
+
+  it("matches bare nori command", () => {
+    expect(isMonitoredBinary("nori")).toBe(true);
+  });
+
+  it("matches nori with arguments and full path", () => {
+    expect(isMonitoredBinary("nori -a crux-lead-mywork")).toBe(true);
+    expect(
+      isMonitoredBinary(
+        "/home/user/.local/share/mise/installs/node/24.16.0/lib/node_modules/nori-ai-cli/vendor/x86_64-unknown-linux-musl/nori/nori --skip-welcome",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects node running nori launcher script", () => {
+    expect(isMonitoredBinary("node /home/user/.local/bin/nori")).toBe(false);
+  });
 });
 
 describe("getMonitoredProcesses", () => {

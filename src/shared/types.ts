@@ -1,7 +1,7 @@
 // Shared types for client/server communication
 // These types are used in API requests and responses
 
-export type AgentType = "claude" | "codex";
+export type AgentType = "claude" | "codex" | "nori";
 
 export interface SessionResponse {
   pane_id: string;

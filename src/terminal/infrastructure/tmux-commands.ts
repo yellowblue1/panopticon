@@ -147,7 +147,13 @@ export function getProcessCwd(pid: number, exec: ExecFn = defaultExec): string |
     const lines = output.split("\n");
     for (const line of lines) {
       if (line.startsWith("n") && line.length > 1) {
-        return line.slice(1);
+        const value = line.slice(1);
+        // lsof reports "/proc/<pid>/cwd (readlink: Permission denied)" when
+        // the symlink read failed (e.g. nori-cli runs hardened). A real cwd
+        // is always absolute, so anything that isn't an absolute path is an
+        // error annotation we should fall through, not return.
+        if (!value.startsWith("/") || value.endsWith(")")) return null;
+        return value;
       }
     }
     return null;

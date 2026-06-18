@@ -149,6 +149,17 @@ describe("getProcessCwd", () => {
     };
     expect(getProcessCwd(1234, exec)).toBeNull();
   });
+
+  it("rejects lsof output with readlink error annotation", () => {
+    // lsof prints the raw symlink target even when readlink failed, e.g.
+    // "n/proc/540023/cwd (readlink: Permission denied)" for hardened processes
+    // like nori-cli. Treat it as unreadable so callers can fall back.
+    const exec = (cmd: string) => {
+      if (cmd.startsWith("readlink")) throw new Error("no /proc");
+      return "p540023\nfcwd\nn/proc/540023/cwd (readlink: Permission denied)";
+    };
+    expect(getProcessCwd(540023, exec)).toBeNull();
+  });
 });
 
 describe("getProcessStartTime", () => {

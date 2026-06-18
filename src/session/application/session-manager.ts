@@ -229,7 +229,11 @@ export class SessionManager {
     },
     binaryName: string,
   ): boolean {
-    const cwd = this.deps.getProcessCwd(processPid);
+    // Read the pane shell's cwd, not the agent's. The shell tmux spawned is
+    // always introspectable; the agent itself may run hardened (e.g. nori-cli
+    // blocks /proc/<pid>/cwd reads). Fall back to the agent pid only if the
+    // shell is somehow gone (race during pane teardown).
+    const cwd = this.deps.getProcessCwd(pane.pane_pid) ?? this.deps.getProcessCwd(processPid);
     if (!cwd) return false;
 
     this.sessions.set(paneId, {
