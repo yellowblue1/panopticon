@@ -1,7 +1,16 @@
 // Shared types for client/server communication
 // These types are used in API requests and responses
 
-export type AgentType = "claude" | "codex" | "nori";
+// Single source of truth for monitored agent CLIs. Used both as the runtime
+// allowlist (process discovery, server-side launch validation) and as the
+// compile-time AgentType union — keeping them in sync makes drift a type
+// error rather than a silent "unknown" fallback in the UI.
+export const AGENT_TYPES = ["claude", "codex", "nori"] as const;
+export type AgentType = (typeof AGENT_TYPES)[number];
+
+export function isAgentType(value: string): value is AgentType {
+  return (AGENT_TYPES as readonly string[]).includes(value);
+}
 
 export interface SessionResponse {
   pane_id: string;

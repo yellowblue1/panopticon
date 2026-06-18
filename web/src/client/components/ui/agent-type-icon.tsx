@@ -68,13 +68,20 @@ const AGENT_CONFIG: Record<AgentVariant, { label: string; Icon: React.FC }> = {
   unknown: { label: "Unknown", Icon: () => <Bot size="100%" /> },
 };
 
+function isAgentVariant(value: string): value is AgentVariant {
+  // Object.hasOwn — `in` would match inherited Object.prototype keys like
+  // "toString" or "constructor", which would then hit `AGENT_CONFIG[key]` and
+  // return undefined, crashing the icon render.
+  return Object.hasOwn(AGENT_CONFIG, value);
+}
+
 interface AgentTypeIconProps {
   agentType: string;
   className?: string;
 }
 
 export function AgentTypeIcon({ agentType, className }: AgentTypeIconProps) {
-  const agent: AgentVariant = agentType in AGENT_CONFIG ? (agentType as AgentVariant) : "unknown";
+  const agent: AgentVariant = isAgentVariant(agentType) ? agentType : "unknown";
   const { label, Icon } = AGENT_CONFIG[agent];
 
   return (

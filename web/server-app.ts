@@ -35,6 +35,7 @@ import type {
   SlashCommandsResponse,
   SwitchClientResponse,
 } from "../src/shared/types";
+import { isAgentType } from "../src/shared/types";
 import type { SendMessageResult } from "../src/terminal/application/send-message";
 
 function escapeRegExp(value: string): string {
@@ -451,15 +452,14 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
         !body ||
         typeof body.projectPath !== "string" ||
         typeof body.agentType !== "string" ||
-        (body.agentType !== "claude" && body.agentType !== "codex")
+        !isAgentType(body.agentType)
       ) {
         return c.json(
           {
             success: false,
             sessionName: "",
             paneId: null,
-            error:
-              "Request body must include 'projectPath' (string) and 'agentType' ('claude' | 'codex')",
+            error: "Request body must include 'projectPath' (string) and a supported 'agentType'",
           } satisfies LaunchResponse,
           400,
         );
@@ -472,7 +472,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
 
       const result = deps.launchSession({
         projectPath: body.projectPath,
-        agentType: body.agentType as AgentType,
+        agentType: body.agentType,
         sessionName,
       });
 

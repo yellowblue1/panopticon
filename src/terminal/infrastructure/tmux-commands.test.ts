@@ -160,6 +160,16 @@ describe("getProcessCwd", () => {
     };
     expect(getProcessCwd(540023, exec)).toBeNull();
   });
+
+  it("accepts cwd whose directory name ends with a parenthesis", () => {
+    // Legitimate paths like "/home/me/work (notes)/" must pass — the lsof
+    // error annotation matcher should be tighter than "ends with )".
+    const exec = (cmd: string) => {
+      if (cmd.startsWith("readlink")) throw new Error("no /proc");
+      return "p1234\nfcwd\nn/home/me/work (notes)";
+    };
+    expect(getProcessCwd(1234, exec)).toBe("/home/me/work (notes)");
+  });
 });
 
 describe("getProcessStartTime", () => {
