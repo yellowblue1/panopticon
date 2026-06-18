@@ -137,6 +137,45 @@ describe("SessionManager", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].agent_type).toBe("codex");
     });
+
+    it("falls back to pane_pid cwd when monitored process cwd is unreadable", () => {
+      // nori-cli runs hardened, so /proc/<pid>/cwd is permission-denied for
+      // the agent process itself; the pane shell (pane_pid) is always readable.
+      const { deps } = createMockDeps({
+        getMonitoredProcesses: () => [{ pid: 2000, ppid: 1000, binaryName: "nori" }],
+        getProcessCwd: (pid) => (pid === 1000 ? "/home/user/project" : null),
+      });
+      manager = new SessionManager(deps);
+      manager.start();
+
+      const sessions = manager.getSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].agent_type).toBe("nori");
+      expect(sessions[0].cwd).toBe("/home/user/project");
+    });
+
+    it("prefers the agent process cwd over the pane shell cwd", () => {
+      // Agent cwd is frozen at exec time; pane shell cwd may have moved if
+      // the user `cd`s after launch. Use the agent's so project_name/branch
+      // stay accurate.
+      const { deps } = createMockDeps({
+        getProcessCwd: (pid) => (pid === 2000 ? "/home/user/agent-cwd" : "/home/user/shell-cwd"),
+      });
+      manager = new SessionManager(deps);
+      manager.start();
+
+      expect(manager.getSessions()[0].cwd).toBe("/home/user/agent-cwd");
+    });
+
+    it("ignores unrecognized binary names", () => {
+      const { deps } = createMockDeps({
+        getMonitoredProcesses: () => [{ pid: 2000, ppid: 1000, binaryName: "rogue" }],
+      });
+      manager = new SessionManager(deps);
+      manager.start();
+
+      expect(manager.getSessions()).toHaveLength(0);
+    });
   });
 
   describe("idle detection via pipe-pane", () => {

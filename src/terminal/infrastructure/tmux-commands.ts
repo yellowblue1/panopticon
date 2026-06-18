@@ -147,7 +147,12 @@ export function getProcessCwd(pid: number, exec: ExecFn = defaultExec): string |
     const lines = output.split("\n");
     for (const line of lines) {
       if (line.startsWith("n") && line.length > 1) {
-        return line.slice(1);
+        const value = line.slice(1);
+        // lsof appends " (readlink: ...)" when the symlink read failed (e.g.
+        // nori-cli runs hardened). Match the annotation specifically so we
+        // don't reject legitimate cwds whose directory name ends with ")".
+        if (!value.startsWith("/") || / \([a-z]+: [^)]*\)$/i.test(value)) return null;
+        return value;
       }
     }
     return null;

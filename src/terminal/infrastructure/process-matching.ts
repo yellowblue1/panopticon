@@ -1,6 +1,7 @@
+import { AGENT_TYPES } from "../../shared/types";
 import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
 
-const MONITORED_BINARIES = new Set(["claude", "codex"]);
+const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 
 /**
  * Extract the binary name from a command string.

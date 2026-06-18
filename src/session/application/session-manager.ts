@@ -3,7 +3,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compareWithHysteresis } from "../../shared/sort";
-import type { AgentType, SessionResponse } from "../../shared/types";
+import { isAgentType, type SessionResponse } from "../../shared/types";
 import type { SessionState } from "../../terminal/domain/types";
 import type { SessionManagerDeps, SessionManagerOptions } from "../domain/ports";
 
@@ -229,13 +229,19 @@ export class SessionManager {
     },
     binaryName: string,
   ): boolean {
-    const cwd = this.deps.getProcessCwd(processPid);
+    if (!isAgentType(binaryName)) return false;
+
+    // Prefer the agent process's own cwd — it was inherited at exec time and
+    // doesn't drift if the user `cd`s in the pane afterwards. Fall back to
+    // the pane shell only when the agent's /proc is unreadable (e.g. nori-cli
+    // runs hardened and blocks /proc/<pid>/cwd reads even for its owner).
+    const cwd = this.deps.getProcessCwd(processPid) ?? this.deps.getProcessCwd(pane.pane_pid);
     if (!cwd) return false;
 
     this.sessions.set(paneId, {
       pane_id: paneId,
       process_pid: processPid,
-      agent_type: binaryName as AgentType,
+      agent_type: binaryName,
       cwd,
       project_name: this.deps.getProjectName(cwd),
       git_branch: this.deps.getGitBranch(cwd),

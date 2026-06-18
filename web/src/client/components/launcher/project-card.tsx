@@ -43,6 +43,7 @@ export function ProjectCard({ project, onLaunch, isLaunching }: ProjectCardProps
         >
           <option value="claude">Claude</option>
           <option value="codex">Codex</option>
+          <option value="nori">Nori</option>
         </select>
 
         <button

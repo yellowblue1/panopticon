@@ -7,6 +7,7 @@ const agentIconVariants = cva("inline-flex items-center justify-center shrink-0"
     agent: {
       claude: "text-[#e8926a]",
       codex: "text-white",
+      nori: "text-[#2e7d32]",
       unknown: "text-text-muted",
     },
   },
@@ -51,11 +52,28 @@ function CodexIcon() {
   );
 }
 
+function NoriIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="w-full h-full">
+      <rect x="1" y="3" width="14" height="10" rx="1.5" />
+      <rect x="3" y="5" width="10" height="6" rx="0.5" fill="#f5f5dc" />
+    </svg>
+  );
+}
+
 const AGENT_CONFIG: Record<AgentVariant, { label: string; Icon: React.FC }> = {
   claude: { label: "Claude Code", Icon: ClaudeIcon },
   codex: { label: "Codex", Icon: CodexIcon },
+  nori: { label: "Nori", Icon: NoriIcon },
   unknown: { label: "Unknown", Icon: () => <Bot size="100%" /> },
 };
+
+function isAgentVariant(value: string): value is AgentVariant {
+  // Object.hasOwn — `in` would match inherited Object.prototype keys like
+  // "toString" or "constructor", which would then hit `AGENT_CONFIG[key]` and
+  // return undefined, crashing the icon render.
+  return Object.hasOwn(AGENT_CONFIG, value);
+}
 
 interface AgentTypeIconProps {
   agentType: string;
@@ -63,8 +81,7 @@ interface AgentTypeIconProps {
 }
 
 export function AgentTypeIcon({ agentType, className }: AgentTypeIconProps) {
-  const agent: AgentVariant =
-    agentType === "codex" ? "codex" : agentType === "claude" ? "claude" : "unknown";
+  const agent: AgentVariant = isAgentVariant(agentType) ? agentType : "unknown";
   const { label, Icon } = AGENT_CONFIG[agent];
 
   return (
