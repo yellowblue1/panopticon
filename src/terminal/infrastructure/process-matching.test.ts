@@ -270,6 +270,30 @@ describe("matchProcessesToPanes", () => {
     expect(matchProcessesToPanes([], [], []).size).toBe(0);
   });
 
+  it("matches when the agent itself is pane_pid (cron-launched tmux)", () => {
+    // `tmux new-session -d claude` makes claude the pane's initial process,
+    // so pane_pid equals the agent's pid and the agent's ppid is the tmux
+    // server, which is not a pane_pid.
+    const processes: MonitoredProcess[] = [{ pid: 2000, ppid: 1500, binaryName: "claude" }];
+    const panes: TmuxPane[] = [
+      {
+        pane_id: "%0",
+        pane_pid: 2000,
+        session_name: "panopticon",
+        window_index: 0,
+        pane_index: 0,
+      },
+    ];
+    const processTable: ProcessInfo[] = [
+      { pid: 1500, ppid: 1, command: "tmux" },
+      { pid: 2000, ppid: 1500, command: "claude" },
+    ];
+
+    const result = matchProcessesToPanes(processes, panes, processTable);
+    expect(result.size).toBe(1);
+    expect(result.get("%0")?.process.pid).toBe(2000);
+  });
+
   it("works with empty process table (falls back to no match)", () => {
     const processes: MonitoredProcess[] = [{ pid: 100, ppid: 1234, binaryName: "claude" }];
     const panes: TmuxPane[] = [
