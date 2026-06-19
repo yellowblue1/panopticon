@@ -5,17 +5,28 @@ const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 
 // Agent Teams workers exec the versioned bundle directly
 // (`~/.local/share/claude/versions/<X> --agent-id ... --team-name ...`),
-// so argv[0]'s last path component is a version string, not "claude". The
-// regex must match argv[0] specifically — otherwise `vim /any/path/claude/
-// versions/X` would be mis-classified as claude. We can't naively
-// `split(/\s+/)[0]` because home dirs with spaces (macOS `~/Library/
-// Application Support/claude/versions/<X>`) would truncate before the bundle
-// suffix. Match instead against the longest prefix of `command` whose end is
-// a versioned-bundle path immediately followed by whitespace or end-of-string.
-const CLAUDE_VERSIONED_ARGV0 = /^\/\S(?:.*[^\s])?\/claude\/versions\/[^/\s]+(?:\s|$)/;
+// so argv[0]'s last path component is a version string, not "claude". A naive
+// `split(/\s+/)[0]` truncates macOS home dirs containing spaces (`~/Library/
+// Application Support/claude/versions/<X>`), and an unanchored regex over the
+// full command mis-classifies things like `/usr/bin/vim /any/path/claude/
+// versions/X`. Find every `/claude/versions/<X>` suffix and accept only when
+// its prefix looks like argv[0]: starts with `/` and contains no ` /` (which
+// would mean the prefix already crossed into argv[1]).
+const CLAUDE_VERSIONED_SUFFIX = /\/claude\/versions\/[^/\s]+(?=\s|$)/g;
+
+function isClaudeVersionedArgv0(command: string): boolean {
+  CLAUDE_VERSIONED_SUFFIX.lastIndex = 0;
+  let match: RegExpExecArray | null = CLAUDE_VERSIONED_SUFFIX.exec(command);
+  while (match !== null) {
+    const prefix = command.slice(0, match.index);
+    if (prefix.startsWith("/") && !prefix.includes(" /")) return true;
+    match = CLAUDE_VERSIONED_SUFFIX.exec(command);
+  }
+  return false;
+}
 
 function extractBinaryName(command: string): string {
-  if (CLAUDE_VERSIONED_ARGV0.test(command)) return "claude";
+  if (isClaudeVersionedArgv0(command)) return "claude";
   const firstWord = command.split(/\s+/)[0] || "";
   return firstWord.split("/").pop() || "";
 }

@@ -113,6 +113,19 @@ describe("isMonitoredBinary", () => {
       isMonitoredBinary("nvim --embed /Users/test/.claude/plugins/claude/versions/2.1.183"),
     ).toBe(false);
   });
+
+  it("rejects editors invoked by absolute path that open a versioned-bundle file", () => {
+    // ps -eo command emits the resolved binary path, so argv[0] is typically
+    // absolute. Ensure the argv[0]/argv[1] boundary check still rejects when
+    // both argv[0] and the file argument are absolute paths.
+    expect(isMonitoredBinary("/usr/bin/vim /home/user/claude/versions/2.1.183")).toBe(false);
+    expect(isMonitoredBinary("/usr/bin/vim /home/user/claude/versions/2.1.183 --readonly")).toBe(
+      false,
+    );
+    expect(isMonitoredBinary("/opt/homebrew/bin/nvim /Users/x/claude/versions/2.1.183")).toBe(
+      false,
+    );
+  });
 });
 
 describe("getMonitoredProcesses", () => {
