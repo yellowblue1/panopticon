@@ -46,6 +46,11 @@ export function buildTmuxTarget(pane: TmuxPane): string {
  * that is a tmux pane's initial process (pane_pid).
  * This handles cases where the agent is launched through intermediate processes
  * (e.g., shell → wrapper script → claude/codex).
+ *
+ * The walk starts from the agent process itself, not its parent: when tmux is
+ * launched with the agent as the pane's initial command (e.g. `tmux new-session
+ * -d 'claude'`, common in cron-driven bootstrap scripts), pane_pid IS the
+ * agent's pid, so a parent-only walk would never match.
  */
 export function matchProcessesToPanes(
   processes: MonitoredProcess[],
@@ -66,9 +71,17 @@ export function matchProcessesToPanes(
   const result = new Map<string, { process: MonitoredProcess; pane: TmuxPane }>();
 
   for (const proc of processes) {
-    // Walk up the process tree from the agent's parent
+    // Start at the agent process itself to cover the case where pane_pid is
+    // the agent (cron-launched `tmux new-session -d claude`), then fall back
+    // to its known ppid so the walk continues even when processTable is empty.
+    const selfPane = paneByPid.get(proc.pid);
+    if (selfPane) {
+      result.set(selfPane.pane_id, { process: proc, pane: selfPane });
+      continue;
+    }
+
     let currentPid = proc.ppid;
-    const visited = new Set<number>();
+    const visited = new Set<number>([proc.pid]);
 
     while (currentPid > 1 && !visited.has(currentPid)) {
       visited.add(currentPid);
