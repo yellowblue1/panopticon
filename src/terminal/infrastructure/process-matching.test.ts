@@ -105,6 +105,14 @@ describe("isMonitoredBinary", () => {
       ),
     ).toBe(true);
   });
+
+  it("rejects editors opening a file under a claude/versions/ path", () => {
+    expect(isMonitoredBinary("vim /home/user/claude/versions/2.1.183")).toBe(false);
+    expect(isMonitoredBinary("vim /home/user/claude/versions/2.1.183 --readonly")).toBe(false);
+    expect(
+      isMonitoredBinary("nvim --embed /Users/test/.claude/plugins/claude/versions/2.1.183"),
+    ).toBe(false);
+  });
 });
 
 describe("getMonitoredProcesses", () => {

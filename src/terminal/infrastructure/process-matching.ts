@@ -5,13 +5,17 @@ const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 
 // Agent Teams workers exec the versioned bundle directly
 // (`~/.local/share/claude/versions/<X> --agent-id ... --team-name ...`),
-// so the binary's last path component is a version string, not "claude".
-// Match against the full command so home dirs with spaces (common on macOS,
-// e.g. `~/Library/Application Support/claude/versions/<X>`) still resolve.
-const CLAUDE_VERSIONED_PATH = /\/claude\/versions\/[^/\s]+(?:\s|$)/;
+// so argv[0]'s last path component is a version string, not "claude". The
+// regex must match argv[0] specifically — otherwise `vim /any/path/claude/
+// versions/X` would be mis-classified as claude. We can't naively
+// `split(/\s+/)[0]` because home dirs with spaces (macOS `~/Library/
+// Application Support/claude/versions/<X>`) would truncate before the bundle
+// suffix. Match instead against the longest prefix of `command` whose end is
+// a versioned-bundle path immediately followed by whitespace or end-of-string.
+const CLAUDE_VERSIONED_ARGV0 = /^\/\S(?:.*[^\s])?\/claude\/versions\/[^/\s]+(?:\s|$)/;
 
 function extractBinaryName(command: string): string {
-  if (CLAUDE_VERSIONED_PATH.test(command)) return "claude";
+  if (CLAUDE_VERSIONED_ARGV0.test(command)) return "claude";
   const firstWord = command.split(/\s+/)[0] || "";
   return firstWord.split("/").pop() || "";
 }
