@@ -6,13 +6,13 @@ const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 // Agent Teams workers exec the versioned bundle directly
 // (`~/.local/share/claude/versions/<X> --agent-id ... --team-name ...`),
 // so the binary's last path component is a version string, not "claude".
-const CLAUDE_VERSIONED_PATH = /\/claude\/versions\/[^/\s]+$/;
+// Match against the full command so home dirs with spaces (common on macOS,
+// e.g. `~/Library/Application Support/claude/versions/<X>`) still resolve.
+const CLAUDE_VERSIONED_PATH = /\/claude\/versions\/[^/\s]+(?:\s|$)/;
 
 function extractBinaryName(command: string): string {
+  if (CLAUDE_VERSIONED_PATH.test(command)) return "claude";
   const firstWord = command.split(/\s+/)[0] || "";
-  if (firstWord.includes("/claude/versions/") && CLAUDE_VERSIONED_PATH.test(firstWord)) {
-    return "claude";
-  }
   return firstWord.split("/").pop() || "";
 }
 

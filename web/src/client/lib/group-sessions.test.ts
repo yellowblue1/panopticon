@@ -581,6 +581,54 @@ describe("groupSessions — team-window grouping", () => {
     expect(winB?.children.map((c) => c.pane_id)).toEqual(["%3"]);
   });
 
+  it("does not group two unrelated sessions that merely share a tmux window", () => {
+    const a = makeSession({
+      pane_id: "%0",
+      tmux_target: "shared:0.0",
+      cwd: "/home/user/proj-a",
+      project_name: "proj-a",
+    });
+    const b = makeSession({
+      pane_id: "%1",
+      tmux_target: "shared:0.1",
+      cwd: "/home/user/proj-b",
+      project_name: "proj-b",
+    });
+
+    const { groups, ungrouped } = groupSessions([a, b]);
+
+    expect(groups).toEqual([]);
+    expect(ungrouped.map((s) => s.pane_id).sort()).toEqual(["%0", "%1"]);
+  });
+
+  it("groups only the team siblings and leaves an unrelated co-window pane ungrouped", () => {
+    const lead = makeSession({
+      pane_id: "%0",
+      tmux_target: "shared:0.0",
+      cwd: "/home/user/team",
+      project_name: "team",
+    });
+    const worker = makeSession({
+      pane_id: "%1",
+      tmux_target: "shared:0.1",
+      cwd: "/home/user/team",
+      project_name: "team",
+    });
+    const stranger = makeSession({
+      pane_id: "%2",
+      tmux_target: "shared:0.2",
+      cwd: "/home/user/other",
+      project_name: "other",
+    });
+
+    const { groups, ungrouped } = groupSessions([lead, worker, stranger]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].orchestrator?.pane_id).toBe("%0");
+    expect(groups[0].children.map((c) => c.pane_id)).toEqual(["%1"]);
+    expect(ungrouped.map((s) => s.pane_id)).toEqual(["%2"]);
+  });
+
   it("does not absorb worktree-grouped sessions into a team-window group", () => {
     const worktreeLead = makeSession({
       pane_id: "%0",

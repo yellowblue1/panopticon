@@ -28,12 +28,6 @@ export function detectWorktreeBase(cwd: string): string | null {
   return cwd.slice(0, idx);
 }
 
-/**
- * Parse `tmux_target` ("session:window.pane") into the window key
- * ("session:window") and the numeric pane index. Used to group lead + Agent
- * Teams worker panes that share a tmux window — `claude` workers spawned via
- * `teammateMode: tmux` land as sibling panes in the lead's window.
- */
 export function parseTmuxTarget(target: string): { windowKey: string; paneIndex: number } | null {
   const lastDot = target.lastIndexOf(".");
   if (lastDot === -1) return null;
@@ -144,26 +138,25 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
   const remainingByWindow = new Map<string, SessionResponse[]>();
   const ungrouped: SessionResponse[] = [];
 
-  const recordRemaining = (session: SessionResponse): void => {
-    const parsed = parseTmuxTarget(session.tmux_target);
-    if (!parsed) {
-      ungrouped.push(session);
-      return;
-    }
-    const arr = remainingByWindow.get(parsed.windowKey) ?? [];
-    arr.push(session);
-    remainingByWindow.set(parsed.windowKey, arr);
-  };
-
   for (const [cwd, sessions] of orchestratorByCwd) {
     const skipFirst = usedOrchestratorCwds.has(cwd);
     for (let i = skipFirst ? 1 : 0; i < sessions.length; i++) {
-      recordRemaining(sessions[i]);
+      const session = sessions[i];
+      const parsed = parseTmuxTarget(session.tmux_target);
+      if (!parsed) {
+        ungrouped.push(session);
+        continue;
+      }
+      const arr = remainingByWindow.get(parsed.windowKey) ?? [];
+      arr.push(session);
+      remainingByWindow.set(parsed.windowKey, arr);
     }
   }
 
   // Agent Teams workers spawn as sibling panes via tmux split-window, so the
-  // lead always has the lowest pane_index in the window.
+  // lead always has the lowest pane_index in the window. Require matching cwd
+  // and project_name so coincidentally co-located panes (e.g. two unrelated
+  // claude sessions hand-split into one window) are not falsely grouped.
   for (const entries of remainingByWindow.values()) {
     if (entries.length < 2) {
       ungrouped.push(...entries);
@@ -171,7 +164,16 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     }
     entries.sort(byTmuxTarget);
     const [lead, ...rest] = entries;
-    groups.push({ orchestrator: lead, children: rest });
+    const teamChildren = rest.filter(
+      (s) => s.cwd === lead.cwd && s.project_name === lead.project_name,
+    );
+    if (teamChildren.length === 0) {
+      ungrouped.push(...entries);
+      continue;
+    }
+    groups.push({ orchestrator: lead, children: teamChildren });
+    const stranded = rest.filter((s) => !teamChildren.includes(s));
+    if (stranded.length > 0) ungrouped.push(...stranded);
   }
 
   const maxActivityByGroup = new Map<SessionGroup, string>();

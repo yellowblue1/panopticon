@@ -97,6 +97,14 @@ describe("isMonitoredBinary", () => {
   it("rejects a path that merely contains claude/versions in arguments", () => {
     expect(isMonitoredBinary("ls /home/user/.local/share/claude/versions/")).toBe(false);
   });
+
+  it("matches versioned-bundle path containing spaces (macOS Application Support)", () => {
+    expect(
+      isMonitoredBinary(
+        "/Users/Foo Bar/Library/Application Support/claude/versions/2.1.183 --agent-id w@s --team-name s",
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("getMonitoredProcesses", () => {
