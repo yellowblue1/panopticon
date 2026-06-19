@@ -15,12 +15,9 @@ const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 const CLAUDE_VERSIONED_SUFFIX = /\/claude\/versions\/[^/\s]+(?=\s|$)/g;
 
 function isClaudeVersionedArgv0(command: string): boolean {
-  CLAUDE_VERSIONED_SUFFIX.lastIndex = 0;
-  let match: RegExpExecArray | null = CLAUDE_VERSIONED_SUFFIX.exec(command);
-  while (match !== null) {
+  for (const match of command.matchAll(CLAUDE_VERSIONED_SUFFIX)) {
     const prefix = command.slice(0, match.index);
     if (prefix.startsWith("/") && !prefix.includes(" /")) return true;
-    match = CLAUDE_VERSIONED_SUFFIX.exec(command);
   }
   return false;
 }
