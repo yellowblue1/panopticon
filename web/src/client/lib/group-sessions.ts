@@ -28,6 +28,21 @@ export function detectWorktreeBase(cwd: string): string | null {
   return cwd.slice(0, idx);
 }
 
+/**
+ * Parse `tmux_target` ("session:window.pane") into the window key
+ * ("session:window") and the numeric pane index. Used to group lead + Agent
+ * Teams worker panes that share a tmux window — `claude` workers spawned via
+ * `teammateMode: tmux` land as sibling panes in the lead's window.
+ */
+export function parseTmuxTarget(target: string): { windowKey: string; paneIndex: number } | null {
+  const lastDot = target.lastIndexOf(".");
+  if (lastDot === -1) return null;
+  const windowKey = target.slice(0, lastDot);
+  const paneIndex = Number.parseInt(target.slice(lastDot + 1), 10);
+  if (!windowKey.includes(":") || Number.isNaN(paneIndex)) return null;
+  return { windowKey, paneIndex };
+}
+
 function getGroupMaxActivity(g: SessionGroup): string {
   let max = g.orchestrator?.last_activity ?? "";
   for (const c of g.children) {
@@ -126,6 +141,39 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     groups.push({ orchestrator: null, children });
   }
 
+  const remainingByWindow = new Map<string, SessionResponse[]>();
+  const ungrouped: SessionResponse[] = [];
+
+  const recordRemaining = (session: SessionResponse): void => {
+    const parsed = parseTmuxTarget(session.tmux_target);
+    if (!parsed) {
+      ungrouped.push(session);
+      return;
+    }
+    const arr = remainingByWindow.get(parsed.windowKey) ?? [];
+    arr.push(session);
+    remainingByWindow.set(parsed.windowKey, arr);
+  };
+
+  for (const [cwd, sessions] of orchestratorByCwd) {
+    const skipFirst = usedOrchestratorCwds.has(cwd);
+    for (let i = skipFirst ? 1 : 0; i < sessions.length; i++) {
+      recordRemaining(sessions[i]);
+    }
+  }
+
+  // Agent Teams workers spawn as sibling panes via tmux split-window, so the
+  // lead always has the lowest pane_index in the window.
+  for (const entries of remainingByWindow.values()) {
+    if (entries.length < 2) {
+      ungrouped.push(...entries);
+      continue;
+    }
+    entries.sort(byTmuxTarget);
+    const [lead, ...rest] = entries;
+    groups.push({ orchestrator: lead, children: rest });
+  }
+
   const maxActivityByGroup = new Map<SessionGroup, string>();
   for (const g of groups) {
     maxActivityByGroup.set(g, getGroupMaxActivity(g));
@@ -141,20 +189,6 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
       tiebreaker,
     );
   });
-
-  const ungrouped: SessionResponse[] = [];
-  for (const [cwd, sessions] of orchestratorByCwd) {
-    if (usedOrchestratorCwds.has(cwd)) {
-      // First session was used as orchestrator; rest go to ungrouped
-      for (let i = 1; i < sessions.length; i++) {
-        ungrouped.push(sessions[i]);
-      }
-    } else {
-      for (const session of sessions) {
-        ungrouped.push(session);
-      }
-    }
-  }
 
   ungrouped.sort(byActivityThenPaneId);
 

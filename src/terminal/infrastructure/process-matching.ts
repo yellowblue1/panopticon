@@ -3,12 +3,16 @@ import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
 
 const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 
-/**
- * Extract the binary name from a command string.
- * Takes the last path component of the first whitespace-delimited word.
- */
+// Agent Teams workers exec the versioned bundle directly
+// (`~/.local/share/claude/versions/<X> --agent-id ... --team-name ...`),
+// so the binary's last path component is a version string, not "claude".
+const CLAUDE_VERSIONED_PATH = /\/claude\/versions\/[^/\s]+$/;
+
 function extractBinaryName(command: string): string {
   const firstWord = command.split(/\s+/)[0] || "";
+  if (firstWord.includes("/claude/versions/") && CLAUDE_VERSIONED_PATH.test(firstWord)) {
+    return "claude";
+  }
   return firstWord.split("/").pop() || "";
 }
 

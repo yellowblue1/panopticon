@@ -85,6 +85,18 @@ describe("isMonitoredBinary", () => {
   it("rejects node running nori launcher script", () => {
     expect(isMonitoredBinary("node /home/user/.local/bin/nori")).toBe(false);
   });
+
+  it("matches Agent Teams worker launched from versioned bundle path", () => {
+    expect(
+      isMonitoredBinary(
+        "/home/user/.local/share/claude/versions/2.1.183 --agent-id agent-foo@session-x --agent-name agent-foo --team-name session-x --agent-color blue --parent-session-id abc --agent-type general-purpose --permission-mode auto --model claude-opus-4-8",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a path that merely contains claude/versions in arguments", () => {
+    expect(isMonitoredBinary("ls /home/user/.local/share/claude/versions/")).toBe(false);
+  });
 });
 
 describe("getMonitoredProcesses", () => {
@@ -133,6 +145,21 @@ describe("getMonitoredProcesses", () => {
 
   it("returns empty array for empty table", () => {
     expect(getMonitoredProcesses([])).toEqual([]);
+  });
+
+  it("normalises versioned-bundle worker path to claude binaryName", () => {
+    const processTable: ProcessInfo[] = [
+      {
+        pid: 24113,
+        ppid: 1705,
+        command:
+          "/home/user/.local/share/claude/versions/2.1.183 --agent-id w@s --team-name s --agent-type general-purpose",
+      },
+    ];
+
+    const processes = getMonitoredProcesses(processTable);
+    expect(processes).toHaveLength(1);
+    expect(processes[0]).toEqual({ pid: 24113, ppid: 1705, binaryName: "claude" });
   });
 
   it("detects mixed claude and codex processes", () => {
