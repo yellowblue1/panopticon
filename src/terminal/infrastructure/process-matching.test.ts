@@ -85,6 +85,47 @@ describe("isMonitoredBinary", () => {
   it("rejects node running nori launcher script", () => {
     expect(isMonitoredBinary("node /home/user/.local/bin/nori")).toBe(false);
   });
+
+  it("matches Agent Teams worker launched from versioned bundle path", () => {
+    expect(
+      isMonitoredBinary(
+        "/home/user/.local/share/claude/versions/2.1.183 --agent-id agent-foo@session-x --agent-name agent-foo --team-name session-x --agent-color blue --parent-session-id abc --agent-type general-purpose --permission-mode auto --model claude-opus-4-8",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a path that merely contains claude/versions in arguments", () => {
+    expect(isMonitoredBinary("ls /home/user/.local/share/claude/versions/")).toBe(false);
+  });
+
+  it("matches versioned-bundle path containing spaces (macOS Application Support)", () => {
+    expect(
+      isMonitoredBinary(
+        "/Users/Foo Bar/Library/Application Support/claude/versions/2.1.183 --agent-id w@s --team-name s",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects editors opening a file under a claude/versions/ path", () => {
+    expect(isMonitoredBinary("vim /home/user/claude/versions/2.1.183")).toBe(false);
+    expect(isMonitoredBinary("vim /home/user/claude/versions/2.1.183 --readonly")).toBe(false);
+    expect(
+      isMonitoredBinary("nvim --embed /Users/test/.claude/plugins/claude/versions/2.1.183"),
+    ).toBe(false);
+  });
+
+  it("rejects editors invoked by absolute path that open a versioned-bundle file", () => {
+    // ps -eo command emits the resolved binary path, so argv[0] is typically
+    // absolute. Ensure the argv[0]/argv[1] boundary check still rejects when
+    // both argv[0] and the file argument are absolute paths.
+    expect(isMonitoredBinary("/usr/bin/vim /home/user/claude/versions/2.1.183")).toBe(false);
+    expect(isMonitoredBinary("/usr/bin/vim /home/user/claude/versions/2.1.183 --readonly")).toBe(
+      false,
+    );
+    expect(isMonitoredBinary("/opt/homebrew/bin/nvim /Users/x/claude/versions/2.1.183")).toBe(
+      false,
+    );
+  });
 });
 
 describe("getMonitoredProcesses", () => {
@@ -133,6 +174,21 @@ describe("getMonitoredProcesses", () => {
 
   it("returns empty array for empty table", () => {
     expect(getMonitoredProcesses([])).toEqual([]);
+  });
+
+  it("normalises versioned-bundle worker path to claude binaryName", () => {
+    const processTable: ProcessInfo[] = [
+      {
+        pid: 24113,
+        ppid: 1705,
+        command:
+          "/home/user/.local/share/claude/versions/2.1.183 --agent-id w@s --team-name s --agent-type general-purpose",
+      },
+    ];
+
+    const processes = getMonitoredProcesses(processTable);
+    expect(processes).toHaveLength(1);
+    expect(processes[0]).toEqual({ pid: 24113, ppid: 1705, binaryName: "claude" });
   });
 
   it("detects mixed claude and codex processes", () => {

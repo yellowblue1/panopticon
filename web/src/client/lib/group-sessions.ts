@@ -28,6 +28,15 @@ export function detectWorktreeBase(cwd: string): string | null {
   return cwd.slice(0, idx);
 }
 
+export function parseTmuxTarget(target: string): { windowKey: string; paneIndex: number } | null {
+  const lastDot = target.lastIndexOf(".");
+  if (lastDot === -1) return null;
+  const windowKey = target.slice(0, lastDot);
+  const paneIndex = Number.parseInt(target.slice(lastDot + 1), 10);
+  if (!windowKey.includes(":") || Number.isNaN(paneIndex)) return null;
+  return { windowKey, paneIndex };
+}
+
 function getGroupMaxActivity(g: SessionGroup): string {
   let max = g.orchestrator?.last_activity ?? "";
   for (const c of g.children) {
@@ -126,6 +135,47 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     groups.push({ orchestrator: null, children });
   }
 
+  const remainingByWindow = new Map<string, SessionResponse[]>();
+  const ungrouped: SessionResponse[] = [];
+
+  for (const [cwd, sessions] of orchestratorByCwd) {
+    const skipFirst = usedOrchestratorCwds.has(cwd);
+    for (let i = skipFirst ? 1 : 0; i < sessions.length; i++) {
+      const session = sessions[i];
+      const parsed = parseTmuxTarget(session.tmux_target);
+      if (!parsed) {
+        ungrouped.push(session);
+        continue;
+      }
+      const arr = remainingByWindow.get(parsed.windowKey) ?? [];
+      arr.push(session);
+      remainingByWindow.set(parsed.windowKey, arr);
+    }
+  }
+
+  // Agent Teams workers spawn as sibling panes via tmux split-window, so the
+  // lead always has the lowest pane_index in the window. Require matching cwd
+  // and project_name so coincidentally co-located panes (e.g. two unrelated
+  // claude sessions hand-split into one window) are not falsely grouped.
+  for (const entries of remainingByWindow.values()) {
+    if (entries.length < 2) {
+      ungrouped.push(...entries);
+      continue;
+    }
+    entries.sort(byTmuxTarget);
+    const [lead, ...rest] = entries;
+    const teamChildren = rest.filter(
+      (s) => s.cwd === lead.cwd && s.project_name === lead.project_name,
+    );
+    if (teamChildren.length === 0) {
+      ungrouped.push(...entries);
+      continue;
+    }
+    groups.push({ orchestrator: lead, children: teamChildren });
+    const stranded = rest.filter((s) => !teamChildren.includes(s));
+    if (stranded.length > 0) ungrouped.push(...stranded);
+  }
+
   const maxActivityByGroup = new Map<SessionGroup, string>();
   for (const g of groups) {
     maxActivityByGroup.set(g, getGroupMaxActivity(g));
@@ -141,20 +191,6 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
       tiebreaker,
     );
   });
-
-  const ungrouped: SessionResponse[] = [];
-  for (const [cwd, sessions] of orchestratorByCwd) {
-    if (usedOrchestratorCwds.has(cwd)) {
-      // First session was used as orchestrator; rest go to ungrouped
-      for (let i = 1; i < sessions.length; i++) {
-        ungrouped.push(sessions[i]);
-      }
-    } else {
-      for (const session of sessions) {
-        ungrouped.push(session);
-      }
-    }
-  }
 
   ungrouped.sort(byActivityThenPaneId);
 

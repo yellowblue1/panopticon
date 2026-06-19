@@ -3,11 +3,27 @@ import type { MonitoredProcess, ProcessInfo, TmuxPane } from "../domain/types";
 
 const MONITORED_BINARIES = new Set<string>(AGENT_TYPES);
 
-/**
- * Extract the binary name from a command string.
- * Takes the last path component of the first whitespace-delimited word.
- */
+// Agent Teams workers exec the versioned bundle directly
+// (`~/.local/share/claude/versions/<X> --agent-id ... --team-name ...`),
+// so argv[0]'s last path component is a version string, not "claude". A naive
+// `split(/\s+/)[0]` truncates macOS home dirs containing spaces (`~/Library/
+// Application Support/claude/versions/<X>`), and an unanchored regex over the
+// full command mis-classifies things like `/usr/bin/vim /any/path/claude/
+// versions/X`. Find every `/claude/versions/<X>` suffix and accept only when
+// its prefix looks like argv[0]: starts with `/` and contains no ` /` (which
+// would mean the prefix already crossed into argv[1]).
+const CLAUDE_VERSIONED_SUFFIX = /\/claude\/versions\/[^/\s]+(?=\s|$)/g;
+
+function isClaudeVersionedArgv0(command: string): boolean {
+  for (const match of command.matchAll(CLAUDE_VERSIONED_SUFFIX)) {
+    const prefix = command.slice(0, match.index);
+    if (prefix.startsWith("/") && !prefix.includes(" /")) return true;
+  }
+  return false;
+}
+
 function extractBinaryName(command: string): string {
+  if (isClaudeVersionedArgv0(command)) return "claude";
   const firstWord = command.split(/\s+/)[0] || "";
   return firstWord.split("/").pop() || "";
 }

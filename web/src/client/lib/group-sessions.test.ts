@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { SessionResponse } from "@shared/types";
-import { detectWorktreeBase, groupSessions } from "./group-sessions";
+import { detectWorktreeBase, groupSessions, parseTmuxTarget } from "./group-sessions";
 
 function makeSession(overrides: Partial<SessionResponse> & { cwd: string }): SessionResponse {
   return {
@@ -69,8 +69,13 @@ describe("groupSessions", () => {
 
   it("puts all sessions in ungrouped when no worktree patterns exist", () => {
     const sessions = [
-      makeSession({ pane_id: "%0", cwd: "/home/user/project-a" }),
-      makeSession({ pane_id: "%1", cwd: "/home/user/project-b", project_name: "project-b" }),
+      makeSession({ pane_id: "%0", cwd: "/home/user/project-a", tmux_target: "a:0.0" }),
+      makeSession({
+        pane_id: "%1",
+        cwd: "/home/user/project-b",
+        project_name: "project-b",
+        tmux_target: "b:0.0",
+      }),
     ];
 
     const result = groupSessions(sessions);
@@ -78,16 +83,18 @@ describe("groupSessions", () => {
     expect(result.ungrouped).toHaveLength(2);
   });
 
-  it("keeps all sessions with the same cwd as ungrouped", () => {
+  it("keeps all sessions with the same cwd as ungrouped when they are in different tmux windows", () => {
     const sessions = [
       makeSession({
         pane_id: "%0",
         cwd: "/home/user/myproject",
+        tmux_target: "main:0.0",
         last_activity: "2026-02-16T00:02:00.000Z",
       }),
       makeSession({
         pane_id: "%1",
         cwd: "/home/user/myproject",
+        tmux_target: "main:1.0",
         last_activity: "2026-02-16T00:01:00.000Z",
       }),
     ];
@@ -401,18 +408,21 @@ describe("groupSessions", () => {
         pane_id: "%2",
         cwd: "/home/user/project-c",
         project_name: "project-c",
+        tmux_target: "c:0.0",
         last_activity: "2026-02-16T00:01:00.000Z",
       }),
       makeSession({
         pane_id: "%0",
         cwd: "/home/user/project-a",
         project_name: "project-a",
+        tmux_target: "a:0.0",
         last_activity: "2026-02-16T00:10:00.000Z",
       }),
       makeSession({
         pane_id: "%1",
         cwd: "/home/user/project-b",
         project_name: "project-b",
+        tmux_target: "b:0.0",
         last_activity: "2026-02-16T00:05:00.000Z",
       }),
     ];
@@ -429,12 +439,14 @@ describe("groupSessions", () => {
         pane_id: "%1",
         cwd: "/home/user/project-b",
         project_name: "project-b",
+        tmux_target: "b:0.0",
         last_activity: "2026-02-16T00:05:03.000Z",
       }),
       makeSession({
         pane_id: "%0",
         cwd: "/home/user/project-a",
         project_name: "project-a",
+        tmux_target: "a:0.0",
         last_activity: "2026-02-16T00:05:01.000Z",
       }),
     ];
@@ -478,5 +490,181 @@ describe("groupSessions", () => {
     // old-project child has the latest activity (00:06), so old-project group comes first
     expect(result.groups[0].orchestrator?.project_name).toBe("old-project");
     expect(result.groups[1].orchestrator?.project_name).toBe("new-project");
+  });
+});
+
+describe("parseTmuxTarget", () => {
+  it("splits session:window.pane into windowKey and paneIndex", () => {
+    expect(parseTmuxTarget("main:0.0")).toEqual({ windowKey: "main:0", paneIndex: 0 });
+    expect(parseTmuxTarget("yb-agents:1.10")).toEqual({
+      windowKey: "yb-agents:1",
+      paneIndex: 10,
+    });
+  });
+
+  it("returns null for malformed targets", () => {
+    expect(parseTmuxTarget("nodot")).toBeNull();
+    expect(parseTmuxTarget("no-colon.0")).toBeNull();
+    expect(parseTmuxTarget("main:0.notanumber")).toBeNull();
+  });
+});
+
+describe("groupSessions — team-window grouping", () => {
+  it("groups lead and Agent Teams workers in the same tmux window", () => {
+    const lead = makeSession({
+      pane_id: "%10",
+      tmux_target: "yb-agents:1.1",
+      tmux_session_name: "yb-agents",
+      cwd: "/home/user/yb-agents",
+    });
+    const worker1 = makeSession({
+      pane_id: "%15",
+      tmux_target: "yb-agents:1.2",
+      tmux_session_name: "yb-agents",
+      cwd: "/home/user/yb-agents",
+    });
+    const worker2 = makeSession({
+      pane_id: "%16",
+      tmux_target: "yb-agents:1.3",
+      tmux_session_name: "yb-agents",
+      cwd: "/home/user/yb-agents",
+    });
+
+    const { groups, ungrouped } = groupSessions([worker2, worker1, lead]);
+
+    expect(ungrouped).toEqual([]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].orchestrator?.pane_id).toBe("%10");
+    expect(groups[0].children.map((c) => c.pane_id)).toEqual(["%15", "%16"]);
+  });
+
+  it("does not group a single-pane window", () => {
+    const solo = makeSession({ pane_id: "%0", tmux_target: "solo:0.0", cwd: "/home/user/solo" });
+    const { groups, ungrouped } = groupSessions([solo]);
+    expect(groups).toEqual([]);
+    expect(ungrouped.map((s) => s.pane_id)).toEqual(["%0"]);
+  });
+
+  it("forms team groups across separate tmux windows independently", () => {
+    const a1 = makeSession({
+      pane_id: "%0",
+      tmux_target: "s:0.0",
+      cwd: "/home/user/a",
+      project_name: "a",
+    });
+    const a2 = makeSession({
+      pane_id: "%1",
+      tmux_target: "s:0.1",
+      cwd: "/home/user/a",
+      project_name: "a",
+    });
+    const b1 = makeSession({
+      pane_id: "%2",
+      tmux_target: "s:1.0",
+      cwd: "/home/user/b",
+      project_name: "b",
+    });
+    const b2 = makeSession({
+      pane_id: "%3",
+      tmux_target: "s:1.1",
+      cwd: "/home/user/b",
+      project_name: "b",
+    });
+
+    const { groups, ungrouped } = groupSessions([a1, a2, b1, b2]);
+
+    expect(ungrouped).toEqual([]);
+    expect(groups).toHaveLength(2);
+    const winA = groups.find((g) => g.orchestrator?.pane_id === "%0");
+    const winB = groups.find((g) => g.orchestrator?.pane_id === "%2");
+    expect(winA?.children.map((c) => c.pane_id)).toEqual(["%1"]);
+    expect(winB?.children.map((c) => c.pane_id)).toEqual(["%3"]);
+  });
+
+  it("does not group two unrelated sessions that merely share a tmux window", () => {
+    const a = makeSession({
+      pane_id: "%0",
+      tmux_target: "shared:0.0",
+      cwd: "/home/user/proj-a",
+      project_name: "proj-a",
+    });
+    const b = makeSession({
+      pane_id: "%1",
+      tmux_target: "shared:0.1",
+      cwd: "/home/user/proj-b",
+      project_name: "proj-b",
+    });
+
+    const { groups, ungrouped } = groupSessions([a, b]);
+
+    expect(groups).toEqual([]);
+    expect(ungrouped.map((s) => s.pane_id).sort()).toEqual(["%0", "%1"]);
+  });
+
+  it("groups only the team siblings and leaves an unrelated co-window pane ungrouped", () => {
+    const lead = makeSession({
+      pane_id: "%0",
+      tmux_target: "shared:0.0",
+      cwd: "/home/user/team",
+      project_name: "team",
+    });
+    const worker = makeSession({
+      pane_id: "%1",
+      tmux_target: "shared:0.1",
+      cwd: "/home/user/team",
+      project_name: "team",
+    });
+    const stranger = makeSession({
+      pane_id: "%2",
+      tmux_target: "shared:0.2",
+      cwd: "/home/user/other",
+      project_name: "other",
+    });
+
+    const { groups, ungrouped } = groupSessions([lead, worker, stranger]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].orchestrator?.pane_id).toBe("%0");
+    expect(groups[0].children.map((c) => c.pane_id)).toEqual(["%1"]);
+    expect(ungrouped.map((s) => s.pane_id)).toEqual(["%2"]);
+  });
+
+  it("does not absorb worktree-grouped sessions into a team-window group", () => {
+    const worktreeLead = makeSession({
+      pane_id: "%0",
+      cwd: "/home/user/proj",
+      tmux_target: "main:0.0",
+    });
+    const worktreeChild = makeSession({
+      pane_id: "%1",
+      cwd: "/home/user/proj-worktrees/feat",
+      tmux_target: "main:1.0",
+    });
+    const teamLead = makeSession({
+      pane_id: "%2",
+      cwd: "/home/user/other",
+      project_name: "other",
+      tmux_target: "agents:0.0",
+    });
+    const teamWorker = makeSession({
+      pane_id: "%3",
+      cwd: "/home/user/other",
+      project_name: "other",
+      tmux_target: "agents:0.1",
+    });
+
+    const { groups, ungrouped } = groupSessions([
+      worktreeLead,
+      worktreeChild,
+      teamLead,
+      teamWorker,
+    ]);
+
+    expect(ungrouped).toEqual([]);
+    expect(groups).toHaveLength(2);
+    const wt = groups.find((g) => g.orchestrator?.pane_id === "%0");
+    expect(wt?.children.map((c) => c.pane_id)).toEqual(["%1"]);
+    const team = groups.find((g) => g.orchestrator?.pane_id === "%2");
+    expect(team?.children.map((c) => c.pane_id)).toEqual(["%3"]);
   });
 });
