@@ -6,7 +6,7 @@ function makeSession(overrides: Partial<SessionResponse> & { cwd: string }): Ses
   return {
     pane_id: "%0",
     project_name: "myproject",
-    git_branch: "main",
+    window_name: "main",
     github_repo_url: null,
     status: "busy",
     summary: null,

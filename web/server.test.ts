@@ -33,7 +33,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
 const sampleSession: SessionResponse = {
   pane_id: "%0",
   project_name: "my-project",
-  git_branch: "main",
+  window_name: "main",
   status: "busy",
   summary: null,
   tmux_target: "main:0.0",

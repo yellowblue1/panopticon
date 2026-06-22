@@ -127,7 +127,6 @@ const sessionManagerDeps: SessionManagerDeps = {
   getProcessCwd,
   getProcessStartTime,
   getProjectName,
-  getGitBranch,
   getGitRemoteUrl,
   buildTmuxTarget,
   matchProcessesToPanes,

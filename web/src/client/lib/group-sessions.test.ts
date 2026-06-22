@@ -6,7 +6,7 @@ function makeSession(overrides: Partial<SessionResponse> & { cwd: string }): Ses
   return {
     pane_id: "%0",
     project_name: "myproject",
-    git_branch: "main",
+    window_name: "main",
     github_repo_url: null,
     status: "busy",
     summary: null,
@@ -206,13 +206,13 @@ describe("groupSessions", () => {
     const child1 = makeSession({
       pane_id: "%1",
       cwd: "/home/user/myproject-worktrees/feat-auth",
-      git_branch: "feat-auth",
+      window_name: "feat-auth",
       last_activity: "2026-02-16T00:02:00.000Z",
     });
     const child2 = makeSession({
       pane_id: "%2",
       cwd: "/home/user/myproject-worktrees/fix-bug",
-      git_branch: "fix-bug",
+      window_name: "fix-bug",
       last_activity: "2026-02-16T00:01:00.000Z",
     });
 

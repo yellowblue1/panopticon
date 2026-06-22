@@ -17,7 +17,7 @@ const _comparedKeys: Record<Exclude<keyof SessionResponse, IgnoredSessionKey>, t
   status: true,
   summary: true,
   project_name: true,
-  git_branch: true,
+  window_name: true,
   github_repo_url: true,
   tmux_target: true,
   tmux_session_name: true,
@@ -34,7 +34,7 @@ function isSessionEqual(a: SessionResponse, b: SessionResponse): boolean {
     a.status === b.status &&
     a.summary === b.summary &&
     a.project_name === b.project_name &&
-    a.git_branch === b.git_branch &&
+    a.window_name === b.window_name &&
     a.github_repo_url === b.github_repo_url &&
     a.tmux_target === b.tmux_target &&
     a.tmux_session_name === b.tmux_session_name &&

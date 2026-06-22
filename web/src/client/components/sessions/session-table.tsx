@@ -52,7 +52,7 @@ export function SessionTable({ sessions }: SessionTableProps) {
         <thead>
           <tr>
             <th className="col-project">Project</th>
-            <th className="col-branch">Branch</th>
+            <th className="col-window">Window</th>
             <th className="col-status">Status</th>
             <th className="col-summary">Summary</th>
             <th className="col-actions">Actions</th>

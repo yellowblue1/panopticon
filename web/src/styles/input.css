@@ -138,7 +138,7 @@ body {
   width: 20%;
   min-width: 140px;
 }
-.col-branch {
+.col-window {
   width: 15%;
   min-width: 100px;
 }
@@ -160,11 +160,11 @@ body {
   @apply font-medium text-accent-blue;
 }
 
-.git-branch {
+.window-name {
   @apply text-sm text-accent-purple font-mono;
 }
 
-.no-branch {
+.no-window {
   @apply text-text-muted italic text-sm opacity-70;
 }
 
@@ -638,9 +638,9 @@ html.vertical-expand [data-app-shell] {
    Responsive Breakpoints
    ============================================ */
 
-/* Medium screens (640px–1023px): table without branch */
+/* Medium screens (640px–1023px): table without window name */
 @media (min-width: 640px) and (max-width: 1023px) {
-  .col-branch {
+  .col-window {
     display: none;
   }
 
@@ -683,7 +683,7 @@ html.vertical-expand [data-app-shell] {
     grid-template-areas:
       "project  actions"
       "summary  summary"
-      "branch   branch";
+      "window   window";
     gap: 4px 8px;
     align-items: center;
     padding: 14px 16px;
@@ -734,8 +734,8 @@ html.vertical-expand [data-app-shell] {
     width: auto;
   }
 
-  .col-branch {
-    grid-area: branch;
+  .col-window {
+    grid-area: window;
     width: auto;
     min-width: 0;
     font-size: 0.8125rem;

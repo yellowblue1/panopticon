@@ -119,7 +119,7 @@ export class SessionManager {
     return sessions.map((s) => ({
       pane_id: s.pane_id,
       project_name: s.project_name,
-      git_branch: s.git_branch,
+      window_name: s.window_name,
       github_repo_url: s.github_repo_url,
       status: s.status,
       summary: s.status === "busy" ? null : s.summary,
@@ -149,7 +149,7 @@ export class SessionManager {
     return {
       pane_id: state.pane_id,
       project_name: state.project_name,
-      git_branch: state.git_branch,
+      window_name: state.window_name,
       github_repo_url: state.github_repo_url,
       status: state.status,
       summary: state.status === "busy" ? null : state.summary,
@@ -226,6 +226,7 @@ export class SessionManager {
       pane_index: number;
       pane_pid: number;
       pane_id: string;
+      window_name: string;
     },
     binaryName: string,
   ): boolean {
@@ -244,7 +245,7 @@ export class SessionManager {
       agent_type: binaryName,
       cwd,
       project_name: this.deps.getProjectName(cwd),
-      git_branch: this.deps.getGitBranch(cwd),
+      window_name: pane.window_name,
       github_repo_url: this.deps.getGitRemoteUrl(cwd),
       status: "busy",
       summary: null,

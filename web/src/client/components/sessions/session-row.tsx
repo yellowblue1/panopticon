@@ -70,11 +70,11 @@ export function SessionRow({
           </span>
         </div>
       </td>
-      <td className="col-branch">
-        {session.git_branch ? (
-          <span className="git-branch">{session.git_branch}</span>
+      <td className="col-window">
+        {session.window_name ? (
+          <span className="window-name">{session.window_name}</span>
         ) : (
-          <span className="no-branch">-</span>
+          <span className="no-window">-</span>
         )}
       </td>
       <td className="col-status">

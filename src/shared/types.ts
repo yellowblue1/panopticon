@@ -24,7 +24,7 @@ export function isAgentDialect(value: string): value is AgentDialect {
 export interface SessionResponse {
   pane_id: string;
   project_name: string;
-  git_branch: string | null;
+  window_name: string;
   github_repo_url: string | null;
   status: "busy" | "waiting";
   summary: string | null;
