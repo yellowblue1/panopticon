@@ -14,7 +14,7 @@ export function isAgentType(value: string): value is AgentType {
 
 // Nori has no dialect entry because it wraps either backend; UIs that need
 // to support nori fetch both dialects' commands and accept both prefixes.
-export const AGENT_DIALECTS = ["claude", "codex"] as const;
+const AGENT_DIALECTS = ["claude", "codex"] as const;
 export type AgentDialect = (typeof AGENT_DIALECTS)[number];
 
 export function isAgentDialect(value: string): value is AgentDialect {
