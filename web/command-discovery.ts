@@ -108,13 +108,13 @@ function specFor(dialect: AgentDialect): DialectSpec {
   return dialect === "codex" ? CODEX_SPEC : CLAUDE_SPEC;
 }
 
-interface ClaudePluginEntry {
+type ClaudePluginEntry = {
   installPath: string;
-}
+};
 
-interface ClaudeInstalledPlugins {
+type ClaudeInstalledPlugins = {
   plugins: Record<string, ClaudePluginEntry[]>;
-}
+};
 
 function parsePluginName(key: string): string {
   const atIndex = key.indexOf("@");

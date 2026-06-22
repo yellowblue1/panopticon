@@ -1,3 +1,5 @@
+import type { AgentDialect } from "@shared/types";
+
 export const sessionKeys = {
   all: ["sessions"] as const,
   lists: () => [...sessionKeys.all, "list"] as const,
@@ -13,8 +15,6 @@ export const planKeys = {
   detail: (paneId: string) => [...planKeys.all, "detail", paneId] as const,
   availability: () => [...planKeys.all, "availability"] as const,
 };
-
-import type { AgentDialect } from "@shared/types";
 
 export const settingsKeys = {
   all: ["settings"] as const,
