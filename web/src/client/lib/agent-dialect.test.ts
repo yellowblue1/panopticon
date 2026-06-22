@@ -29,6 +29,20 @@ describe("triggerKeysForAgent", () => {
   });
 });
 
+describe("dialectsForAgent / triggerKeysForAgent stability", () => {
+  it("returns the same array identity for repeated calls with the same agent", () => {
+    // Stable identity matters: send-keys-input uses triggerKeys in a useEffect
+    // dep list, and a fresh array each render would resubscribe the document
+    // keydown handler on every parent re-render.
+    expect(dialectsForAgent("claude")).toBe(dialectsForAgent("claude"));
+    expect(dialectsForAgent("codex")).toBe(dialectsForAgent("codex"));
+    expect(dialectsForAgent("nori")).toBe(dialectsForAgent("nori"));
+    expect(triggerKeysForAgent("claude")).toBe(triggerKeysForAgent("claude"));
+    expect(triggerKeysForAgent("codex")).toBe(triggerKeysForAgent("codex"));
+    expect(triggerKeysForAgent("nori")).toBe(triggerKeysForAgent("nori"));
+  });
+});
+
 describe("mergeUniqueCommands", () => {
   it("returns an empty list when nothing is passed", () => {
     expect(mergeUniqueCommands()).toEqual([]);

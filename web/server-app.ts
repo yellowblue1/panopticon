@@ -396,12 +396,9 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       } satisfies AuthStatusResponse);
     })
 
-    // GET /api/settings/slash-commands?dialect=claude|codex
     .get("/api/settings/slash-commands", (c) => {
-      const dialectParam = c.req.query("dialect");
-      const dialect: AgentDialect = isAgentDialect(dialectParam ?? "")
-        ? (dialectParam as AgentDialect)
-        : "claude";
+      const candidate = c.req.query("dialect") ?? "";
+      const dialect: AgentDialect = isAgentDialect(candidate) ? candidate : "claude";
 
       const discovered = deps.discoverSlashCommands?.(dialect) ?? [];
       const builtin = deps.getBuiltinCommands?.(dialect) ?? [];

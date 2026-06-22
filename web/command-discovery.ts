@@ -72,19 +72,19 @@ function parseFrontmatter(content: string): Record<string, string> {
   return result;
 }
 
-interface PluginRoot {
+type PluginRoot = {
   name: string;
   installPath: string;
-}
+};
 
-interface DialectSpec {
+type DialectSpec = {
   dialect: AgentDialect;
   prefix: "/" | "$";
   rootDir: string;
   commandsSubdir: string;
   commandLabel: string;
   resolvePlugins: (homeDir: string) => PluginRoot[];
-}
+};
 
 const CLAUDE_SPEC: DialectSpec = {
   dialect: "claude",
@@ -177,8 +177,16 @@ function readSkillCommand(
   dirName: string,
   spec: DialectSpec,
   pluginName?: string,
-): SlashCommand {
-  const content = readFileSync(skillMdPath, "utf-8");
+): SlashCommand | null {
+  // Skill dirs may be symlinks into other users' trees (shared plugin
+  // installs); a read error here would otherwise 500 the whole discovery
+  // request. Skip the entry instead.
+  let content: string;
+  try {
+    content = readFileSync(skillMdPath, "utf-8");
+  } catch {
+    return null;
+  }
   const meta = parseFrontmatter(content);
   const name = meta.name || dirName;
   const description = meta.description || "Skill";
@@ -208,7 +216,8 @@ function discoverSkillsIn(spec: DialectSpec, base: string): SlashCommand[] {
   for (const dirName of listSubdirectories(dir)) {
     const skillMd = join(dir, dirName, "SKILL.md");
     if (existsSync(skillMd)) {
-      commands.push(readSkillCommand(skillMd, dirName, spec));
+      const cmd = readSkillCommand(skillMd, dirName, spec);
+      if (cmd) commands.push(cmd);
     }
   }
   return commands;
@@ -232,7 +241,8 @@ function discoverPluginSkillsFor(spec: DialectSpec, plugins: PluginRoot[]): Slas
     for (const dirName of listSubdirectories(skillsDir)) {
       const skillMd = join(skillsDir, dirName, "SKILL.md");
       if (existsSync(skillMd)) {
-        commands.push(readSkillCommand(skillMd, dirName, spec, plugin.name));
+        const cmd = readSkillCommand(skillMd, dirName, spec, plugin.name);
+        if (cmd) commands.push(cmd);
       }
     }
   }
