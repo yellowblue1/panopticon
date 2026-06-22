@@ -41,6 +41,7 @@ function createMockDeps(overrides: Partial<SessionManagerDeps> = {}): {
       session_name: "main",
       window_index: 0,
       pane_index: 0,
+      window_name: "main",
     },
   ];
   const defaultProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000, binaryName: "claude" }];
@@ -58,7 +59,6 @@ function createMockDeps(overrides: Partial<SessionManagerDeps> = {}): {
     getProcessCwd: () => "/home/user/project",
     getProcessStartTime: () => "2023-11-14T22:13:20.000Z",
     getProjectName: () => "my-project",
-    getGitBranch: () => "main",
     getGitRemoteUrl: () => "https://github.com/user/my-project",
     buildTmuxTarget: (pane) => `${pane.session_name}:${pane.window_index}.${pane.pane_index}`,
     matchProcessesToPanes: (processes, panes, _processTable) => {
@@ -119,7 +119,7 @@ describe("SessionManager", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].pane_id).toBe("%0");
       expect(sessions[0].project_name).toBe("my-project");
-      expect(sessions[0].git_branch).toBe("main");
+      expect(sessions[0].window_name).toBe("main");
       expect(sessions[0].status).toBe("busy");
       expect(sessions[0].tmux_target).toBe("main:0.0");
       expect(sessions[0].tmux_session_name).toBe("main");
@@ -318,7 +318,16 @@ describe("SessionManager", () => {
       let currentPid = 2000;
       const { deps } = createMockDeps({
         getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000, binaryName: "claude" }],
-        getGitBranch: () => (currentPid === 2000 ? "feature-a" : "feature-b"),
+        getAllTmuxPanes: () => [
+          {
+            pane_id: "%0",
+            pane_pid: 1000,
+            session_name: "main",
+            window_index: 0,
+            pane_index: 0,
+            window_name: currentPid === 2000 ? "feature-a" : "feature-b",
+          },
+        ],
         getProcessCwd: () =>
           currentPid === 2000 ? "/home/user/project-a" : "/home/user/project-b",
       });
@@ -328,7 +337,7 @@ describe("SessionManager", () => {
 
       // Initial session
       expect(manager.getSessions()).toHaveLength(1);
-      expect(manager.getSessions()[0].git_branch).toBe("feature-a");
+      expect(manager.getSessions()[0].window_name).toBe("feature-a");
 
       // Claude restarts with a different PID in the same pane
       currentPid = 3000;
@@ -337,7 +346,7 @@ describe("SessionManager", () => {
       // Session should be recreated with fresh metadata
       const sessions = manager.getSessions();
       expect(sessions).toHaveLength(1);
-      expect(sessions[0].git_branch).toBe("feature-b");
+      expect(sessions[0].window_name).toBe("feature-b");
       expect(sessions[0].pane_id).toBe("%0");
     });
 
@@ -365,7 +374,16 @@ describe("SessionManager", () => {
       let currentPid = 2000;
       const { deps } = createMockDeps({
         getMonitoredProcesses: () => [{ pid: currentPid, ppid: 1000, binaryName: "claude" }],
-        getGitBranch: () => (currentPid === 2000 ? "old-branch" : "new-branch"),
+        getAllTmuxPanes: () => [
+          {
+            pane_id: "%0",
+            pane_pid: 1000,
+            session_name: "main",
+            window_index: 0,
+            pane_index: 0,
+            window_name: currentPid === 2000 ? "old-window" : "new-window",
+          },
+        ],
       });
 
       manager = new SessionManager(deps, {
@@ -377,14 +395,14 @@ describe("SessionManager", () => {
       // Wait for WAITING status
       await new Promise((resolve) => setTimeout(resolve, 80));
       expect(manager.getSessions()[0]?.status).toBe("waiting");
-      expect(manager.getSessions()[0]?.git_branch).toBe("old-branch");
+      expect(manager.getSessions()[0]?.window_name).toBe("old-window");
 
       // PID change: new Claude starts
       currentPid = 3000;
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Session should be recreated with fresh metadata
-      expect(manager.getSessions()[0]?.git_branch).toBe("new-branch");
+      expect(manager.getSessions()[0]?.window_name).toBe("new-window");
     });
 
     it("does not recreate session when PID remains the same", async () => {
@@ -1633,6 +1651,7 @@ describe("SessionManager", () => {
           session_name: "main",
           window_index: 0,
           pane_index: 0,
+          window_name: "main",
         },
       ];
       let currentProcesses: MonitoredProcess[] = [{ pid: 2000, ppid: 1000, binaryName: "claude" }];
@@ -1676,6 +1695,7 @@ describe("SessionManager", () => {
           session_name: "main",
           window_index: 0,
           pane_index: 1,
+          window_name: "main",
         },
       ];
       currentProcesses = [{ pid: 3000, ppid: 1001, binaryName: "claude" }];

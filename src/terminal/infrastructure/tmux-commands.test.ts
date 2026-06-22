@@ -38,7 +38,7 @@ describe("isTmuxAvailable", () => {
 
 describe("getAllTmuxPanes", () => {
   it("parses tmux list-panes output correctly", () => {
-    const exec = () => "%0 1234 main 0 0\n%1 5678 work 1 0\n%2 9012 work 1 1";
+    const exec = () => "%0 1234 main 0 0 editor\n%1 5678 work 1 0 server\n%2 9012 work 1 1 logs";
     const panes = getAllTmuxPanes(exec);
 
     expect(panes).toHaveLength(3);
@@ -48,6 +48,7 @@ describe("getAllTmuxPanes", () => {
       session_name: "main",
       window_index: 0,
       pane_index: 0,
+      window_name: "editor",
     });
     expect(panes[1]).toEqual({
       pane_id: "%1",
@@ -55,7 +56,16 @@ describe("getAllTmuxPanes", () => {
       session_name: "work",
       window_index: 1,
       pane_index: 0,
+      window_name: "server",
     });
+  });
+
+  it("preserves window names containing spaces", () => {
+    const exec = () => "%0 1234 main 0 0 my feature branch";
+    const panes = getAllTmuxPanes(exec);
+
+    expect(panes).toHaveLength(1);
+    expect(panes[0].window_name).toBe("my feature branch");
   });
 
   it("returns empty array when tmux fails", () => {
@@ -66,7 +76,7 @@ describe("getAllTmuxPanes", () => {
   });
 
   it("skips malformed lines", () => {
-    const exec = () => "%0 1234 main 0 0\nbadline\n%1 5678 work 1 0";
+    const exec = () => "%0 1234 main 0 0 editor\nbadline\n%1 5678 work 1 0 server";
     const panes = getAllTmuxPanes(exec);
     expect(panes).toHaveLength(2);
   });

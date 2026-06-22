@@ -214,6 +214,7 @@ describe("buildTmuxTarget", () => {
       session_name: "main",
       window_index: 2,
       pane_index: 1,
+      window_name: "win",
     };
     expect(buildTmuxTarget(pane)).toBe("main:2.1");
   });
@@ -229,6 +230,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        window_name: "win",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -253,6 +255,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        window_name: "win",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -279,6 +282,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        window_name: "win",
       },
       {
         pane_id: "%1",
@@ -286,6 +290,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "work",
         window_index: 1,
         pane_index: 0,
+        window_name: "win",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -310,6 +315,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        window_name: "win",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -338,6 +344,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "panopticon",
         window_index: 0,
         pane_index: 0,
+        window_name: "win",
       },
     ];
     const processTable: ProcessInfo[] = [
@@ -359,6 +366,7 @@ describe("matchProcessesToPanes", () => {
         session_name: "main",
         window_index: 0,
         pane_index: 0,
+        window_name: "win",
       },
     ];
 

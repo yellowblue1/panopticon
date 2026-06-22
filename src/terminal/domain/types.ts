@@ -8,7 +8,7 @@ export interface SessionState {
   agent_type: AgentType;
   cwd: string;
   project_name: string;
-  git_branch: string | null;
+  window_name: string;
   github_repo_url: string | null;
   status: "busy" | "waiting";
   summary: string | null;
@@ -27,6 +27,7 @@ export interface TmuxPane {
   session_name: string;
   window_index: number;
   pane_index: number;
+  window_name: string;
 }
 
 export interface MonitoredProcess {

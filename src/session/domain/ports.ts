@@ -13,7 +13,6 @@ export interface SessionManagerDeps {
   getProcessCwd: (pid: number) => string | null;
   getProcessStartTime: (pid: number) => string | null;
   getProjectName: (cwd: string) => string;
-  getGitBranch: (cwd: string) => string | null;
   getGitRemoteUrl: (cwd: string) => string | null;
   buildTmuxTarget: (pane: TmuxPane) => string;
   matchProcessesToPanes: (

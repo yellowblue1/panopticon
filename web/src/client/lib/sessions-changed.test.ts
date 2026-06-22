@@ -6,7 +6,7 @@ function makeSession(overrides: Partial<SessionResponse> = {}): SessionResponse 
   return {
     pane_id: "%0",
     project_name: "myproject",
-    git_branch: "main",
+    window_name: "main",
     github_repo_url: null,
     status: "busy",
     summary: "Working on feature",
@@ -77,15 +77,15 @@ describe("hasSessionsChanged", () => {
     expect(hasSessionsChanged(prev, next)).toBe(true);
   });
 
-  it("returns true when git_branch changes", () => {
-    const prev = makeResponse([makeSession({ git_branch: "main" })]);
-    const next = makeResponse([makeSession({ git_branch: "feat/new" })]);
+  it("returns true when window_name changes", () => {
+    const prev = makeResponse([makeSession({ window_name: "main" })]);
+    const next = makeResponse([makeSession({ window_name: "feat/new" })]);
     expect(hasSessionsChanged(prev, next)).toBe(true);
   });
 
-  it("returns true when git_branch changes to null", () => {
-    const prev = makeResponse([makeSession({ git_branch: "main" })]);
-    const next = makeResponse([makeSession({ git_branch: null })]);
+  it("returns true when window_name changes to empty", () => {
+    const prev = makeResponse([makeSession({ window_name: "main" })]);
+    const next = makeResponse([makeSession({ window_name: "" })]);
     expect(hasSessionsChanged(prev, next)).toBe(true);
   });
 

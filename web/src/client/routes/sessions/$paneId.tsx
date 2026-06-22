@@ -97,8 +97,8 @@ function SessionDetailPage() {
               <span className="font-medium text-text-primary text-base">
                 {session.project_name}
               </span>
-              {session.git_branch && (
-                <span className="font-mono text-accent-purple">{session.git_branch}</span>
+              {session.window_name && (
+                <span className="font-mono text-accent-purple">{session.window_name}</span>
               )}
               <StatusBadge variant={session.status} />
               <span className="text-text-muted">{paneId}</span>
