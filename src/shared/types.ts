@@ -12,6 +12,15 @@ export function isAgentType(value: string): value is AgentType {
   return (AGENT_TYPES as readonly string[]).includes(value);
 }
 
+// Nori has no dialect entry because it wraps either backend; UIs that need
+// to support nori fetch both dialects' commands and accept both prefixes.
+const AGENT_DIALECTS = ["claude", "codex"] as const;
+export type AgentDialect = (typeof AGENT_DIALECTS)[number];
+
+export function isAgentDialect(value: string): value is AgentDialect {
+  return (AGENT_DIALECTS as readonly string[]).includes(value);
+}
+
 export interface SessionResponse {
   pane_id: string;
   project_name: string;

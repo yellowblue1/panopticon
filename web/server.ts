@@ -73,7 +73,7 @@ import {
   switchClient,
 } from "../src/terminal/infrastructure/tmux-commands";
 import { BuiltinCommandProvider } from "./builtin-command-fetcher";
-import { discoverAllSlashCommands } from "./command-discovery";
+import { discoverDialectCommands } from "./command-discovery";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
@@ -528,7 +528,10 @@ const app = createApp(
       }
       return success;
     },
-    getBuiltinCommands: () => builtinCommandProvider.getCommands(),
+    // The provider scrapes claude.com docs; codex has no equivalent canonical
+    // command list, so return nothing for non-claude dialects.
+    getBuiltinCommands: (dialect) =>
+      dialect === "claude" ? builtinCommandProvider.getCommands() : [],
     discoverProjects: () =>
       discoverProjects(launcherDeps).map((p) => ({
         name: p.name,
@@ -567,13 +570,13 @@ const app = createApp(
           );
         }
       : undefined,
-    discoverSlashCommands: () => {
+    discoverSlashCommands: (dialect) => {
       const cwds: string[] = [];
       for (const session of sessionManager.getSessions()) {
         const cwd = sessionManager.getSessionCwd(session.pane_id);
         if (cwd) cwds.push(cwd);
       }
-      return discoverAllSlashCommands(cwds);
+      return discoverDialectCommands(dialect, cwds);
     },
     onSseConnect: (client) => {
       clients.add(client);

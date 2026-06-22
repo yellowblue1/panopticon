@@ -146,7 +146,7 @@ function SessionDetailPage() {
             />
           )}
 
-          <SendKeysInput paneId={paneId} />
+          <SendKeysInput paneId={paneId} agentType={session?.agent_type ?? "claude"} />
         </div>
       )}
 

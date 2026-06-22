@@ -1,3 +1,5 @@
+import type { AgentDialect } from "@shared/types";
+
 export const sessionKeys = {
   all: ["sessions"] as const,
   lists: () => [...sessionKeys.all, "list"] as const,
@@ -16,7 +18,8 @@ export const planKeys = {
 
 export const settingsKeys = {
   all: ["settings"] as const,
-  slashCommands: () => [...settingsKeys.all, "slash-commands"] as const,
+  slashCommands: (dialect: AgentDialect) =>
+    [...settingsKeys.all, "slash-commands", dialect] as const,
 };
 
 export const launcherKeys = {

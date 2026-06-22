@@ -1,4 +1,5 @@
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, MAX_FILES_PER_REQUEST } from "@shared/constants";
+import type { AgentType } from "@shared/types";
 import { Camera, FileText, Paperclip, Send, X } from "lucide-react";
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -7,11 +8,13 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSendKeys } from "@/hooks/use-send-keys";
 import { useSendMessage } from "@/hooks/use-send-message";
 import { useSlashCommands } from "@/hooks/use-slash-commands";
+import { dialectsForAgent, mergeUniqueCommands, triggerKeysForAgent } from "@/lib/agent-dialect";
 import { cn } from "@/lib/cn";
 import { CommandPalette } from "./command-palette";
 
 interface SendKeysInputProps {
   paneId: string;
+  agentType: AgentType;
 }
 
 /**
@@ -34,7 +37,7 @@ const RAW_KEY_BUTTONS: { key: string; label: string; title: string }[] = [
   { key: "5", label: "5", title: "Send 5 key" },
 ];
 
-export function SendKeysInput({ paneId }: SendKeysInputProps) {
+export function SendKeysInput({ paneId, agentType }: SendKeysInputProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -46,18 +49,31 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
   const sendMessage = useSendMessage();
   const interrupt = useInterrupt();
   const isMobile = useMediaQuery("(max-width: 639px)");
-  const { data: slashCommandsData } = useSlashCommands();
-  const slashCommands = slashCommandsData?.commands ?? [];
+
+  const dialects = dialectsForAgent(agentType);
+  const { data: claudeData } = useSlashCommands("claude", {
+    enabled: dialects.includes("claude"),
+  });
+  const { data: codexData } = useSlashCommands("codex", {
+    enabled: dialects.includes("codex"),
+  });
+  const slashCommands = mergeUniqueCommands(
+    dialects.includes("claude") ? (claudeData?.commands ?? []) : [],
+    dialects.includes("codex") ? (codexData?.commands ?? []) : [],
+  );
+
+  const triggerKeys = triggerKeysForAgent(agentType);
 
   const hasText = text.trim().length > 0;
   const hasFiles = files.length > 0;
   const isPending = sendKeys.isPending || sendMessage.isPending || interrupt.isPending;
 
-  // Open command palette with "/" key when no input is focused
+  // Open command palette via the dialect's trigger key (`/` for claude,
+  // `$` for codex, both for nori) when no input is focused.
   useEffect(() => {
-    const handleSlashKey = (e: globalThis.KeyboardEvent) => {
+    const handleTriggerKey = (e: globalThis.KeyboardEvent) => {
       if (
-        e.key === "/" &&
+        triggerKeys.includes(e.key) &&
         !isPaletteOpen &&
         !(e.target instanceof HTMLInputElement) &&
         !(e.target instanceof HTMLTextAreaElement)
@@ -66,9 +82,9 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
         setIsPaletteOpen(true);
       }
     };
-    document.addEventListener("keydown", handleSlashKey);
-    return () => document.removeEventListener("keydown", handleSlashKey);
-  }, [isPaletteOpen]);
+    document.addEventListener("keydown", handleTriggerKey);
+    return () => document.removeEventListener("keydown", handleTriggerKey);
+  }, [isPaletteOpen, triggerKeys]);
 
   // Adjust send-keys-bar position when the virtual keyboard opens/closes
   useEffect(() => {
@@ -170,8 +186,8 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
       e.preventDefault();
       handleSend(text);
     }
-    // Typing "/" in an empty textarea (no files) opens the command palette
-    if (e.key === "/" && !text && !hasFiles) {
+    // Typing the dialect trigger key in an empty textarea opens the palette
+    if (triggerKeys.includes(e.key) && !text && !hasFiles) {
       e.preventDefault();
       setIsPaletteOpen(true);
     }
@@ -367,12 +383,16 @@ export function SendKeysInput({ paneId }: SendKeysInputProps) {
               ? "bg-accent-blue text-white hover:opacity-90"
               : "bg-bg-secondary text-text-secondary border border-border-default hover:text-text-primary hover:bg-bg-tertiary",
           )}
-          title={hasText || hasFiles ? "Send message" : "Open command palette (/)"}
+          title={
+            hasText || hasFiles
+              ? "Send message"
+              : `Open command palette (${triggerKeys.join(" or ")})`
+          }
         >
           {hasText || hasFiles ? (
             <Send size={18} />
           ) : (
-            <span className="font-mono text-base font-bold">/</span>
+            <span className="font-mono text-base font-bold">{triggerKeys.join("")}</span>
           )}
         </button>
       </div>
