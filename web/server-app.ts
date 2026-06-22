@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import type {
+  AgentDialect,
   AgentType,
   AuthStatusResponse,
   BrowseEntry,
@@ -35,7 +36,7 @@ import type {
   SlashCommandsResponse,
   SwitchClientResponse,
 } from "../src/shared/types";
-import { isAgentType } from "../src/shared/types";
+import { isAgentDialect, isAgentType } from "../src/shared/types";
 import type { SendMessageResult } from "../src/terminal/application/send-message";
 
 function escapeRegExp(value: string): string {
@@ -115,9 +116,8 @@ export interface AppDeps {
   getPlansAvailability?: () => Record<string, boolean>;
   deletePlan?: (paneId: string) => boolean;
 
-  // Settings: slash commands (read-only, auto-discovered)
-  discoverSlashCommands?: () => SlashCommand[];
-  getBuiltinCommands?: () => SlashCommand[] | null;
+  discoverSlashCommands?: (dialect: AgentDialect) => SlashCommand[];
+  getBuiltinCommands?: (dialect: AgentDialect) => SlashCommand[] | null;
 
   // File upload + message sending
   sendMessage?: (
@@ -396,10 +396,15 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       } satisfies AuthStatusResponse);
     })
 
-    // GET /api/settings/slash-commands
+    // GET /api/settings/slash-commands?dialect=claude|codex
     .get("/api/settings/slash-commands", (c) => {
-      const discovered = deps.discoverSlashCommands?.() ?? [];
-      const builtin = deps.getBuiltinCommands?.() ?? [];
+      const dialectParam = c.req.query("dialect");
+      const dialect: AgentDialect = isAgentDialect(dialectParam ?? "")
+        ? (dialectParam as AgentDialect)
+        : "claude";
+
+      const discovered = deps.discoverSlashCommands?.(dialect) ?? [];
+      const builtin = deps.getBuiltinCommands?.(dialect) ?? [];
 
       // Priority: discovered > builtin (discovered wins on duplicates)
       const seen = new Set<string>();

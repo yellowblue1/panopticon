@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   discoverAllSlashCommands,
+  discoverDialectCommands,
   discoverPluginCommands,
   discoverSkillCommands,
   discoverSlashCommands,
@@ -965,6 +966,236 @@ describe("discoverAllSlashCommands with skills", () => {
     } finally {
       rmSync(homeDir, { recursive: true });
       rmSync(cwd, { recursive: true });
+    }
+  });
+});
+
+describe("discoverDialectCommands (codex)", () => {
+  it("returns empty array when no codex directories exist", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    try {
+      expect(discoverDialectCommands("codex", [cwd], homeDir)).toEqual([]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("discovers global codex skills with $ prefix", () => {
+    const homeDir = createTempDir();
+    const skillDir = join(homeDir, ".codex", "skills", "brainstorming");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: brainstorming\ndescription: Explore ideas before building\n---\n",
+    );
+
+    try {
+      expect(discoverDialectCommands("codex", [], homeDir)).toEqual([
+        { command: "$brainstorming", description: "Explore ideas before building" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("discovers global codex prompts from ~/.codex/prompts/", () => {
+    const homeDir = createTempDir();
+    const promptsDir = join(homeDir, ".codex", "prompts");
+    mkdirSync(promptsDir, { recursive: true });
+    writeFileSync(join(promptsDir, "review.md"), "# Review prompt");
+
+    try {
+      expect(discoverDialectCommands("codex", [], homeDir)).toEqual([
+        { command: "$review", description: "Custom prompt (global)" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("discovers project codex skills and prompts under {cwd}/.codex/", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const projectSkill = join(cwd, ".codex", "skills", "deploy");
+    mkdirSync(projectSkill, { recursive: true });
+    writeFileSync(
+      join(projectSkill, "SKILL.md"),
+      "---\nname: deploy\ndescription: Deploy this app\n---\n",
+    );
+
+    const projectPrompts = join(cwd, ".codex", "prompts");
+    mkdirSync(projectPrompts, { recursive: true });
+    writeFileSync(join(projectPrompts, "release.md"), "# Release");
+
+    try {
+      expect(discoverDialectCommands("codex", [cwd], homeDir)).toEqual([
+        { command: "$deploy", description: "Deploy this app" },
+        { command: "$release", description: "Custom prompt (project)" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("project codex skills take priority over global codex skills", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const globalSkill = join(homeDir, ".codex", "skills", "deploy");
+    mkdirSync(globalSkill, { recursive: true });
+    writeFileSync(
+      join(globalSkill, "SKILL.md"),
+      "---\nname: deploy\ndescription: Global deploy\n---\n",
+    );
+
+    const projectSkill = join(cwd, ".codex", "skills", "deploy");
+    mkdirSync(projectSkill, { recursive: true });
+    writeFileSync(
+      join(projectSkill, "SKILL.md"),
+      "---\nname: deploy\ndescription: Project deploy\n---\n",
+    );
+
+    try {
+      expect(discoverDialectCommands("codex", [cwd], homeDir)).toEqual([
+        { command: "$deploy", description: "Project deploy" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+
+  it("discovers codex plugin skills from ~/.codex/.tmp/plugins/plugins/", () => {
+    const homeDir = createTempDir();
+    const pluginSkill = join(
+      homeDir,
+      ".codex",
+      ".tmp",
+      "plugins",
+      "plugins",
+      "hugging-face",
+      "skills",
+      "papers",
+    );
+    mkdirSync(pluginSkill, { recursive: true });
+    writeFileSync(
+      join(pluginSkill, "SKILL.md"),
+      "---\nname: papers\ndescription: Browse HF papers\n---\n",
+    );
+
+    try {
+      expect(discoverDialectCommands("codex", [], homeDir)).toEqual([
+        { command: "$hugging-face:papers", description: "Browse HF papers" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("does not mix claude and codex sources", () => {
+    const homeDir = createTempDir();
+
+    const claudeSkill = join(homeDir, ".claude", "skills", "claude-only");
+    mkdirSync(claudeSkill, { recursive: true });
+    writeFileSync(
+      join(claudeSkill, "SKILL.md"),
+      "---\nname: claude-only\ndescription: Claude side\n---\n",
+    );
+
+    const codexSkill = join(homeDir, ".codex", "skills", "codex-only");
+    mkdirSync(codexSkill, { recursive: true });
+    writeFileSync(
+      join(codexSkill, "SKILL.md"),
+      "---\nname: codex-only\ndescription: Codex side\n---\n",
+    );
+
+    try {
+      const claudeCmds = discoverDialectCommands("claude", [], homeDir);
+      const codexCmds = discoverDialectCommands("codex", [], homeDir);
+      expect(claudeCmds).toEqual([{ command: "/claude-only", description: "Claude side" }]);
+      expect(codexCmds).toEqual([{ command: "$codex-only", description: "Codex side" }]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+    }
+  });
+
+  it("project prompt takes priority over global prompt with same name", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const globalPrompts = join(homeDir, ".codex", "prompts");
+    mkdirSync(globalPrompts, { recursive: true });
+    writeFileSync(join(globalPrompts, "ship.md"), "# Global ship");
+
+    const projectPrompts = join(cwd, ".codex", "prompts");
+    mkdirSync(projectPrompts, { recursive: true });
+    writeFileSync(join(projectPrompts, "ship.md"), "# Project ship");
+
+    try {
+      expect(discoverDialectCommands("codex", [cwd], homeDir)).toEqual([
+        { command: "$ship", description: "Custom prompt (project)" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+});
+
+describe("discoverDialectCommands (claude) equals discoverAllSlashCommands", () => {
+  it("returns the same result for claude dialect as the legacy wrapper", () => {
+    const homeDir = createTempDir();
+    const cwd = createTempDir();
+
+    const globalDir = join(homeDir, ".claude", "commands");
+    mkdirSync(globalDir, { recursive: true });
+    writeFileSync(join(globalDir, "commit.md"), "# Commit");
+
+    const skillDir = join(homeDir, ".claude", "skills", "review");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, "SKILL.md"), "---\nname: review\ndescription: Review code\n---\n");
+
+    try {
+      const viaDialect = discoverDialectCommands("claude", [cwd], homeDir);
+      const viaLegacy = discoverAllSlashCommands([cwd], homeDir);
+      expect(viaDialect).toEqual(viaLegacy);
+    } finally {
+      rmSync(homeDir, { recursive: true });
+      rmSync(cwd, { recursive: true });
+    }
+  });
+});
+
+describe("symlinked skill directories", () => {
+  it("discovers codex user skills that symlink into ~/.claude/skills", () => {
+    const homeDir = createTempDir();
+
+    // The real skill lives under ~/.claude/skills/...
+    const realSkill = join(homeDir, ".claude", "skills", "brainstorming");
+    mkdirSync(realSkill, { recursive: true });
+    writeFileSync(
+      join(realSkill, "SKILL.md"),
+      "---\nname: brainstorming\ndescription: Explore ideas\n---\n",
+    );
+
+    // ~/.codex/skills/brainstorming is a symlink — matches the layout the
+    // codex CLI ships, which broke the initial readdirSync(isDirectory)
+    // filter because Dirent uses lstat.
+    const codexSkillsDir = join(homeDir, ".codex", "skills");
+    mkdirSync(codexSkillsDir, { recursive: true });
+    symlinkSync(realSkill, join(codexSkillsDir, "brainstorming"));
+
+    try {
+      expect(discoverDialectCommands("codex", [], homeDir)).toEqual([
+        { command: "$brainstorming", description: "Explore ideas" },
+      ]);
+    } finally {
+      rmSync(homeDir, { recursive: true });
     }
   });
 });

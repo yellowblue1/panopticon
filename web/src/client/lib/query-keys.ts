@@ -14,9 +14,12 @@ export const planKeys = {
   availability: () => [...planKeys.all, "availability"] as const,
 };
 
+import type { AgentDialect } from "@shared/types";
+
 export const settingsKeys = {
   all: ["settings"] as const,
-  slashCommands: () => [...settingsKeys.all, "slash-commands"] as const,
+  slashCommands: (dialect: AgentDialect) =>
+    [...settingsKeys.all, "slash-commands", dialect] as const,
 };
 
 export const launcherKeys = {

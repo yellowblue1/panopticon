@@ -24,6 +24,19 @@ export const Route = createFileRoute("/sessions/$paneId")({
         ? search.tab
         : undefined,
   }),
+  // tmux pane ids start with `%` (e.g. `%38`), which the URL layer would
+  // otherwise treat as a percent-escape (`%38` → ASCII `8`). We round-trip
+  // through encodeURIComponent so `Link` produces `/sessions/%2538` and
+  // `useParams().paneId` is restored to `%38`. Bare `/sessions/%38` URLs
+  // (browser collapses `%38` to `8` before we see it) are also recovered by
+  // re-prepending the missing `%`.
+  params: {
+    parse: ({ paneId }: { paneId: string }) => {
+      const decoded = decodeURIComponent(paneId);
+      return { paneId: decoded.startsWith("%") ? decoded : `%${decoded}` };
+    },
+    stringify: ({ paneId }: { paneId: string }) => ({ paneId: encodeURIComponent(paneId) }),
+  },
 });
 
 function SessionDetailPage() {
@@ -146,7 +159,7 @@ function SessionDetailPage() {
             />
           )}
 
-          <SendKeysInput paneId={paneId} />
+          <SendKeysInput paneId={paneId} agentType={session?.agent_type ?? "claude"} />
         </div>
       )}
 

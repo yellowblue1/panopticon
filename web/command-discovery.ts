@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { SlashCommand } from "../src/shared/types";
+import type { AgentDialect, SlashCommand } from "../src/shared/types";
 
 function listMdFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -10,8 +10,11 @@ function listMdFiles(dir: string): string[] {
 
 function listSubdirectories(dir: string): string[] {
   if (!existsSync(dir)) return [];
+  // Include symlinks: codex skill dirs are commonly symlinks into
+  // ~/.claude/skills/, and Dirent#isDirectory() is lstat-based so it
+  // reports symlinks as non-directories.
   return readdirSync(dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
+    .filter((d) => d.isDirectory() || d.isSymbolicLink())
     .map((d) => d.name);
 }
 
@@ -69,23 +72,48 @@ function parseFrontmatter(content: string): Record<string, string> {
   return result;
 }
 
-function toSlashCommand(
-  name: string,
-  source: "global" | "project" | "plugin",
-  pluginName?: string,
-): SlashCommand {
-  if (source === "plugin" && pluginName) {
-    return { command: `/${pluginName}:${name}`, description: `Plugin command (${pluginName})` };
-  }
-  return { command: `/${name}`, description: `Custom command (${source})` };
-}
-
-interface PluginEntry {
+interface PluginRoot {
+  name: string;
   installPath: string;
 }
 
-interface InstalledPlugins {
-  plugins: Record<string, PluginEntry[]>;
+interface DialectSpec {
+  dialect: AgentDialect;
+  prefix: "/" | "$";
+  rootDir: string;
+  commandsSubdir: string;
+  commandLabel: string;
+  resolvePlugins: (homeDir: string) => PluginRoot[];
+}
+
+const CLAUDE_SPEC: DialectSpec = {
+  dialect: "claude",
+  prefix: "/",
+  rootDir: ".claude",
+  commandsSubdir: "commands",
+  commandLabel: "Custom command",
+  resolvePlugins: resolveClaudePlugins,
+};
+
+const CODEX_SPEC: DialectSpec = {
+  dialect: "codex",
+  prefix: "$",
+  rootDir: ".codex",
+  commandsSubdir: "prompts",
+  commandLabel: "Custom prompt",
+  resolvePlugins: resolveCodexPlugins,
+};
+
+function specFor(dialect: AgentDialect): DialectSpec {
+  return dialect === "codex" ? CODEX_SPEC : CLAUDE_SPEC;
+}
+
+interface ClaudePluginEntry {
+  installPath: string;
+}
+
+interface ClaudeInstalledPlugins {
+  plugins: Record<string, ClaudePluginEntry[]>;
 }
 
 function parsePluginName(key: string): string {
@@ -93,24 +121,15 @@ function parsePluginName(key: string): string {
   return atIndex === -1 ? key : key.slice(0, atIndex);
 }
 
-function isInstalledPlugins(value: unknown): value is InstalledPlugins {
+function isClaudeInstalledPlugins(value: unknown): value is ClaudeInstalledPlugins {
   if (typeof value !== "object" || value === null) return false;
   const obj = value as Record<string, unknown>;
   if (typeof obj.plugins !== "object" || obj.plugins === null) return false;
   return true;
 }
 
-/**
- * Discover slash commands from installed Claude Code plugins.
- *
- * Reads ~/.claude/plugins/installed_plugins.json and scans each plugin's
- * installPath + commands/ directory for .md files. Commands are namespaced
- * as /{pluginName}:{commandName}.
- */
-export function discoverPluginCommands(homeDir?: string): SlashCommand[] {
-  const home = homeDir ?? homedir();
-  const pluginsFile = join(home, ".claude", "plugins", "installed_plugins.json");
-
+function resolveClaudePlugins(homeDir: string): PluginRoot[] {
+  const pluginsFile = join(homeDir, ".claude", "plugins", "installed_plugins.json");
   if (!existsSync(pluginsFile)) return [];
 
   let parsed: unknown;
@@ -119,177 +138,179 @@ export function discoverPluginCommands(homeDir?: string): SlashCommand[] {
   } catch {
     return [];
   }
+  if (!isClaudeInstalledPlugins(parsed)) return [];
 
-  if (!isInstalledPlugins(parsed)) return [];
-
-  const commands: SlashCommand[] = [];
-
+  const roots: PluginRoot[] = [];
   for (const [key, entries] of Object.entries(parsed.plugins)) {
     if (!Array.isArray(entries) || entries.length === 0) continue;
     const entry = entries[0];
     if (typeof entry?.installPath !== "string") continue;
-
-    const pluginName = parsePluginName(key);
-    const commandsDir = join(entry.installPath, "commands");
-
-    for (const file of listMdFiles(commandsDir)) {
-      const name = basename(file, ".md");
-      commands.push(toSlashCommand(name, "plugin", pluginName));
-    }
+    roots.push({ name: parsePluginName(key), installPath: entry.installPath });
   }
-
-  return commands.sort((a, b) => a.command.localeCompare(b.command));
+  return roots;
 }
 
-/**
- * Read a SKILL.md file and return a SlashCommand.
- *
- * Parses YAML frontmatter for `name` and `description`.
- * Falls back to the directory name when `name` is absent and "Skill"
- * when `description` is absent.
- */
-function readSkillFile(skillMdPath: string, dirName: string, pluginName?: string): SlashCommand {
+// Codex plugins have no manifest equivalent to installed_plugins.json: each
+// directory under ~/.codex/.tmp/plugins/plugins/ is treated as an installed
+// plugin, with `skills/` underneath.
+function resolveCodexPlugins(homeDir: string): PluginRoot[] {
+  const pluginsRoot = join(homeDir, ".codex", ".tmp", "plugins", "plugins");
+  return listSubdirectories(pluginsRoot).map((name) => ({
+    name,
+    installPath: join(pluginsRoot, name),
+  }));
+}
+
+function commandFromMd(
+  name: string,
+  spec: DialectSpec,
+  source: "global" | "project",
+): SlashCommand {
+  return {
+    command: `${spec.prefix}${name}`,
+    description: `${spec.commandLabel} (${source})`,
+  };
+}
+
+function readSkillCommand(
+  skillMdPath: string,
+  dirName: string,
+  spec: DialectSpec,
+  pluginName?: string,
+): SlashCommand {
   const content = readFileSync(skillMdPath, "utf-8");
   const meta = parseFrontmatter(content);
   const name = meta.name || dirName;
   const description = meta.description || "Skill";
-  if (pluginName) {
-    return { command: `/${pluginName}:${name}`, description };
-  }
-  return { command: `/${name}`, description };
+  const command = pluginName ? `${spec.prefix}${pluginName}:${name}` : `${spec.prefix}${name}`;
+  return { command, description };
 }
 
-/**
- * Discover slash commands from global and plugin skills.
- *
- * Scans ~/.claude/skills/{name}/SKILL.md for user skills and
- * each installed plugin's skills/{name}/SKILL.md for plugin skills.
- * Plugin skills are namespaced as /{pluginName}:{skillName}.
- *
- * Note: project-level skills ({cwd}/.claude/skills/) are NOT included here;
- * they are handled by discoverAllSlashCommands() which requires CWD context.
- */
-export function discoverSkillCommands(homeDir?: string): SlashCommand[] {
-  const home = homeDir ?? homedir();
-  const commands: SlashCommand[] = [];
+function pluginCommandFromMd(name: string, spec: DialectSpec, pluginName: string): SlashCommand {
+  return {
+    command: `${spec.prefix}${pluginName}:${name}`,
+    description: `Plugin command (${pluginName})`,
+  };
+}
 
-  const userSkillsDir = join(home, ".claude", "skills");
-  for (const dirName of listSubdirectories(userSkillsDir)) {
-    const skillMd = join(userSkillsDir, dirName, "SKILL.md");
+function discoverCommandsIn(
+  spec: DialectSpec,
+  base: string,
+  source: "global" | "project",
+): SlashCommand[] {
+  const dir = join(base, spec.rootDir, spec.commandsSubdir);
+  return listMdFiles(dir).map((file) => commandFromMd(basename(file, ".md"), spec, source));
+}
+
+function discoverSkillsIn(spec: DialectSpec, base: string): SlashCommand[] {
+  const dir = join(base, spec.rootDir, "skills");
+  const commands: SlashCommand[] = [];
+  for (const dirName of listSubdirectories(dir)) {
+    const skillMd = join(dir, dirName, "SKILL.md");
     if (existsSync(skillMd)) {
-      commands.push(readSkillFile(skillMd, dirName));
+      commands.push(readSkillCommand(skillMd, dirName, spec));
     }
   }
+  return commands;
+}
 
-  const pluginsFile = join(home, ".claude", "plugins", "installed_plugins.json");
-  if (existsSync(pluginsFile)) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readFileSync(pluginsFile, "utf-8"));
-    } catch {
-      parsed = null;
+function discoverPluginCommandsFor(spec: DialectSpec, plugins: PluginRoot[]): SlashCommand[] {
+  const commands: SlashCommand[] = [];
+  for (const plugin of plugins) {
+    const commandsDir = join(plugin.installPath, "commands");
+    for (const file of listMdFiles(commandsDir)) {
+      commands.push(pluginCommandFromMd(basename(file, ".md"), spec, plugin.name));
     }
-    if (isInstalledPlugins(parsed)) {
-      for (const [key, entries] of Object.entries(parsed.plugins)) {
-        if (!Array.isArray(entries) || entries.length === 0) continue;
-        const entry = entries[0];
-        if (typeof entry?.installPath !== "string") continue;
-        const pluginName = parsePluginName(key);
-        const pluginSkillsDir = join(entry.installPath, "skills");
-        for (const dirName of listSubdirectories(pluginSkillsDir)) {
-          const skillMd = join(pluginSkillsDir, dirName, "SKILL.md");
-          if (existsSync(skillMd)) {
-            commands.push(readSkillFile(skillMd, dirName, pluginName));
-          }
-        }
+  }
+  return commands;
+}
+
+function discoverPluginSkillsFor(spec: DialectSpec, plugins: PluginRoot[]): SlashCommand[] {
+  const commands: SlashCommand[] = [];
+  for (const plugin of plugins) {
+    const skillsDir = join(plugin.installPath, "skills");
+    for (const dirName of listSubdirectories(skillsDir)) {
+      const skillMd = join(skillsDir, dirName, "SKILL.md");
+      if (existsSync(skillMd)) {
+        commands.push(readSkillCommand(skillMd, dirName, spec, plugin.name));
       }
     }
   }
+  return commands;
+}
 
-  return commands.sort((a, b) => a.command.localeCompare(b.command));
+function bareName(command: string): string {
+  return command.slice(1);
+}
+
+function mergeUnique(seen: Map<string, SlashCommand>, additions: SlashCommand[]): void {
+  for (const cmd of additions) {
+    const key = bareName(cmd.command);
+    if (!seen.has(key)) seen.set(key, cmd);
+  }
 }
 
 /**
- * Discover slash commands by scanning .claude/commands/ directories.
+ * Discover all commands for a given dialect across multiple session cwds.
  *
- * Scans both global (~/.claude/commands/) and project ({cwd}/.claude/commands/).
- * When both contain a command with the same name, the project version takes precedence.
- */
-export function discoverSlashCommands(cwd: string, homeDir?: string): SlashCommand[] {
-  const home = homeDir ?? homedir();
-
-  const globalDir = join(home, ".claude", "commands");
-  const projectDir = join(cwd, ".claude", "commands");
-
-  const globalFiles = listMdFiles(globalDir);
-  const projectFiles = listMdFiles(projectDir);
-
-  const projectNames = new Set(projectFiles.map((f) => basename(f, ".md")));
-
-  const commands: SlashCommand[] = [];
-
-  for (const file of globalFiles) {
-    const name = basename(file, ".md");
-    if (!projectNames.has(name)) {
-      commands.push(toSlashCommand(name, "global"));
-    }
-  }
-
-  for (const file of projectFiles) {
-    const name = basename(file, ".md");
-    commands.push(toSlashCommand(name, "project"));
-  }
-
-  return commands.sort((a, b) => a.command.localeCompare(b.command));
-}
-
-/**
- * Discover slash commands across multiple session CWDs.
+ * Priority (highest → lowest):
+ *   1. project commands
+ *   2. project skills
+ *   3. global commands
+ *   4. global skills
+ *   5. plugin commands
+ *   6. plugin skills
  *
- * Priority (highest → lowest): project commands → project skills →
- * global commands → global skills → plugin commands. When the same
- * command name appears in multiple locations, the higher-priority source wins.
+ * Same-name entries from a lower-priority source are dropped.
  */
-export function discoverAllSlashCommands(cwds: string[], homeDir?: string): SlashCommand[] {
+export function discoverDialectCommands(
+  dialect: AgentDialect,
+  cwds: string[],
+  homeDir?: string,
+): SlashCommand[] {
+  const spec = specFor(dialect);
   const home = homeDir ?? homedir();
-  const globalDir = join(home, ".claude", "commands");
-
+  const plugins = spec.resolvePlugins(home);
   const seen = new Map<string, SlashCommand>();
 
-  for (const cwd of cwds) {
-    const projectDir = join(cwd, ".claude", "commands");
-    for (const file of listMdFiles(projectDir)) {
-      const name = basename(file, ".md");
-      seen.getOrInsertComputed(name, (n) => toSlashCommand(n, "project"));
-    }
-  }
-
-  // Project-level skills: {cwd}/.claude/skills/{name}/SKILL.md
-  for (const cwd of cwds) {
-    const projectSkillsDir = join(cwd, ".claude", "skills");
-    for (const dirName of listSubdirectories(projectSkillsDir)) {
-      if (seen.has(dirName)) continue;
-      const skillMd = join(projectSkillsDir, dirName, "SKILL.md");
-      if (existsSync(skillMd)) {
-        seen.set(dirName, readSkillFile(skillMd, dirName));
-      }
-    }
-  }
-
-  for (const file of listMdFiles(globalDir)) {
-    const name = basename(file, ".md");
-    seen.getOrInsertComputed(name, (n) => toSlashCommand(n, "global"));
-  }
-
-  for (const cmd of discoverSkillCommands(home)) {
-    const name = cmd.command.slice(1);
-    seen.getOrInsert(name, cmd);
-  }
-
-  for (const cmd of discoverPluginCommands(home)) {
-    const name = cmd.command.slice(1);
-    seen.getOrInsert(name, cmd);
-  }
+  for (const cwd of cwds) mergeUnique(seen, discoverCommandsIn(spec, cwd, "project"));
+  for (const cwd of cwds) mergeUnique(seen, discoverSkillsIn(spec, cwd));
+  mergeUnique(seen, discoverCommandsIn(spec, home, "global"));
+  mergeUnique(seen, discoverSkillsIn(spec, home));
+  mergeUnique(seen, discoverPluginCommandsFor(spec, plugins));
+  mergeUnique(seen, discoverPluginSkillsFor(spec, plugins));
 
   return [...seen.values()].sort((a, b) => a.command.localeCompare(b.command));
+}
+
+// Legacy claude-only exports: kept as a regression safety net for the existing
+// test suite that pins per-source behavior; new callers should use
+// discoverDialectCommands directly.
+
+export function discoverPluginCommands(homeDir?: string): SlashCommand[] {
+  const home = homeDir ?? homedir();
+  return discoverPluginCommandsFor(CLAUDE_SPEC, CLAUDE_SPEC.resolvePlugins(home)).sort((a, b) =>
+    a.command.localeCompare(b.command),
+  );
+}
+
+export function discoverSkillCommands(homeDir?: string): SlashCommand[] {
+  const home = homeDir ?? homedir();
+  const plugins = CLAUDE_SPEC.resolvePlugins(home);
+  return [
+    ...discoverSkillsIn(CLAUDE_SPEC, home),
+    ...discoverPluginSkillsFor(CLAUDE_SPEC, plugins),
+  ].sort((a, b) => a.command.localeCompare(b.command));
+}
+
+export function discoverSlashCommands(cwd: string, homeDir?: string): SlashCommand[] {
+  const home = homeDir ?? homedir();
+  const seen = new Map<string, SlashCommand>();
+  mergeUnique(seen, discoverCommandsIn(CLAUDE_SPEC, cwd, "project"));
+  mergeUnique(seen, discoverCommandsIn(CLAUDE_SPEC, home, "global"));
+  return [...seen.values()].sort((a, b) => a.command.localeCompare(b.command));
+}
+
+export function discoverAllSlashCommands(cwds: string[], homeDir?: string): SlashCommand[] {
+  return discoverDialectCommands("claude", cwds, homeDir);
 }

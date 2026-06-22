@@ -764,6 +764,77 @@ describe("Settings API endpoints", () => {
       const data = await res.json();
       expect(data.commands).toEqual(builtin);
     });
+
+    it("passes the dialect query through to discoverSlashCommands", async () => {
+      const seen: string[] = [];
+      const deps = createMockDeps({
+        discoverSlashCommands: (dialect) => {
+          seen.push(dialect);
+          return [{ command: `${dialect === "codex" ? "$" : "/"}only`, description: dialect }];
+        },
+      });
+      const app = createApp(deps);
+
+      const claudeRes = await app.request("/api/settings/slash-commands?dialect=claude");
+      const codexRes = await app.request("/api/settings/slash-commands?dialect=codex");
+
+      expect(seen).toEqual(["claude", "codex"]);
+      expect((await claudeRes.json()).commands).toEqual([
+        { command: "/only", description: "claude" },
+      ]);
+      expect((await codexRes.json()).commands).toEqual([
+        { command: "$only", description: "codex" },
+      ]);
+    });
+
+    it("defaults to claude dialect when ?dialect is omitted", async () => {
+      const seen: string[] = [];
+      const deps = createMockDeps({
+        discoverSlashCommands: (dialect) => {
+          seen.push(dialect);
+          return [];
+        },
+      });
+      const app = createApp(deps);
+
+      await app.request("/api/settings/slash-commands");
+      expect(seen).toEqual(["claude"]);
+    });
+
+    it("treats an unknown dialect value as claude", async () => {
+      const seen: string[] = [];
+      const deps = createMockDeps({
+        discoverSlashCommands: (dialect) => {
+          seen.push(dialect);
+          return [];
+        },
+      });
+      const app = createApp(deps);
+
+      await app.request("/api/settings/slash-commands?dialect=bogus");
+      expect(seen).toEqual(["claude"]);
+    });
+
+    it("passes the dialect through to getBuiltinCommands", async () => {
+      const seen: string[] = [];
+      const deps = createMockDeps({
+        discoverSlashCommands: () => [],
+        getBuiltinCommands: (dialect) => {
+          seen.push(dialect);
+          return dialect === "claude" ? [{ command: "/clear", description: "Clear history" }] : [];
+        },
+      });
+      const app = createApp(deps);
+
+      const codexRes = await app.request("/api/settings/slash-commands?dialect=codex");
+      const claudeRes = await app.request("/api/settings/slash-commands?dialect=claude");
+
+      expect(seen).toEqual(["codex", "claude"]);
+      expect((await codexRes.json()).commands).toEqual([]);
+      expect((await claudeRes.json()).commands).toEqual([
+        { command: "/clear", description: "Clear history" },
+      ]);
+    });
   });
 });
 
