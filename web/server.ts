@@ -74,6 +74,7 @@ import {
 } from "../src/terminal/infrastructure/tmux-commands";
 import { BuiltinCommandProvider } from "./builtin-command-fetcher";
 import { discoverDialectCommands } from "./command-discovery";
+import { handlePaneContentSseConnect } from "./pane-content-sse";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
@@ -158,6 +159,30 @@ setInterval(() => {
       client.controller.enqueue(heartbeatMessage);
     } catch {
       clients.delete(client);
+    }
+  }
+  for (const [paneId, watchers] of paneContentClients) {
+    for (const client of watchers) {
+      try {
+        client.controller.enqueue(heartbeatMessage);
+      } catch {
+        watchers.delete(client);
+      }
+    }
+    // Heartbeat may detect a dead client before the stream's cancel()
+    // callback fires (e.g. abrupt socket close). Clean up the matching
+    // per-pane state so it doesn't leak.
+    if (watchers.size === 0) {
+      paneContentClients.delete(paneId);
+      const timer = paneContentDebounce.get(paneId);
+      if (timer) {
+        clearTimeout(timer);
+        paneContentDebounce.delete(paneId);
+      }
+      paneContentHashes.delete(paneId);
+      paneContentPrev.delete(paneId);
+      paneContentSeq.delete(paneId);
+      paneContentUpdateCount.delete(paneId);
     }
   }
 }, SSE_HEARTBEAT_INTERVAL_MS);
@@ -584,20 +609,27 @@ const app = createApp(
       clients.delete(client);
     },
     serializeSessionsData,
-    onPaneContentSseConnect: (paneId, client) => {
-      if (!paneContentClients.has(paneId)) {
-        paneContentClients.set(paneId, new Set());
-      }
-      paneContentClients.get(paneId)?.add(client);
-
-      // Store initial content so the first onPaneActivity can compute a diff
-      // instead of falling back to full sync
-      const initialContent = capturePaneContentEscaped(paneId);
-      if (initialContent !== null) {
-        paneContentPrev.set(paneId, initialContent);
-        paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
-      }
-    },
+    // For the first watcher of a paneId, capture once and reuse the same
+    // snapshot for both the server-side diff baseline (paneContentPrev) and
+    // the client's initial full payload. A second capture would race with a
+    // live synchronized-update TUI (e.g. Nori) and the resulting baseline
+    // drift would mis-apply every diff until the next ~20-emit forced full
+    // sync. For later watchers, reuse the existing baseline so all watchers
+    // stay aligned to one server-side snapshot. The logic is extracted to
+    // handlePaneContentSseConnect so this invariant is unit-testable.
+    onPaneContentSseConnect: (paneId, client) =>
+      handlePaneContentSseConnect(
+        paneId,
+        client,
+        {
+          paneContentClients: paneContentClients as Map<string, Set<unknown>>,
+          paneContentPrev,
+          paneContentHashes,
+          paneContentSeq,
+        },
+        () => capturePaneContentEscaped(paneId),
+        (s) => Bun.hash(s).toString(),
+      ),
     onPaneContentSseDisconnect: (paneId, client) => {
       const watchers = paneContentClients.get(paneId);
       if (watchers) {

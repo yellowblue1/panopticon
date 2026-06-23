@@ -1572,28 +1572,28 @@ describe("SessionManager", () => {
   });
 
   describe("real-time pane destruction detection", () => {
-    it("removes session immediately when pipe-pane reader exits unexpectedly", async () => {
+    it("keeps session alive when reader exits unexpectedly", async () => {
       const { deps, fifoReaders } = createMockDeps();
 
       manager = new SessionManager(deps, {
-        pollIntervalMs: 60_000, // Long interval — rely on exit handler
+        pollIntervalMs: 60_000,
         paneCheckIntervalMs: 60_000,
       });
       manager.start();
 
       expect(manager.getSessions()).toHaveLength(1);
 
-      // Simulate pane destruction — reader exits
+      // Simulate FIFO EOF — reader exits while tmux pane is still alive
       const reader = Array.from(fifoReaders.values())[0];
       reader?.simulateExit();
 
-      // Allow async exit event to propagate
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(manager.getSessions()).toHaveLength(0);
+      // Session stays — poll() owns pane lifetime, not the FIFO reader.
+      expect(manager.getSessions()).toHaveLength(1);
     });
 
-    it("fires onChange when reader exits unexpectedly", async () => {
+    it("does not fire onChange when reader exits unexpectedly", async () => {
       const onChangeSpy = mock(() => {});
       const { deps, fifoReaders } = createMockDeps();
 
@@ -1606,14 +1606,69 @@ describe("SessionManager", () => {
 
       const countAfterStart = onChangeSpy.mock.calls.length;
 
-      // Simulate pane destruction
       const reader = Array.from(fifoReaders.values())[0];
       reader?.simulateExit();
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(onChangeSpy.mock.calls.length).toBeGreaterThan(countAfterStart);
+      expect(onChangeSpy.mock.calls.length).toBe(countAfterStart);
     });
+
+    it("re-arms pipe-pane on the next checkPaneContent tick after reader exit", async () => {
+      const { deps, fifoReaders } = createMockDeps();
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 60_000,
+        paneCheckIntervalMs: 50,
+      });
+      manager.start();
+
+      expect(fifoReaders.size).toBe(1);
+
+      const firstReader = Array.from(fifoReaders.values())[0];
+      firstReader?.simulateExit();
+
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
+      // A new reader should be spawned by the re-arm path; total ever-created
+      // count grew, and the session is still alive.
+      expect(fifoReaders.size).toBeGreaterThanOrEqual(2);
+      expect(manager.getSessions()).toHaveLength(1);
+    });
+
+    it("backs off pipe-pane setup with growing delay when startPipePane keeps failing", async () => {
+      const startCallTimes: number[] = [];
+      const { deps } = createMockDeps({
+        startPipePane: () => {
+          startCallTimes.push(Date.now());
+          return false;
+        },
+      });
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 60_000,
+        paneCheckIntervalMs: 50,
+      });
+      manager.start();
+
+      // Wait long enough to see at least the second retry (after the 1s
+      // backoff from the first failure) and ideally the third (after the
+      // 2s backoff from the second). With paneCheckIntervalMs=50ms, the
+      // retry path runs as soon as the backoff deadline passes.
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+
+      expect(startCallTimes.length).toBeGreaterThanOrEqual(3);
+
+      const [t0, t1, t2] = startCallTimes;
+      if (t0 === undefined || t1 === undefined || t2 === undefined) {
+        throw new Error("expected at least 3 retry timestamps");
+      }
+      // First gap should be ≥ ~1 s (1s backoff), second ≥ ~2 s (2s backoff).
+      const gap1 = t1 - t0;
+      const gap2 = t2 - t1;
+      expect(gap1).toBeGreaterThanOrEqual(900);
+      expect(gap2).toBeGreaterThan(gap1);
+    }, 5000);
 
     it("does not double-remove when teardownPipePane kills the reader", async () => {
       const { deps, fifoReaders } = createMockDeps();
