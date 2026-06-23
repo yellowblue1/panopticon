@@ -1636,11 +1636,11 @@ describe("SessionManager", () => {
       expect(manager.getSessions()).toHaveLength(1);
     });
 
-    it("backs off pipe-pane setup when startPipePane keeps failing", async () => {
-      const startCalls: string[] = [];
+    it("backs off pipe-pane setup with growing delay when startPipePane keeps failing", async () => {
+      const startCallTimes: number[] = [];
       const { deps } = createMockDeps({
-        startPipePane: (paneId) => {
-          startCalls.push(paneId);
+        startPipePane: () => {
+          startCallTimes.push(Date.now());
           return false;
         },
       });
@@ -1651,16 +1651,24 @@ describe("SessionManager", () => {
       });
       manager.start();
 
-      const initialCount = startCalls.length;
-      expect(initialCount).toBeGreaterThanOrEqual(1);
+      // Wait long enough to see at least the second retry (after the 1s
+      // backoff from the first failure) and ideally the third (after the
+      // 2s backoff from the second). With paneCheckIntervalMs=50ms, the
+      // retry path runs as soon as the backoff deadline passes.
+      await new Promise((resolve) => setTimeout(resolve, 3500));
 
-      // Wait through several paneCheckIntervalMs ticks. With 1 s minimum
-      // backoff after the first failure, no additional calls should happen
-      // within ~500 ms.
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(startCallTimes.length).toBeGreaterThanOrEqual(3);
 
-      expect(startCalls.length).toBe(initialCount);
-    });
+      const [t0, t1, t2] = startCallTimes;
+      if (t0 === undefined || t1 === undefined || t2 === undefined) {
+        throw new Error("expected at least 3 retry timestamps");
+      }
+      // First gap should be ≥ ~1 s (1s backoff), second ≥ ~2 s (2s backoff).
+      const gap1 = t1 - t0;
+      const gap2 = t2 - t1;
+      expect(gap1).toBeGreaterThanOrEqual(900);
+      expect(gap2).toBeGreaterThan(gap1);
+    }, 5000);
 
     it("does not double-remove when teardownPipePane kills the reader", async () => {
       const { deps, fifoReaders } = createMockDeps();

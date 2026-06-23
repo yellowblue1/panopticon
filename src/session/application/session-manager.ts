@@ -296,6 +296,8 @@ export class SessionManager {
     }
     this.sessions.clear();
     this.idleTimers.clear();
+    this.pipePaneRetryAt.clear();
+    this.pipePaneFailureCount.clear();
     for (const timer of this.summaryTimers.values()) {
       clearTimeout(timer);
     }

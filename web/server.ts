@@ -74,6 +74,7 @@ import {
 } from "../src/terminal/infrastructure/tmux-commands";
 import { BuiltinCommandProvider } from "./builtin-command-fetcher";
 import { discoverDialectCommands } from "./command-discovery";
+import { handlePaneContentSseConnect } from "./pane-content-sse";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
@@ -608,36 +609,27 @@ const app = createApp(
       clients.delete(client);
     },
     serializeSessionsData,
-    onPaneContentSseConnect: (paneId, client) => {
-      const isFirstWatcher = !paneContentClients.has(paneId);
-      if (isFirstWatcher) {
-        paneContentClients.set(paneId, new Set());
-      }
-      paneContentClients.get(paneId)?.add(client);
-
-      // For the first watcher, capture once and use the same snapshot for both
-      // the server-side diff baseline (paneContentPrev) and the client's
-      // initial full payload. A second capture would race with a live
-      // synchronized-update TUI (e.g. Nori) and the resulting baseline drift
-      // would mis-apply every diff until the next ~20-emit forced full sync.
-      //
-      // For later watchers, do NOT touch paneContentPrev — overwriting it would
-      // re-introduce the same drift for the EXISTING watchers, whose contentRef
-      // is still aligned to the current baseline. Instead, hand the new watcher
-      // the current baseline so its initial full matches paneContentPrev.
-      if (isFirstWatcher) {
-        const initialContent = capturePaneContentEscaped(paneId);
-        if (initialContent !== null) {
-          paneContentPrev.set(paneId, initialContent);
-          paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
-        }
-        return { content: initialContent, seq: paneContentSeq.get(paneId) ?? 0 };
-      }
-      return {
-        content: paneContentPrev.get(paneId) ?? capturePaneContentEscaped(paneId),
-        seq: paneContentSeq.get(paneId) ?? 0,
-      };
-    },
+    // For the first watcher of a paneId, capture once and reuse the same
+    // snapshot for both the server-side diff baseline (paneContentPrev) and
+    // the client's initial full payload. A second capture would race with a
+    // live synchronized-update TUI (e.g. Nori) and the resulting baseline
+    // drift would mis-apply every diff until the next ~20-emit forced full
+    // sync. For later watchers, reuse the existing baseline so all watchers
+    // stay aligned to one server-side snapshot. The logic is extracted to
+    // handlePaneContentSseConnect so this invariant is unit-testable.
+    onPaneContentSseConnect: (paneId, client) =>
+      handlePaneContentSseConnect(
+        paneId,
+        client,
+        {
+          paneContentClients: paneContentClients as Map<string, Set<unknown>>,
+          paneContentPrev,
+          paneContentHashes,
+          paneContentSeq,
+        },
+        () => capturePaneContentEscaped(paneId),
+        (s) => Bun.hash(s).toString(),
+      ),
     onPaneContentSseDisconnect: (paneId, client) => {
       const watchers = paneContentClients.get(paneId);
       if (watchers) {
