@@ -160,13 +160,28 @@ setInterval(() => {
       clients.delete(client);
     }
   }
-  for (const watchers of paneContentClients.values()) {
+  for (const [paneId, watchers] of paneContentClients) {
     for (const client of watchers) {
       try {
         client.controller.enqueue(heartbeatMessage);
       } catch {
         watchers.delete(client);
       }
+    }
+    // Heartbeat may detect a dead client before the stream's cancel()
+    // callback fires (e.g. abrupt socket close). Clean up the matching
+    // per-pane state so it doesn't leak.
+    if (watchers.size === 0) {
+      paneContentClients.delete(paneId);
+      const timer = paneContentDebounce.get(paneId);
+      if (timer) {
+        clearTimeout(timer);
+        paneContentDebounce.delete(paneId);
+      }
+      paneContentHashes.delete(paneId);
+      paneContentPrev.delete(paneId);
+      paneContentSeq.delete(paneId);
+      paneContentUpdateCount.delete(paneId);
     }
   }
 }, SSE_HEARTBEAT_INTERVAL_MS);
@@ -594,23 +609,31 @@ const app = createApp(
     },
     serializeSessionsData,
     onPaneContentSseConnect: (paneId, client) => {
-      if (!paneContentClients.has(paneId)) {
+      const isFirstWatcher = !paneContentClients.has(paneId);
+      if (isFirstWatcher) {
         paneContentClients.set(paneId, new Set());
       }
       paneContentClients.get(paneId)?.add(client);
 
-      // Capture once and use the same snapshot for both the server-side diff
-      // baseline (paneContentPrev) and the client's initial full payload. A
-      // second capture here would race with the live pane (microseconds apart
-      // is enough for a synchronized-update TUI like Nori to diverge), and
-      // every subsequent diff would mis-apply on the client until a full sync
-      // arrived ~20 emits later.
-      const initialContent = capturePaneContentEscaped(paneId);
-      if (initialContent !== null) {
-        paneContentPrev.set(paneId, initialContent);
-        paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
+      // For the first watcher, capture once and use the same snapshot for both
+      // the server-side diff baseline (paneContentPrev) and the client's
+      // initial full payload. A second capture would race with a live
+      // synchronized-update TUI (e.g. Nori) and the resulting baseline drift
+      // would mis-apply every diff until the next ~20-emit forced full sync.
+      //
+      // For later watchers, do NOT touch paneContentPrev — overwriting it would
+      // re-introduce the same drift for the EXISTING watchers, whose contentRef
+      // is still aligned to the current baseline. Instead, hand the new watcher
+      // the current baseline so its initial full matches paneContentPrev.
+      if (isFirstWatcher) {
+        const initialContent = capturePaneContentEscaped(paneId);
+        if (initialContent !== null) {
+          paneContentPrev.set(paneId, initialContent);
+          paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
+        }
+        return initialContent;
       }
-      return initialContent;
+      return paneContentPrev.get(paneId) ?? capturePaneContentEscaped(paneId);
     },
     onPaneContentSseDisconnect: (paneId, client) => {
       const watchers = paneContentClients.get(paneId);

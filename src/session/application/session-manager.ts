@@ -38,6 +38,7 @@ export class SessionManager {
   private idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private summaryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private pipePanes = new Map<string, PipePaneState>();
+  private pipePaneRetryAt = new Map<string, number>();
   private deps: SessionManagerDeps;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private paneCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -273,6 +274,7 @@ export class SessionManager {
   private removeSession(paneId: string): void {
     this.sessions.delete(paneId);
     this.teardownPipePane(paneId);
+    this.pipePaneRetryAt.delete(paneId);
     const idleTimer = this.idleTimers.get(paneId);
     if (idleTimer) {
       clearTimeout(idleTimer);
@@ -463,12 +465,15 @@ export class SessionManager {
       this.teardownPipePane(paneId);
     });
 
-    this.pipePanes.set(paneId, { fifoPath, readerProcess });
+    const pipeState: PipePaneState = { fifoPath, readerProcess };
+    this.pipePanes.set(paneId, pipeState);
 
     // FIFO EOF does not mean the pane is gone — poll() owns pane lifetime.
     // Tear down the pipe so checkPaneContent will re-arm it on the next tick.
+    // Guard with identity: if pipePanes[paneId] is already a different state,
+    // a fresh setupPipePane raced ahead and we must not tear down its reader.
     readerProcess.on("exit", () => {
-      if (this.pipePanes.has(paneId) && this.sessions.has(paneId)) {
+      if (this.pipePanes.get(paneId) === pipeState && this.sessions.has(paneId)) {
         this.teardownPipePane(paneId);
       }
     });
@@ -476,10 +481,20 @@ export class SessionManager {
     // Start pipe-pane → FIFO
     const started = this.deps.startPipePane(paneId, fifoPath);
     if (started) {
+      this.pipePaneRetryAt.delete(paneId);
       const session = this.sessions.get(paneId);
       if (session) session.pipePaneActive = true;
     } else {
-      console.error(`[panopticon] pipe-pane start failed for pane ${paneId}`);
+      // Back off so a permanently-failing pane (e.g. the tmux pane is gone but
+      // poll() hasn't reaped it yet) doesn't spam stderr at 1 Hz from the
+      // checkPaneContent re-arm path. Capped exponential backoff.
+      const now = Date.now();
+      const prev = this.pipePaneRetryAt.get(paneId) ?? now;
+      const failureCount = Math.min(6, Math.max(0, Math.floor((now - prev) / 1000)));
+      this.pipePaneRetryAt.set(paneId, now + 2 ** failureCount * 1000);
+      if (failureCount === 0) {
+        console.error(`[panopticon] pipe-pane start failed for pane ${paneId}`);
+      }
       this.teardownPipePane(paneId);
     }
   }
@@ -549,7 +564,10 @@ export class SessionManager {
     for (const [paneId, session] of this.sessions) {
       try {
         if (!session.pipePaneActive && !this.pipePanes.has(paneId)) {
-          this.setupPipePane(paneId);
+          const retryAt = this.pipePaneRetryAt.get(paneId);
+          if (retryAt === undefined || Date.now() >= retryAt) {
+            this.setupPipePane(paneId);
+          }
         }
 
         const content = this.deps.capturePaneContent(session.pane_id);

@@ -76,7 +76,13 @@ export function usePaneContent(paneId: string) {
             timestamp: parsed.timestamp,
           });
         } else if (parsed.type === "diff") {
-          if (contentRef.current === null) return;
+          if (contentRef.current === null) {
+            // Server sent a diff before we have a baseline (e.g. initial full
+            // had content=null because capture failed). Fall back to polling
+            // until a usable full arrives.
+            startPolling();
+            return;
+          }
           const newContent = applyLineDiff(contentRef.current, {
             lines: parsed.lines,
             lineCount: parsed.lineCount,
@@ -96,10 +102,15 @@ export function usePaneContent(paneId: string) {
       }
     };
 
+    const wrappedHandleMessage = (event: MessageEvent) => {
+      stopPolling();
+      handleMessage(event);
+    };
+
     const connect = (): EventSource => {
       const source = new EventSource(`/api/sessions/${encodedPaneId}/pane-content/stream`);
       lastMessageRef.current = Date.now();
-      source.onmessage = handleMessage;
+      source.onmessage = wrappedHandleMessage;
       source.onerror = () => {
         source.close();
         if (eventSourceRef.current === source) {
@@ -113,17 +124,19 @@ export function usePaneContent(paneId: string) {
 
     connect();
 
-    // Staleness watchdog: if SSE stays connected but stops emitting (data or
-    // heartbeat), the underlying pipe-pane likely died. Reconnect to re-trigger
-    // initial-content capture on the server, then fall back to polling on error.
+    // Staleness watchdog: if no message arrives within the threshold, the
+    // stream is dead. Reconnect SSE — works for both the "SSE connected but
+    // silent" case (e.g. pipe-pane died upstream) and the "fell back to
+    // polling and never came back" case (eventSourceRef is null).
     stalenessTimerRef.current = setInterval(() => {
-      if (!eventSourceRef.current) return;
       const elapsed = Date.now() - lastMessageRef.current;
       if (elapsed < SSE_STALENESS_THRESHOLD_MS) return;
 
       const stale = eventSourceRef.current;
-      stale.close();
-      eventSourceRef.current = null;
+      if (stale) {
+        stale.close();
+        eventSourceRef.current = null;
+      }
       connect();
     }, STALENESS_CHECK_INTERVAL_MS);
 

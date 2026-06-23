@@ -476,7 +476,7 @@ describe("Hono API endpoints", () => {
   describe("GET /api/sessions/:pane_id/pane-content/stream", () => {
     it("returns SSE stream with initial full pane content", async () => {
       const deps = createMockDeps({
-        capturePaneContent: () => "$ hello world\n",
+        onPaneContentSseConnect: () => "$ hello world\n",
       });
       const app = createApp(deps);
 
@@ -503,9 +503,9 @@ describe("Hono API endpoints", () => {
       let connectedPaneId = "";
       let disconnectedPaneId = "";
       const deps = createMockDeps({
-        capturePaneContent: () => "content",
         onPaneContentSseConnect: (paneId, _client) => {
           connectedPaneId = paneId;
+          return "content";
         },
         onPaneContentSseDisconnect: (paneId, _client) => {
           disconnectedPaneId = paneId;

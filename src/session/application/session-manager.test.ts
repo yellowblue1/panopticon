@@ -1572,7 +1572,7 @@ describe("SessionManager", () => {
   });
 
   describe("real-time pane destruction detection", () => {
-    it("keeps session alive but tears down pipe-pane when reader exits unexpectedly", async () => {
+    it("keeps session alive when reader exits unexpectedly", async () => {
       const { deps, fifoReaders } = createMockDeps();
 
       manager = new SessionManager(deps, {
@@ -1611,7 +1611,6 @@ describe("SessionManager", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // No change notification — the session list did not change.
       expect(onChangeSpy.mock.calls.length).toBe(countAfterStart);
     });
 
