@@ -1572,28 +1572,28 @@ describe("SessionManager", () => {
   });
 
   describe("real-time pane destruction detection", () => {
-    it("removes session immediately when pipe-pane reader exits unexpectedly", async () => {
+    it("keeps session alive but tears down pipe-pane when reader exits unexpectedly", async () => {
       const { deps, fifoReaders } = createMockDeps();
 
       manager = new SessionManager(deps, {
-        pollIntervalMs: 60_000, // Long interval — rely on exit handler
+        pollIntervalMs: 60_000,
         paneCheckIntervalMs: 60_000,
       });
       manager.start();
 
       expect(manager.getSessions()).toHaveLength(1);
 
-      // Simulate pane destruction — reader exits
+      // Simulate FIFO EOF — reader exits while tmux pane is still alive
       const reader = Array.from(fifoReaders.values())[0];
       reader?.simulateExit();
 
-      // Allow async exit event to propagate
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(manager.getSessions()).toHaveLength(0);
+      // Session stays — poll() owns pane lifetime, not the FIFO reader.
+      expect(manager.getSessions()).toHaveLength(1);
     });
 
-    it("fires onChange when reader exits unexpectedly", async () => {
+    it("does not fire onChange when reader exits unexpectedly", async () => {
       const onChangeSpy = mock(() => {});
       const { deps, fifoReaders } = createMockDeps();
 
@@ -1606,13 +1606,13 @@ describe("SessionManager", () => {
 
       const countAfterStart = onChangeSpy.mock.calls.length;
 
-      // Simulate pane destruction
       const reader = Array.from(fifoReaders.values())[0];
       reader?.simulateExit();
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(onChangeSpy.mock.calls.length).toBeGreaterThan(countAfterStart);
+      // No change notification — the session list did not change.
+      expect(onChangeSpy.mock.calls.length).toBe(countAfterStart);
     });
 
     it("does not double-remove when teardownPipePane kills the reader", async () => {

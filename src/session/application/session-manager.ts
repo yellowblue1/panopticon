@@ -465,13 +465,11 @@ export class SessionManager {
 
     this.pipePanes.set(paneId, { fifoPath, readerProcess });
 
-    // Detect unexpected reader exit (e.g. tmux pane destroyed → FIFO EOF)
+    // FIFO EOF does not mean the pane is gone — poll() owns pane lifetime.
+    // Tear down the pipe so checkPaneContent will re-arm it on the next tick.
     readerProcess.on("exit", () => {
-      // Guard: teardownPipePane deletes from pipePanes synchronously
-      // before killing the reader, so this won't fire for intentional teardowns
       if (this.pipePanes.has(paneId) && this.sessions.has(paneId)) {
-        this.removeSession(paneId);
-        this.notifyChange();
+        this.teardownPipePane(paneId);
       }
     });
 
@@ -481,7 +479,7 @@ export class SessionManager {
       const session = this.sessions.get(paneId);
       if (session) session.pipePaneActive = true;
     } else {
-      // pipe-pane failed — clean up
+      console.error(`[panopticon] pipe-pane start failed for pane ${paneId}`);
       this.teardownPipePane(paneId);
     }
   }
@@ -550,6 +548,10 @@ export class SessionManager {
   private checkPaneContent(): void {
     for (const [paneId, session] of this.sessions) {
       try {
+        if (!session.pipePaneActive && !this.pipePanes.has(paneId)) {
+          this.setupPipePane(paneId);
+        }
+
         const content = this.deps.capturePaneContent(session.pane_id);
         if (content === null) continue;
 

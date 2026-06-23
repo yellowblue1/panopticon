@@ -160,6 +160,15 @@ setInterval(() => {
       clients.delete(client);
     }
   }
+  for (const watchers of paneContentClients.values()) {
+    for (const client of watchers) {
+      try {
+        client.controller.enqueue(heartbeatMessage);
+      } catch {
+        watchers.delete(client);
+      }
+    }
+  }
 }, SSE_HEARTBEAT_INTERVAL_MS);
 
 // SSE clients (pane content — per-pane)
@@ -590,13 +599,18 @@ const app = createApp(
       }
       paneContentClients.get(paneId)?.add(client);
 
-      // Store initial content so the first onPaneActivity can compute a diff
-      // instead of falling back to full sync
+      // Capture once and use the same snapshot for both the server-side diff
+      // baseline (paneContentPrev) and the client's initial full payload. A
+      // second capture here would race with the live pane (microseconds apart
+      // is enough for a synchronized-update TUI like Nori to diverge), and
+      // every subsequent diff would mis-apply on the client until a full sync
+      // arrived ~20 emits later.
       const initialContent = capturePaneContentEscaped(paneId);
       if (initialContent !== null) {
         paneContentPrev.set(paneId, initialContent);
         paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
       }
+      return initialContent;
     },
     onPaneContentSseDisconnect: (paneId, client) => {
       const watchers = paneContentClients.get(paneId);

@@ -107,8 +107,11 @@ export interface AppDeps {
   onSseDisconnect?: (client: SseClient) => void;
   serializeSessionsData?: () => string;
 
-  // SSE callbacks (pane content)
-  onPaneContentSseConnect?: (paneId: string, client: SseClient) => void;
+  // SSE callbacks (pane content). onPaneContentSseConnect returns the captured
+  // pane content used to seed the server's diff baseline; the same value MUST
+  // be sent as the client's initial `full` payload so subsequent diffs apply
+  // cleanly. Returning null means capture failed.
+  onPaneContentSseConnect?: (paneId: string, client: SseClient) => string | null;
   onPaneContentSseDisconnect?: (paneId: string, client: SseClient) => void;
 
   // Plan viewer
@@ -612,10 +615,8 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       const stream = new ReadableStream({
         start(controller) {
           client = { controller };
-          deps.onPaneContentSseConnect?.(paneId, client);
+          const content = deps.onPaneContentSseConnect?.(paneId, client) ?? null;
 
-          // Send initial content as full message
-          const content = deps.capturePaneContent?.(paneId) ?? null;
           const initial = JSON.stringify({
             type: "full",
             pane_id: paneId,

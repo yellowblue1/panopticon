@@ -5,6 +5,12 @@ import { sessionsApi } from "@/lib/rpc-client";
 
 const POLL_FALLBACK_INTERVAL = 2000;
 
+// Staleness detection: if no SSE message (data or heartbeat) arrives within
+// this threshold, treat the connection as dead and reconnect. Must exceed the
+// server heartbeat interval (30s) to avoid false positives.
+const SSE_STALENESS_THRESHOLD_MS = 45_000;
+const STALENESS_CHECK_INTERVAL_MS = 15_000;
+
 const fetchPaneContent = async (paneId: string): Promise<PaneContentResponse> => {
   const res = await sessionsApi[":pane_id"]["pane-content"].$get({
     param: { pane_id: encodeURIComponent(paneId) },
@@ -19,6 +25,8 @@ export function usePaneContent(paneId: string) {
   const [error, setError] = useState<Error | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stalenessTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMessageRef = useRef<number>(Date.now());
 
   // Track current content for diff application
   const contentRef = useRef<string | null>(null);
@@ -48,16 +56,17 @@ export function usePaneContent(paneId: string) {
   }, []);
 
   useEffect(() => {
-    // Reset refs on pane change
     contentRef.current = null;
+    lastMessageRef.current = Date.now();
 
     const encodedPaneId = encodeURIComponent(paneId);
-    const es = new EventSource(`/api/sessions/${encodedPaneId}/pane-content/stream`);
-    eventSourceRef.current = es;
 
-    es.onmessage = (event) => {
+    const handleMessage = (event: MessageEvent) => {
+      lastMessageRef.current = Date.now();
       try {
-        const parsed = JSON.parse(event.data) as PaneContentMessage;
+        const parsed = JSON.parse(event.data) as PaneContentMessage | { type: "heartbeat" };
+
+        if (parsed.type === "heartbeat") return;
 
         if (parsed.type === "full") {
           contentRef.current = parsed.content;
@@ -67,10 +76,7 @@ export function usePaneContent(paneId: string) {
             timestamp: parsed.timestamp,
           });
         } else if (parsed.type === "diff") {
-          if (contentRef.current === null) {
-            // No baseline yet — cannot apply diff, wait for full
-            return;
-          }
+          if (contentRef.current === null) return;
           const newContent = applyLineDiff(contentRef.current, {
             lines: parsed.lines,
             lineCount: parsed.lineCount,
@@ -90,16 +96,46 @@ export function usePaneContent(paneId: string) {
       }
     };
 
-    es.onerror = () => {
-      // SSE failed — close and fall back to polling
-      es.close();
-      eventSourceRef.current = null;
-      startPolling();
+    const connect = (): EventSource => {
+      const source = new EventSource(`/api/sessions/${encodedPaneId}/pane-content/stream`);
+      lastMessageRef.current = Date.now();
+      source.onmessage = handleMessage;
+      source.onerror = () => {
+        source.close();
+        if (eventSourceRef.current === source) {
+          eventSourceRef.current = null;
+        }
+        startPolling();
+      };
+      eventSourceRef.current = source;
+      return source;
     };
 
-    return () => {
-      es.close();
+    connect();
+
+    // Staleness watchdog: if SSE stays connected but stops emitting (data or
+    // heartbeat), the underlying pipe-pane likely died. Reconnect to re-trigger
+    // initial-content capture on the server, then fall back to polling on error.
+    stalenessTimerRef.current = setInterval(() => {
+      if (!eventSourceRef.current) return;
+      const elapsed = Date.now() - lastMessageRef.current;
+      if (elapsed < SSE_STALENESS_THRESHOLD_MS) return;
+
+      const stale = eventSourceRef.current;
+      stale.close();
       eventSourceRef.current = null;
+      connect();
+    }, STALENESS_CHECK_INTERVAL_MS);
+
+    return () => {
+      if (stalenessTimerRef.current) {
+        clearInterval(stalenessTimerRef.current);
+        stalenessTimerRef.current = null;
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
       stopPolling();
     };
   }, [paneId, startPolling, stopPolling]);
