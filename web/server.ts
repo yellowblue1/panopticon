@@ -170,34 +170,44 @@ setInterval(() => {
       }
     }
     // Heartbeat may detect a dead client before the stream's cancel()
-    // callback fires (e.g. abrupt socket close). Clean up the matching
-    // per-pane state so it doesn't leak.
-    if (watchers.size === 0) {
-      paneContentClients.delete(paneId);
-      const timer = paneContentDebounce.get(paneId);
-      if (timer) {
-        clearTimeout(timer);
-        paneContentDebounce.delete(paneId);
-      }
-      paneContentHashes.delete(paneId);
-      paneContentPrev.delete(paneId);
-      paneContentSeq.delete(paneId);
-      paneContentUpdateCount.delete(paneId);
-    }
+    // callback fires (e.g. abrupt socket close). Clean up matching per-pane
+    // state so it doesn't leak.
+    if (watchers.size === 0) clearPaneContentState(paneId);
   }
 }, SSE_HEARTBEAT_INTERVAL_MS);
 
 // SSE clients (pane content — per-pane)
 const paneContentClients = new Map<string, Set<SseClient>>();
-const paneContentDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+const paneContentThrottle = new Map<string, ReturnType<typeof setTimeout>>();
+const paneContentPending = new Set<string>();
 const paneContentHashes = new Map<string, string>();
-const PANE_CONTENT_DEBOUNCE_MS = 75;
+// Trailing-edge throttle: once an activity fires, capture-and-broadcast is
+// scheduled PANE_CONTENT_THROTTLE_MS later; further activity during the
+// interval is collapsed into that pending emit. Picking trailing throttle
+// (not debounce) is load-bearing: a continuously-emitting TUI (e.g. Nori
+// using crossterm SynchronizedUpdate to write many cells per frame) would
+// starve a debounce because each new byte resets the timer before it fires.
+const PANE_CONTENT_THROTTLE_MS = 75;
 
 // Diff state for bandwidth optimization
 const paneContentPrev = new Map<string, string>();
 const paneContentSeq = new Map<string, number>();
 const paneContentUpdateCount = new Map<string, number>();
 const FULL_SYNC_INTERVAL = 20;
+
+function clearPaneContentState(paneId: string): void {
+  paneContentClients.delete(paneId);
+  const timer = paneContentThrottle.get(paneId);
+  if (timer) {
+    clearTimeout(timer);
+    paneContentThrottle.delete(paneId);
+  }
+  paneContentPending.delete(paneId);
+  paneContentHashes.delete(paneId);
+  paneContentPrev.delete(paneId);
+  paneContentSeq.delete(paneId);
+  paneContentUpdateCount.delete(paneId);
+}
 
 function makeFullPayload(paneId: string, content: string, seq: number): PaneContentFull {
   return { type: "full", pane_id: paneId, content, timestamp: Date.now(), seq };
@@ -393,82 +403,109 @@ sessionManager.onChange(() => {
   }
 });
 
-// Debounced pane content push via SSE (with diff optimization)
 sessionManager.onPaneActivity((paneId) => {
   const watchers = paneContentClients.get(paneId);
   if (!watchers || watchers.size === 0) return;
 
-  // Reset debounce timer
-  const existing = paneContentDebounce.get(paneId);
-  if (existing) clearTimeout(existing);
+  // If a window is already armed, mark that more activity arrived so the
+  // trailing emit re-arms itself — otherwise the last burst before the agent
+  // goes idle could be lost when capture-pane races with tmux's grid update.
+  if (paneContentThrottle.has(paneId)) {
+    paneContentPending.add(paneId);
+    return;
+  }
 
-  paneContentDebounce.set(
-    paneId,
-    setTimeout(() => {
-      paneContentDebounce.delete(paneId);
-
-      const content = capturePaneContentEscaped(paneId);
-      if (content === null) return;
-
-      // Hash guard — skip if content unchanged
-      const hash = Bun.hash(content).toString();
-      if (paneContentHashes.get(paneId) === hash) return;
-      paneContentHashes.set(paneId, hash);
-
-      // Increment sequence number
-      const seq = (paneContentSeq.get(paneId) ?? 0) + 1;
-      paneContentSeq.set(paneId, seq);
-
-      // Periodic full sync to prevent drift
-      const updateCount = (paneContentUpdateCount.get(paneId) ?? 0) + 1;
-      paneContentUpdateCount.set(paneId, updateCount);
-      const forceFullSync = updateCount % FULL_SYNC_INTERVAL === 0;
-
-      const prevContent = paneContentPrev.get(paneId);
-      let message: string;
-
-      if (!forceFullSync && prevContent !== undefined) {
-        const diff = computeLineDiff(prevContent, content);
-        if (diff === null) return; // identical (safety after hash guard)
-
-        if (isDiffWorthSending(content.length, diff.lines)) {
-          const payload: PaneContentDiff = {
-            type: "diff",
-            pane_id: paneId,
-            lines: diff.lines,
-            lineCount: diff.lineCount,
-            timestamp: Date.now(),
-            seq,
-          };
-          message = `data: ${JSON.stringify(payload)}\n\n`;
-        } else {
-          message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
-        }
-      } else {
-        message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
-        if (forceFullSync) {
-          paneContentUpdateCount.set(paneId, 0);
-        }
-      }
-
-      // Store current content for next diff
-      paneContentPrev.set(paneId, content);
-
-      // Push to watching clients
-      const encoded = encoder.encode(message);
-      const currentWatchers = paneContentClients.get(paneId);
-      if (!currentWatchers) return;
-
-      for (const client of currentWatchers) {
-        try {
-          client.controller.enqueue(encoded);
-        } catch {
-          currentWatchers.delete(client);
-        }
-      }
-    }, PANE_CONTENT_DEBOUNCE_MS),
-  );
+  armPaneContentThrottle(paneId);
 });
+
+function armPaneContentThrottle(paneId: string): void {
+  paneContentThrottle.set(
+    paneId,
+    setTimeout(() => emitPaneContent(paneId), PANE_CONTENT_THROTTLE_MS),
+  );
+}
+
+function emitPaneContent(paneId: string): void {
+  paneContentThrottle.delete(paneId);
+  const hadPending = paneContentPending.delete(paneId);
+
+  // Bail out if every watcher disconnected during the throttle window. Without
+  // this guard, the emit path would re-populate per-pane state that the
+  // disconnect handler just cleaned up, and the next reconnect would inherit
+  // stale baselines.
+  const currentWatchers = paneContentClients.get(paneId);
+  if (!currentWatchers || currentWatchers.size === 0) return;
+
+  const content = capturePaneContentEscaped(paneId);
+  if (content === null) {
+    if (hadPending) armPaneContentThrottle(paneId);
+    return;
+  }
+
+  // Hash guard — skip if content unchanged
+  const hash = Bun.hash(content).toString();
+  if (paneContentHashes.get(paneId) === hash) {
+    if (hadPending) armPaneContentThrottle(paneId);
+    return;
+  }
+  paneContentHashes.set(paneId, hash);
+
+  // Increment sequence number
+  const seq = (paneContentSeq.get(paneId) ?? 0) + 1;
+  paneContentSeq.set(paneId, seq);
+
+  // Periodic full sync to prevent drift
+  const updateCount = (paneContentUpdateCount.get(paneId) ?? 0) + 1;
+  paneContentUpdateCount.set(paneId, updateCount);
+  const forceFullSync = updateCount % FULL_SYNC_INTERVAL === 0;
+
+  const prevContent = paneContentPrev.get(paneId);
+  let message: string;
+
+  if (!forceFullSync && prevContent !== undefined) {
+    const diff = computeLineDiff(prevContent, content);
+    if (diff === null) {
+      if (hadPending) armPaneContentThrottle(paneId);
+      return;
+    }
+
+    if (isDiffWorthSending(content.length, diff.lines)) {
+      const payload: PaneContentDiff = {
+        type: "diff",
+        pane_id: paneId,
+        lines: diff.lines,
+        lineCount: diff.lineCount,
+        timestamp: Date.now(),
+        seq,
+      };
+      message = `data: ${JSON.stringify(payload)}\n\n`;
+    } else {
+      message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
+    }
+  } else {
+    message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
+    if (forceFullSync) {
+      paneContentUpdateCount.set(paneId, 0);
+    }
+  }
+
+  // Store current content for next diff
+  paneContentPrev.set(paneId, content);
+
+  // Push to watching clients
+  const encoded = encoder.encode(message);
+  for (const client of currentWatchers) {
+    try {
+      client.controller.enqueue(encoded);
+    } catch {
+      currentWatchers.delete(client);
+    }
+  }
+
+  // If activity arrived during this window, schedule one more emit so the
+  // final burst still reaches clients even when the agent goes idle next.
+  if (hadPending) armPaneContentThrottle(paneId);
+}
 
 // Check if a panopticon server is already running on the port
 async function isOurServerRunning(port: number): Promise<boolean> {
@@ -635,17 +672,7 @@ const app = createApp(
       if (watchers) {
         watchers.delete(client);
         if (watchers.size === 0) {
-          paneContentClients.delete(paneId);
-          // Clean up all per-pane state when no watchers
-          const timer = paneContentDebounce.get(paneId);
-          if (timer) {
-            clearTimeout(timer);
-            paneContentDebounce.delete(paneId);
-          }
-          paneContentHashes.delete(paneId);
-          paneContentPrev.delete(paneId);
-          paneContentSeq.delete(paneId);
-          paneContentUpdateCount.delete(paneId);
+          clearPaneContentState(paneId);
         }
       }
     },
