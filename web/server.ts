@@ -174,10 +174,10 @@ setInterval(() => {
     // per-pane state so it doesn't leak.
     if (watchers.size === 0) {
       paneContentClients.delete(paneId);
-      const timer = paneContentDebounce.get(paneId);
+      const timer = paneContentThrottle.get(paneId);
       if (timer) {
         clearTimeout(timer);
-        paneContentDebounce.delete(paneId);
+        paneContentThrottle.delete(paneId);
       }
       paneContentHashes.delete(paneId);
       paneContentPrev.delete(paneId);
@@ -189,9 +189,15 @@ setInterval(() => {
 
 // SSE clients (pane content — per-pane)
 const paneContentClients = new Map<string, Set<SseClient>>();
-const paneContentDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+const paneContentThrottle = new Map<string, ReturnType<typeof setTimeout>>();
 const paneContentHashes = new Map<string, string>();
-const PANE_CONTENT_DEBOUNCE_MS = 75;
+// Trailing-edge throttle: once an activity fires, capture-and-broadcast is
+// scheduled PANE_CONTENT_THROTTLE_MS later; further activity during the
+// interval is collapsed into that pending emit. Picking trailing throttle
+// (not debounce) is load-bearing: a continuously-emitting TUI (e.g. Nori
+// using crossterm SynchronizedUpdate to write many cells per frame) would
+// starve a debounce because each new byte resets the timer before it fires.
+const PANE_CONTENT_THROTTLE_MS = 75;
 
 // Diff state for bandwidth optimization
 const paneContentPrev = new Map<string, string>();
@@ -393,19 +399,20 @@ sessionManager.onChange(() => {
   }
 });
 
-// Debounced pane content push via SSE (with diff optimization)
+// Throttled pane-content push via SSE (with diff optimization).
 sessionManager.onPaneActivity((paneId) => {
   const watchers = paneContentClients.get(paneId);
   if (!watchers || watchers.size === 0) return;
 
-  // Reset debounce timer
-  const existing = paneContentDebounce.get(paneId);
-  if (existing) clearTimeout(existing);
+  // Trailing-edge throttle: only the first activity in each window arms the
+  // timer; further activity during the window is folded into that pending
+  // emit. See PANE_CONTENT_THROTTLE_MS comment for why throttle, not debounce.
+  if (paneContentThrottle.has(paneId)) return;
 
-  paneContentDebounce.set(
+  paneContentThrottle.set(
     paneId,
     setTimeout(() => {
-      paneContentDebounce.delete(paneId);
+      paneContentThrottle.delete(paneId);
 
       const content = capturePaneContentEscaped(paneId);
       if (content === null) return;
@@ -466,7 +473,7 @@ sessionManager.onPaneActivity((paneId) => {
           currentWatchers.delete(client);
         }
       }
-    }, PANE_CONTENT_DEBOUNCE_MS),
+    }, PANE_CONTENT_THROTTLE_MS),
   );
 });
 
@@ -637,10 +644,10 @@ const app = createApp(
         if (watchers.size === 0) {
           paneContentClients.delete(paneId);
           // Clean up all per-pane state when no watchers
-          const timer = paneContentDebounce.get(paneId);
+          const timer = paneContentThrottle.get(paneId);
           if (timer) {
             clearTimeout(timer);
-            paneContentDebounce.delete(paneId);
+            paneContentThrottle.delete(paneId);
           }
           paneContentHashes.delete(paneId);
           paneContentPrev.delete(paneId);
