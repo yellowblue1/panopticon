@@ -23,7 +23,7 @@ function createMockDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     onSseConnect: () => {},
     onSseDisconnect: () => {},
     serializeSessionsData: () => "{}",
-    onPaneContentSseConnect: () => {},
+    onPaneContentSseConnect: () => ({ content: null, seq: 0 }),
     onPaneContentSseDisconnect: () => {},
     deletePlan: () => true,
     ...overrides,
@@ -476,7 +476,7 @@ describe("Hono API endpoints", () => {
   describe("GET /api/sessions/:pane_id/pane-content/stream", () => {
     it("returns SSE stream with initial full pane content", async () => {
       const deps = createMockDeps({
-        onPaneContentSseConnect: () => "$ hello world\n",
+        onPaneContentSseConnect: () => ({ content: "$ hello world\n", seq: 0 }),
       });
       const app = createApp(deps);
 
@@ -499,13 +499,30 @@ describe("Hono API endpoints", () => {
       reader.cancel();
     });
 
+    it("forwards the seq returned by onPaneContentSseConnect to the client", async () => {
+      const deps = createMockDeps({
+        onPaneContentSseConnect: () => ({ content: "snapshot", seq: 42 }),
+      });
+      const app = createApp(deps);
+
+      const res = await app.request("/api/sessions/%250/pane-content/stream");
+      const reader = res.body?.getReader();
+      const { value } = await reader.read();
+      const text = new TextDecoder().decode(value);
+      const json = JSON.parse(text.replace("data: ", "").trim());
+
+      expect(json.seq).toBe(42);
+      expect(json.content).toBe("snapshot");
+      reader.cancel();
+    });
+
     it("calls onPaneContentSseConnect and onPaneContentSseDisconnect", async () => {
       let connectedPaneId = "";
       let disconnectedPaneId = "";
       const deps = createMockDeps({
         onPaneContentSseConnect: (paneId, _client) => {
           connectedPaneId = paneId;
-          return "content";
+          return { content: "content", seq: 0 };
         },
         onPaneContentSseDisconnect: (paneId, _client) => {
           disconnectedPaneId = paneId;

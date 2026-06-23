@@ -108,10 +108,16 @@ export interface AppDeps {
   serializeSessionsData?: () => string;
 
   // SSE callbacks (pane content). onPaneContentSseConnect returns the captured
-  // pane content used to seed the server's diff baseline; the same value MUST
-  // be sent as the client's initial `full` payload so subsequent diffs apply
-  // cleanly. Returning null means capture failed.
-  onPaneContentSseConnect?: (paneId: string, client: SseClient) => string | null;
+  // pane content + the current diff sequence number. The `content` MUST match
+  // what the server stored as its diff baseline so subsequent diffs apply
+  // cleanly; the `seq` MUST match the server's running counter so future
+  // protocol changes (e.g. baseline-hash echo, seq-based resync) work for
+  // late-joining watchers, not just the first one. Returning null content
+  // means capture failed.
+  onPaneContentSseConnect?: (
+    paneId: string,
+    client: SseClient,
+  ) => { content: string | null; seq: number };
   onPaneContentSseDisconnect?: (paneId: string, client: SseClient) => void;
 
   // Plan viewer
@@ -615,14 +621,17 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       const stream = new ReadableStream({
         start(controller) {
           client = { controller };
-          const content = deps.onPaneContentSseConnect?.(paneId, client) ?? null;
+          const initialState = deps.onPaneContentSseConnect?.(paneId, client) ?? {
+            content: null,
+            seq: 0,
+          };
 
           const initial = JSON.stringify({
             type: "full",
             pane_id: paneId,
-            content,
+            content: initialState.content,
             timestamp: Date.now(),
-            seq: 0,
+            seq: initialState.seq,
           } satisfies PaneContentFull);
           controller.enqueue(new TextEncoder().encode(`data: ${initial}\n\n`));
         },

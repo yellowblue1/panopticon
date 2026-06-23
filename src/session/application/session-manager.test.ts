@@ -1614,6 +1614,54 @@ describe("SessionManager", () => {
       expect(onChangeSpy.mock.calls.length).toBe(countAfterStart);
     });
 
+    it("re-arms pipe-pane on the next checkPaneContent tick after reader exit", async () => {
+      const { deps, fifoReaders } = createMockDeps();
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 60_000,
+        paneCheckIntervalMs: 50,
+      });
+      manager.start();
+
+      expect(fifoReaders.size).toBe(1);
+
+      const firstReader = Array.from(fifoReaders.values())[0];
+      firstReader?.simulateExit();
+
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
+      // A new reader should be spawned by the re-arm path; total ever-created
+      // count grew, and the session is still alive.
+      expect(fifoReaders.size).toBeGreaterThanOrEqual(2);
+      expect(manager.getSessions()).toHaveLength(1);
+    });
+
+    it("backs off pipe-pane setup when startPipePane keeps failing", async () => {
+      const startCalls: string[] = [];
+      const { deps } = createMockDeps({
+        startPipePane: (paneId) => {
+          startCalls.push(paneId);
+          return false;
+        },
+      });
+
+      manager = new SessionManager(deps, {
+        pollIntervalMs: 60_000,
+        paneCheckIntervalMs: 50,
+      });
+      manager.start();
+
+      const initialCount = startCalls.length;
+      expect(initialCount).toBeGreaterThanOrEqual(1);
+
+      // Wait through several paneCheckIntervalMs ticks. With 1 s minimum
+      // backoff after the first failure, no additional calls should happen
+      // within ~500 ms.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      expect(startCalls.length).toBe(initialCount);
+    });
+
     it("does not double-remove when teardownPipePane kills the reader", async () => {
       const { deps, fifoReaders } = createMockDeps();
 

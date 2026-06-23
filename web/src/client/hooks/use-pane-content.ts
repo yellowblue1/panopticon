@@ -36,6 +36,9 @@ export function usePaneContent(paneId: string) {
     const poll = async () => {
       try {
         const result = await fetchPaneContent(paneId);
+        // Treat successful polls as liveness signals so the staleness watchdog
+        // doesn't keep reconnecting SSE every 15 s while polling is healthy.
+        lastMessageRef.current = Date.now();
         contentRef.current = result.content;
         setData(result);
         setIsLoading(false);

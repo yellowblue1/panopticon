@@ -631,9 +631,12 @@ const app = createApp(
           paneContentPrev.set(paneId, initialContent);
           paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
         }
-        return initialContent;
+        return { content: initialContent, seq: paneContentSeq.get(paneId) ?? 0 };
       }
-      return paneContentPrev.get(paneId) ?? capturePaneContentEscaped(paneId);
+      return {
+        content: paneContentPrev.get(paneId) ?? capturePaneContentEscaped(paneId),
+        seq: paneContentSeq.get(paneId) ?? 0,
+      };
     },
     onPaneContentSseDisconnect: (paneId, client) => {
       const watchers = paneContentClients.get(paneId);
