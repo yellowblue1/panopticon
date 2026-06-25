@@ -125,11 +125,11 @@ body {
   @apply text-text-muted text-sm font-mono select-none;
 }
 
-.orphan-group-header td {
+.lost-lead-group-header td {
   @apply py-2 px-[18px] bg-bg-secondary text-text-muted text-sm italic border-b border-border-muted;
 }
 
-.orphan-label {
+.lost-lead-label {
   @apply ml-2 text-xs;
 }
 
@@ -800,13 +800,13 @@ html.vertical-expand [data-app-shell] {
     border-left: 3px solid var(--color-border-muted);
   }
 
-  .sessions-table tbody tr.orphan-group-header {
+  .sessions-table tbody tr.lost-lead-group-header {
     display: flex;
     align-items: center;
     padding: 8px 16px;
   }
 
-  .sessions-table tbody tr.orphan-group-header td {
+  .sessions-table tbody tr.lost-lead-group-header td {
     padding: 0;
     border: none;
   }

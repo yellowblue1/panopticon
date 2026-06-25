@@ -157,6 +157,33 @@ describe("groupSessions", () => {
     expect(result.ungrouped.map((s) => s.pane_id)).toEqual(["%2"]);
   });
 
+  it("groups a sibling pair at higher pane indices even when the lowest tmux_target is an unrelated project", () => {
+    const stranger = makeSession({
+      pane_id: "%0",
+      tmux_session_name: "s",
+      tmux_target: "s:0.0",
+      project_name: "other",
+    });
+    const teamLead = makeSession({
+      pane_id: "%1",
+      tmux_session_name: "s",
+      tmux_target: "s:0.1",
+      project_name: "team",
+    });
+    const teamWorker = makeSession({
+      pane_id: "%2",
+      tmux_session_name: "s",
+      tmux_target: "s:0.2",
+      project_name: "team",
+    });
+
+    const result = groupSessions([stranger, teamLead, teamWorker]);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].orchestrator?.pane_id).toBe("%1");
+    expect(result.groups[0].children.map((c) => c.pane_id)).toEqual(["%2"]);
+    expect(result.ungrouped.map((s) => s.pane_id)).toEqual(["%0"]);
+  });
+
   it("forms separate groups for different tmux sessions sharing a project_name", () => {
     const a1 = makeSession({
       pane_id: "%0",
