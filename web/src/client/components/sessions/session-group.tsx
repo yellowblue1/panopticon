@@ -44,7 +44,7 @@ export function SessionGroup({
           lastSeenAt={lastSeenMap.get(child.pane_id) ?? 0}
           hasPlan={plans?.[child.pane_id] ?? false}
           onMarkAsRead={onMarkAsRead}
-          groupRole="worktree-child"
+          groupRole="team-child"
         />
       ))}
     </>

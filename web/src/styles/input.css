@@ -117,11 +117,11 @@ body {
   border-left: 3px solid var(--color-accent-blue);
 }
 
-.row-worktree-child {
+.row-team-child {
   border-left: 3px solid var(--color-border-muted);
 }
 
-.worktree-indent {
+.team-child-indent {
   @apply text-text-muted text-sm font-mono select-none;
 }
 
@@ -795,7 +795,7 @@ html.vertical-expand [data-app-shell] {
     border-left: 3px solid var(--color-accent-blue);
   }
 
-  .sessions-table tbody tr.row-worktree-child {
+  .sessions-table tbody tr.row-team-child {
     margin-left: 16px;
     border-left: 3px solid var(--color-border-muted);
   }
@@ -823,12 +823,12 @@ html.vertical-expand [data-app-shell] {
   @apply font-semibold;
 }
 
-.row-worktree-child .col-project {
+.row-team-child .col-project {
   padding-left: 32px;
 }
 
 @media (max-width: 639px) {
-  .row-worktree-child .col-project {
+  .row-team-child .col-project {
     padding-left: 0;
   }
 }
