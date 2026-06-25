@@ -112,24 +112,24 @@ body {
   border-left-color: transparent;
 }
 
-/* Session grouping — orchestrator / worktree hierarchy */
+/* Session grouping — lead orchestrator / team-child hierarchy */
 .row-orchestrator {
   border-left: 3px solid var(--color-accent-blue);
 }
 
-.row-worktree-child {
+.row-team-child {
   border-left: 3px solid var(--color-border-muted);
 }
 
-.worktree-indent {
+.team-child-indent {
   @apply text-text-muted text-sm font-mono select-none;
 }
 
-.orphan-group-header td {
+.lost-lead-group-header td {
   @apply py-2 px-[18px] bg-bg-secondary text-text-muted text-sm italic border-b border-border-muted;
 }
 
-.orphan-label {
+.lost-lead-label {
   @apply ml-2 text-xs;
 }
 
@@ -795,18 +795,18 @@ html.vertical-expand [data-app-shell] {
     border-left: 3px solid var(--color-accent-blue);
   }
 
-  .sessions-table tbody tr.row-worktree-child {
+  .sessions-table tbody tr.row-team-child {
     margin-left: 16px;
     border-left: 3px solid var(--color-border-muted);
   }
 
-  .sessions-table tbody tr.orphan-group-header {
+  .sessions-table tbody tr.lost-lead-group-header {
     display: flex;
     align-items: center;
     padding: 8px 16px;
   }
 
-  .sessions-table tbody tr.orphan-group-header td {
+  .sessions-table tbody tr.lost-lead-group-header td {
     padding: 0;
     border: none;
   }
@@ -823,12 +823,12 @@ html.vertical-expand [data-app-shell] {
   @apply font-semibold;
 }
 
-.row-worktree-child .col-project {
+.row-team-child .col-project {
   padding-left: 32px;
 }
 
 @media (max-width: 639px) {
-  .row-worktree-child .col-project {
+  .row-team-child .col-project {
     padding-left: 0;
   }
 }

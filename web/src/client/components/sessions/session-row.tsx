@@ -13,7 +13,7 @@ interface SessionRowProps {
   lastSeenAt: number;
   hasPlan: boolean;
   onMarkAsRead: (paneId: string) => void;
-  groupRole?: "orchestrator" | "worktree-child";
+  groupRole?: "orchestrator" | "team-child";
 }
 
 export function SessionRow({
@@ -47,13 +47,13 @@ export function SessionRow({
         statusClass,
         isRead && "read",
         groupRole === "orchestrator" && "row-orchestrator",
-        groupRole === "worktree-child" && "row-worktree-child",
+        groupRole === "team-child" && "row-team-child",
       )}
     >
       <td className="col-project">
         <div className="flex items-center gap-2">
-          {groupRole === "worktree-child" && (
-            <span className="worktree-indent" aria-hidden="true">
+          {groupRole === "team-child" && (
+            <span className="team-child-indent" aria-hidden="true">
               └
             </span>
           )}
