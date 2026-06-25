@@ -24,7 +24,7 @@ function byActivityThenPaneId(a: SessionResponse, b: SessionResponse): number {
   return compareWithHysteresis(
     a.last_activity,
     b.last_activity,
-    a.pane_id.localeCompare(b.pane_id),
+    a.pane_id.localeCompare(b.pane_id, undefined, { numeric: true }),
   );
 }
 
@@ -73,13 +73,18 @@ export function groupSessions(sessions: SessionResponse[]): GroupedSessions {
     ungrouped.push(...stranded);
   }
 
-  const decorated = groups.map((g) => ({ g, max: getGroupMaxActivity(g) }));
-  decorated.sort((a, b) => {
-    const tiebreaker = (a.g.orchestrator?.pane_id ?? a.g.children[0]?.pane_id ?? "").localeCompare(
-      b.g.orchestrator?.pane_id ?? b.g.children[0]?.pane_id ?? "",
-    );
-    return compareWithHysteresis(a.max, b.max, tiebreaker);
-  });
+  const decorated = groups.map((g) => ({
+    g,
+    max: getGroupMaxActivity(g),
+    tieKey: g.orchestrator?.pane_id ?? g.children[0]?.pane_id ?? "",
+  }));
+  decorated.sort((a, b) =>
+    compareWithHysteresis(
+      a.max,
+      b.max,
+      a.tieKey.localeCompare(b.tieKey, undefined, { numeric: true }),
+    ),
+  );
 
   ungrouped.sort(byActivityThenPaneId);
 

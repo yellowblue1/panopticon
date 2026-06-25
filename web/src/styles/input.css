@@ -112,7 +112,7 @@ body {
   border-left-color: transparent;
 }
 
-/* Session grouping — orchestrator / worktree hierarchy */
+/* Session grouping — lead orchestrator / team-child hierarchy */
 .row-orchestrator {
   border-left: 3px solid var(--color-accent-blue);
 }
