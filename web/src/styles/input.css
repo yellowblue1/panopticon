@@ -638,9 +638,9 @@ html.vertical-expand [data-app-shell] {
    Responsive Breakpoints
    ============================================ */
 
-/* Medium screens (640px–1023px): table without window name */
+/* Medium screens (640px–1023px): table without AI summary */
 @media (min-width: 640px) and (max-width: 1023px) {
-  .col-window {
+  .col-summary {
     display: none;
   }
 
@@ -650,7 +650,7 @@ html.vertical-expand [data-app-shell] {
   .col-status {
     width: 15%;
   }
-  .col-summary {
+  .col-window {
     width: auto;
   }
 
