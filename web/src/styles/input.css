@@ -638,20 +638,19 @@ html.vertical-expand [data-app-shell] {
    Responsive Breakpoints
    ============================================ */
 
-/* Medium screens (640px–1023px): table without window name */
 @media (min-width: 640px) and (max-width: 1023px) {
-  .col-window {
+  .col-summary {
     display: none;
   }
 
   .col-project {
-    width: 25%;
+    width: auto;
   }
   .col-status {
     width: 15%;
   }
-  .col-summary {
-    width: auto;
+  .col-window {
+    width: 30%;
   }
 
   .sessions-table th,
