@@ -69,6 +69,23 @@ describe("Hono API endpoints", () => {
   });
 
   describe("POST /api/sessions/:pane_id/send-keys", () => {
+    it("awaits delayed submission before reporting failure", async () => {
+      const app = createApp(
+        createMockDeps({
+          sendKeys: async () => {
+            await Bun.sleep(1);
+            return false;
+          },
+        }),
+      );
+      const res = await app.request("/api/sessions/%250/send-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "hello" }),
+      });
+      expect(res.status).toBe(500);
+      expect((await res.json()).success).toBe(false);
+    });
     it("returns success when sendKeys succeeds", async () => {
       const sendKeysSpy = mock((_paneId: string, _text: string) => true);
       const deps = createMockDeps({ sendKeys: sendKeysSpy });

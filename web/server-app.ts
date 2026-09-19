@@ -91,7 +91,7 @@ function mcpHostGuard(allowedHost?: string): MiddlewareHandler {
  */
 export interface AppDeps {
   getSessions: () => SessionResponse[];
-  sendKeys?: (paneId: string, text: string) => boolean;
+  sendKeys?: (paneId: string, text: string) => boolean | Promise<boolean>;
   sendRawKey?: (paneId: string, key: string) => boolean;
   switchClient?: (paneId: string) => boolean;
   sendInterrupt?: (paneId: string) => boolean;
@@ -242,7 +242,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       if (!deps.sendKeys) {
         return c.json({ success: false, error: "Not available" } satisfies SendKeysResponse, 501);
       }
-      const success = deps.sendKeys(paneId, body.text);
+      const success = await deps.sendKeys(paneId, body.text);
       if (success) {
         return c.json({ success: true } satisfies SendKeysResponse);
       }

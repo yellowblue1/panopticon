@@ -65,7 +65,6 @@ import {
   pastePath,
   sendEnter,
   sendInterrupt,
-  sendKeys,
   sendLiteral,
   sendRawKey,
   startPipePane,
@@ -523,25 +522,48 @@ async function isOurServerRunning(port: number): Promise<boolean> {
   return false;
 }
 
+// Serialize composition so simultaneous requests cannot interleave during paste delays.
+const pendingMessages = new Map<string, ReturnType<typeof sendMessage>>();
+function sendPaneMessage(
+  paneId: string,
+  text: string,
+  files: Parameters<typeof sendMessage>[0]["files"] = [],
+) {
+  const previous = pendingMessages.get(paneId);
+  const pending = (previous ?? Promise.resolve()).then(() =>
+    sendMessage(
+      {
+        paneId,
+        text,
+        files,
+        agentType: sessionManager.getSessions().find((s) => s.pane_id === paneId)?.agent_type,
+      },
+      {
+        pastePath,
+        sendLiteral,
+        sendEnter,
+        saveFile: fileUploadDeps.saveFile,
+        sleep: (ms) => Bun.sleep(ms),
+      },
+    ),
+  );
+  pendingMessages.set(paneId, pending);
+  const cleanup = () => {
+    if (pendingMessages.get(paneId) === pending) pendingMessages.delete(paneId);
+  };
+  void pending.then(cleanup, cleanup);
+  return pending;
+}
+
 // Create Hono app with dependencies
 const app = createApp(
   {
     getSessions: () => sessionManager.getSessions(),
-    sendKeys: (paneId, text) => sendKeys(paneId, text),
+    sendKeys: async (paneId, text) => (await sendPaneMessage(paneId, text)).success,
     sendRawKey: (paneId, key) => sendRawKey(paneId, key),
     switchClient: (paneId) => switchClient(paneId),
     sendInterrupt: (paneId) => sendInterrupt(paneId),
-    sendMessage: (paneId, text, files) =>
-      sendMessage(
-        { paneId, text, files },
-        {
-          pastePath: (pid, content) => pastePath(pid, content),
-          sendLiteral: (pid, txt) => sendLiteral(pid, txt),
-          sendEnter: (pid) => sendEnter(pid),
-          saveFile: fileUploadDeps.saveFile,
-          sleep: (ms) => Bun.sleep(ms),
-        },
-      ),
+    sendMessage: sendPaneMessage,
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
     capturePaneContent: capturePaneContentEscaped,
     geminiBackend,
