@@ -234,22 +234,6 @@ export function getGitBranch(cwd: string, exec: ExecFn = defaultExec): string | 
 }
 
 /**
- * Send text to a tmux pane followed by Enter key press.
- * Uses -l flag to send text literally (avoiding key-name interpretation),
- * then sends Enter as a separate command to ensure proper submission.
- */
-export function sendKeys(paneId: string, text: string, exec: ExecFn = defaultExec): boolean {
-  try {
-    const target = shellEscape(paneId);
-    exec(`tmux send-keys -t ${target} -l ${shellEscape(text)}`);
-    exec(`tmux send-keys -t ${target} Enter`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Send text to a tmux pane literally, without a trailing Enter.
  * Used when composing a single multi-part message (e.g. image attachments +
  * text + final Enter handled by the caller).
@@ -301,7 +285,7 @@ export function pastePath(
 
 /**
  * Send a raw tmux key name to a pane (e.g. Escape, Enter, C-c).
- * Unlike sendKeys(), this does NOT use -l (literal) mode and does NOT append Enter.
+ * Does not use -l (literal) mode or append Enter.
  */
 export function sendRawKey(paneId: string, key: string, exec: ExecFn = defaultExec): boolean {
   try {
