@@ -91,7 +91,7 @@ function mcpHostGuard(allowedHost?: string): MiddlewareHandler {
  */
 export interface AppDeps {
   getSessions: () => SessionResponse[];
-  sendKeys?: (paneId: string, text: string) => boolean;
+  sendKeys?: (paneId: string, text: string) => boolean | Promise<boolean>;
   sendRawKey?: (paneId: string, key: string) => boolean;
   switchClient?: (paneId: string) => boolean;
   sendInterrupt?: (paneId: string) => boolean;
@@ -108,7 +108,7 @@ export interface AppDeps {
   serializeSessionsData?: () => string;
 
   // SSE callbacks (pane content)
-  onPaneContentSseConnect?: (paneId: string, client: SseClient) => void;
+  onPaneContentSseConnect?: (paneId: string, client: SseClient) => PaneContentFull | undefined;
   onPaneContentSseDisconnect?: (paneId: string, client: SseClient) => void;
 
   // Plan viewer
@@ -233,7 +233,7 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       if (!deps.sendKeys) {
         return c.json({ success: false, error: "Not available" } satisfies SendKeysResponse, 501);
       }
-      const success = deps.sendKeys(paneId, body.text);
+      const success = await deps.sendKeys(paneId, body.text);
       if (success) {
         return c.json({ success: true } satisfies SendKeysResponse);
       }
@@ -612,17 +612,19 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       const stream = new ReadableStream({
         start(controller) {
           client = { controller };
-          deps.onPaneContentSseConnect?.(paneId, client);
+          const snapshot = deps.onPaneContentSseConnect?.(paneId, client);
 
-          // Send initial content as full message
-          const content = deps.capturePaneContent?.(paneId) ?? null;
-          const initial = JSON.stringify({
-            type: "full",
-            pane_id: paneId,
-            content,
-            timestamp: Date.now(),
-            seq: 0,
-          } satisfies PaneContentFull);
+          // Use the same capture and sequence as the shared diff baseline.
+          const initial = JSON.stringify(
+            snapshot ??
+              ({
+                type: "full",
+                pane_id: paneId,
+                content: deps.capturePaneContent?.(paneId) ?? null,
+                timestamp: Date.now(),
+                seq: 0,
+              } satisfies PaneContentFull),
+          );
           controller.enqueue(new TextEncoder().encode(`data: ${initial}\n\n`));
         },
         cancel() {

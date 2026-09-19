@@ -294,3 +294,33 @@ describe("sendMessage", () => {
     expect(result.uploadedFiles[0].mimeType).toBe("image/png");
   });
 });
+
+describe("Codex submission", () => {
+  it("pastes multiline text intact and waits before submitting once", async () => {
+    const { deps, calls } = createMockDeps();
+    await sendMessage({ paneId: "%0", text: "first\nsecond", files: [], agentType: "codex" }, deps);
+    expect(calls).toEqual([
+      { kind: "pastePath", paneId: "%0", payload: "first\nsecond" },
+      { kind: "sleep", ms: 250 },
+      { kind: "sendEnter", paneId: "%0" },
+    ]);
+  });
+
+  it("does not submit before the Codex input settles", async () => {
+    let release!: () => void;
+    const { deps, calls } = createMockDeps({
+      sleep: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const pending = sendMessage(
+      { paneId: "%0", text: "hello", files: [], agentType: "codex" },
+      deps,
+    );
+    expect(calls.some((c) => c.kind === "sendEnter")).toBe(false);
+    release();
+    expect((await pending).success).toBe(true);
+    expect(calls.filter((c) => c.kind === "sendEnter")).toHaveLength(1);
+  });
+});

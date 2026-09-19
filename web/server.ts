@@ -36,13 +36,7 @@ import { createPlanDiscoveryDeps } from "../src/plan/infrastructure/file-operati
 import { SessionManager } from "../src/session/application/session-manager";
 import type { SessionManagerDeps } from "../src/session/domain/ports";
 import { defaultCreateFifo, defaultSpawnFifoReader } from "../src/session/infrastructure/fifo";
-import { computeLineDiff, isDiffWorthSending } from "../src/shared/pane-diff";
-import type {
-  FilePushSseEvent,
-  PaneContentDiff,
-  PaneContentFull,
-  UrlPushSseEvent,
-} from "../src/shared/types";
+import type { FilePushSseEvent, UrlPushSseEvent } from "../src/shared/types";
 import { sendMessage } from "../src/terminal/application/send-message";
 import { createFileUploadDeps } from "../src/terminal/infrastructure/file-upload";
 import {
@@ -65,7 +59,6 @@ import {
   pastePath,
   sendEnter,
   sendInterrupt,
-  sendKeys,
   sendLiteral,
   sendRawKey,
   startPipePane,
@@ -74,6 +67,7 @@ import {
 } from "../src/terminal/infrastructure/tmux-commands";
 import { BuiltinCommandProvider } from "./builtin-command-fetcher";
 import { discoverDialectCommands } from "./command-discovery";
+import { createPaneContentStream } from "./pane-content-stream";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
 const DEFAULT_PORT = 3847;
@@ -162,21 +156,8 @@ setInterval(() => {
   }
 }, SSE_HEARTBEAT_INTERVAL_MS);
 
-// SSE clients (pane content — per-pane)
-const paneContentClients = new Map<string, Set<SseClient>>();
-const paneContentDebounce = new Map<string, ReturnType<typeof setTimeout>>();
-const paneContentHashes = new Map<string, string>();
-const PANE_CONTENT_DEBOUNCE_MS = 75;
-
-// Diff state for bandwidth optimization
-const paneContentPrev = new Map<string, string>();
-const paneContentSeq = new Map<string, number>();
-const paneContentUpdateCount = new Map<string, number>();
-const FULL_SYNC_INTERVAL = 20;
-
-function makeFullPayload(paneId: string, content: string, seq: number): PaneContentFull {
-  return { type: "full", pane_id: paneId, content, timestamp: Date.now(), seq };
-}
+// Pane content streaming state is shared by all watchers of a pane.
+const paneContentStream = createPaneContentStream(capturePaneContentEscaped);
 
 // Session manager with tmux polling
 const sessionManager = new SessionManager(sessionManagerDeps);
@@ -368,82 +349,7 @@ sessionManager.onChange(() => {
   }
 });
 
-// Debounced pane content push via SSE (with diff optimization)
-sessionManager.onPaneActivity((paneId) => {
-  const watchers = paneContentClients.get(paneId);
-  if (!watchers || watchers.size === 0) return;
-
-  // Reset debounce timer
-  const existing = paneContentDebounce.get(paneId);
-  if (existing) clearTimeout(existing);
-
-  paneContentDebounce.set(
-    paneId,
-    setTimeout(() => {
-      paneContentDebounce.delete(paneId);
-
-      const content = capturePaneContentEscaped(paneId);
-      if (content === null) return;
-
-      // Hash guard — skip if content unchanged
-      const hash = Bun.hash(content).toString();
-      if (paneContentHashes.get(paneId) === hash) return;
-      paneContentHashes.set(paneId, hash);
-
-      // Increment sequence number
-      const seq = (paneContentSeq.get(paneId) ?? 0) + 1;
-      paneContentSeq.set(paneId, seq);
-
-      // Periodic full sync to prevent drift
-      const updateCount = (paneContentUpdateCount.get(paneId) ?? 0) + 1;
-      paneContentUpdateCount.set(paneId, updateCount);
-      const forceFullSync = updateCount % FULL_SYNC_INTERVAL === 0;
-
-      const prevContent = paneContentPrev.get(paneId);
-      let message: string;
-
-      if (!forceFullSync && prevContent !== undefined) {
-        const diff = computeLineDiff(prevContent, content);
-        if (diff === null) return; // identical (safety after hash guard)
-
-        if (isDiffWorthSending(content.length, diff.lines)) {
-          const payload: PaneContentDiff = {
-            type: "diff",
-            pane_id: paneId,
-            lines: diff.lines,
-            lineCount: diff.lineCount,
-            timestamp: Date.now(),
-            seq,
-          };
-          message = `data: ${JSON.stringify(payload)}\n\n`;
-        } else {
-          message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
-        }
-      } else {
-        message = `data: ${JSON.stringify(makeFullPayload(paneId, content, seq))}\n\n`;
-        if (forceFullSync) {
-          paneContentUpdateCount.set(paneId, 0);
-        }
-      }
-
-      // Store current content for next diff
-      paneContentPrev.set(paneId, content);
-
-      // Push to watching clients
-      const encoded = encoder.encode(message);
-      const currentWatchers = paneContentClients.get(paneId);
-      if (!currentWatchers) return;
-
-      for (const client of currentWatchers) {
-        try {
-          client.controller.enqueue(encoded);
-        } catch {
-          currentWatchers.delete(client);
-        }
-      }
-    }, PANE_CONTENT_DEBOUNCE_MS),
-  );
-});
+sessionManager.onPaneActivity(paneContentStream.onActivity);
 
 // Check if a panopticon server is already running on the port
 async function isOurServerRunning(port: number): Promise<boolean> {
@@ -461,25 +367,48 @@ async function isOurServerRunning(port: number): Promise<boolean> {
   return false;
 }
 
+// Serialize composition so simultaneous requests cannot interleave during paste delays.
+const pendingMessages = new Map<string, ReturnType<typeof sendMessage>>();
+function sendPaneMessage(
+  paneId: string,
+  text: string,
+  files: Parameters<typeof sendMessage>[0]["files"] = [],
+) {
+  const previous = pendingMessages.get(paneId);
+  const pending = (previous ?? Promise.resolve()).then(() =>
+    sendMessage(
+      {
+        paneId,
+        text,
+        files,
+        agentType: sessionManager.getSessions().find((s) => s.pane_id === paneId)?.agent_type,
+      },
+      {
+        pastePath,
+        sendLiteral,
+        sendEnter,
+        saveFile: fileUploadDeps.saveFile,
+        sleep: (ms) => Bun.sleep(ms),
+      },
+    ),
+  );
+  pendingMessages.set(paneId, pending);
+  const cleanup = () => {
+    if (pendingMessages.get(paneId) === pending) pendingMessages.delete(paneId);
+  };
+  void pending.then(cleanup, cleanup);
+  return pending;
+}
+
 // Create Hono app with dependencies
 const app = createApp(
   {
     getSessions: () => sessionManager.getSessions(),
-    sendKeys: (paneId, text) => sendKeys(paneId, text),
+    sendKeys: async (paneId, text) => (await sendPaneMessage(paneId, text)).success,
     sendRawKey: (paneId, key) => sendRawKey(paneId, key),
     switchClient: (paneId) => switchClient(paneId),
     sendInterrupt: (paneId) => sendInterrupt(paneId),
-    sendMessage: (paneId, text, files) =>
-      sendMessage(
-        { paneId, text, files },
-        {
-          pastePath: (pid, content) => pastePath(pid, content),
-          sendLiteral: (pid, txt) => sendLiteral(pid, txt),
-          sendEnter: (pid) => sendEnter(pid),
-          saveFile: fileUploadDeps.saveFile,
-          sleep: (ms) => Bun.sleep(ms),
-        },
-      ),
+    sendMessage: sendPaneMessage,
     // Uses escaped variant to preserve ANSI codes for xterm.js rendering
     capturePaneContent: capturePaneContentEscaped,
     geminiBackend,
@@ -584,39 +513,8 @@ const app = createApp(
       clients.delete(client);
     },
     serializeSessionsData,
-    onPaneContentSseConnect: (paneId, client) => {
-      if (!paneContentClients.has(paneId)) {
-        paneContentClients.set(paneId, new Set());
-      }
-      paneContentClients.get(paneId)?.add(client);
-
-      // Store initial content so the first onPaneActivity can compute a diff
-      // instead of falling back to full sync
-      const initialContent = capturePaneContentEscaped(paneId);
-      if (initialContent !== null) {
-        paneContentPrev.set(paneId, initialContent);
-        paneContentHashes.set(paneId, Bun.hash(initialContent).toString());
-      }
-    },
-    onPaneContentSseDisconnect: (paneId, client) => {
-      const watchers = paneContentClients.get(paneId);
-      if (watchers) {
-        watchers.delete(client);
-        if (watchers.size === 0) {
-          paneContentClients.delete(paneId);
-          // Clean up all per-pane state when no watchers
-          const timer = paneContentDebounce.get(paneId);
-          if (timer) {
-            clearTimeout(timer);
-            paneContentDebounce.delete(paneId);
-          }
-          paneContentHashes.delete(paneId);
-          paneContentPrev.delete(paneId);
-          paneContentSeq.delete(paneId);
-          paneContentUpdateCount.delete(paneId);
-        }
-      }
-    },
+    onPaneContentSseConnect: paneContentStream.onConnect,
+    onPaneContentSseDisconnect: paneContentStream.onDisconnect,
   },
   { restrictCors: true, mcpAllowedHost: resolveMcpConnectHost(HOST) },
 );

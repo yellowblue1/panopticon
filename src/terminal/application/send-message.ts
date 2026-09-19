@@ -1,4 +1,5 @@
 import { isImageMimeType, MAX_FILES_PER_REQUEST } from "../../shared/constants";
+import type { AgentType } from "../../shared/types";
 import type { SaveFileResult, UploadedFile } from "../infrastructure/file-upload";
 
 /**
@@ -23,6 +24,7 @@ export interface SendMessageDeps {
 
 interface SendMessageInput {
   readonly paneId: string;
+  readonly agentType?: AgentType;
   readonly text: string;
   readonly files: ReadonlyArray<{
     readonly data: ArrayBuffer;
@@ -112,9 +114,17 @@ export async function sendMessage(
 
   if (trimmedText) {
     if (hasPart && !deps.sendLiteral(paneId, " ")) return fail();
-    if (!deps.sendLiteral(paneId, trimmedText)) return fail();
+    // Explicit paste keeps embedded newlines inside a single Codex prompt.
+    const ok =
+      input.agentType === "codex"
+        ? deps.pastePath(paneId, trimmedText)
+        : deps.sendLiteral(paneId, trimmedText);
+    if (!ok) return fail();
   }
 
+  // Codex treats Enter immediately after burst input as a pasted newline.
+  // Allow its 120 ms suppression window and input processing to settle.
+  if (input.agentType === "codex") await deps.sleep(250);
   if (!deps.sendEnter(paneId)) return fail();
 
   return { success: true, uploadedFiles: savedFiles };
