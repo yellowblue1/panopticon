@@ -107,8 +107,17 @@ export interface AppDeps {
   onSseDisconnect?: (client: SseClient) => void;
   serializeSessionsData?: () => string;
 
-  // SSE callbacks (pane content)
-  onPaneContentSseConnect?: (paneId: string, client: SseClient) => PaneContentFull | undefined;
+  // SSE callbacks (pane content). onPaneContentSseConnect returns the captured
+  // pane content + the current diff sequence number. The `content` MUST match
+  // what the server stored as its diff baseline so subsequent diffs apply
+  // cleanly; the `seq` MUST match the server's running counter so future
+  // protocol changes (e.g. baseline-hash echo, seq-based resync) work for
+  // late-joining watchers, not just the first one. Returning null content
+  // means capture failed.
+  onPaneContentSseConnect?: (
+    paneId: string,
+    client: SseClient,
+  ) => { content: string | null; seq: number };
   onPaneContentSseDisconnect?: (paneId: string, client: SseClient) => void;
 
   // Plan viewer
@@ -612,19 +621,18 @@ export function createApp(deps: AppDeps, options: AppOptions = {}) {
       const stream = new ReadableStream({
         start(controller) {
           client = { controller };
-          const snapshot = deps.onPaneContentSseConnect?.(paneId, client);
+          const initialState = deps.onPaneContentSseConnect?.(paneId, client) ?? {
+            content: null,
+            seq: 0,
+          };
 
-          // Use the same capture and sequence as the shared diff baseline.
-          const initial = JSON.stringify(
-            snapshot ??
-              ({
-                type: "full",
-                pane_id: paneId,
-                content: deps.capturePaneContent?.(paneId) ?? null,
-                timestamp: Date.now(),
-                seq: 0,
-              } satisfies PaneContentFull),
-          );
+          const initial = JSON.stringify({
+            type: "full",
+            pane_id: paneId,
+            content: initialState.content,
+            timestamp: Date.now(),
+            seq: initialState.seq,
+          } satisfies PaneContentFull);
           controller.enqueue(new TextEncoder().encode(`data: ${initial}\n\n`));
         },
         cancel() {

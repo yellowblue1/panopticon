@@ -77,7 +77,7 @@ export interface PaneContentFull {
 }
 
 /** Diff message (sent on subsequent updates when content changes) */
-interface PaneContentDiff {
+export interface PaneContentDiff {
   type: "diff";
   pane_id: string;
   /** Lines that changed, applied to previous full content split by \n */

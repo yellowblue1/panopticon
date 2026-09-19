@@ -38,6 +38,8 @@ export class SessionManager {
   private idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private summaryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private pipePanes = new Map<string, PipePaneState>();
+  private pipePaneRetryAt = new Map<string, number>();
+  private pipePaneFailureCount = new Map<string, number>();
   private deps: SessionManagerDeps;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private paneCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -273,6 +275,8 @@ export class SessionManager {
   private removeSession(paneId: string): void {
     this.sessions.delete(paneId);
     this.teardownPipePane(paneId);
+    this.pipePaneRetryAt.delete(paneId);
+    this.pipePaneFailureCount.delete(paneId);
     const idleTimer = this.idleTimers.get(paneId);
     if (idleTimer) {
       clearTimeout(idleTimer);
@@ -292,6 +296,8 @@ export class SessionManager {
     }
     this.sessions.clear();
     this.idleTimers.clear();
+    this.pipePaneRetryAt.clear();
+    this.pipePaneFailureCount.clear();
     for (const timer of this.summaryTimers.values()) {
       clearTimeout(timer);
     }
@@ -453,35 +459,46 @@ export class SessionManager {
 
     // Open reader FIRST to prevent writer blocking
     const readerProcess = this.deps.spawnFifoReader(fifoPath);
+    const pipeState: PipePaneState = { fifoPath, readerProcess };
+    this.pipePanes.set(paneId, pipeState);
 
     readerProcess.stdout?.on("data", () => {
       this.onPipePaneActivity(paneId);
     });
 
+    // Identity guard on both 'error' and 'exit': if pipePanes[paneId] is
+    // already a different state, a fresh setupPipePane raced ahead and we
+    // must not tear down its reader. FIFO EOF does not mean the pane is gone
+    // either — poll() owns pane lifetime; checkPaneContent will re-arm next.
     readerProcess.on("error", () => {
-      // Reader failed — clean up and fall back to polling
-      this.teardownPipePane(paneId);
+      if (this.pipePanes.get(paneId) === pipeState) {
+        this.teardownPipePane(paneId);
+      }
     });
-
-    this.pipePanes.set(paneId, { fifoPath, readerProcess });
-
-    // Detect unexpected reader exit (e.g. tmux pane destroyed → FIFO EOF)
     readerProcess.on("exit", () => {
-      // Guard: teardownPipePane deletes from pipePanes synchronously
-      // before killing the reader, so this won't fire for intentional teardowns
-      if (this.pipePanes.has(paneId) && this.sessions.has(paneId)) {
-        this.removeSession(paneId);
-        this.notifyChange();
+      if (this.pipePanes.get(paneId) === pipeState && this.sessions.has(paneId)) {
+        this.teardownPipePane(paneId);
       }
     });
 
     // Start pipe-pane → FIFO
     const started = this.deps.startPipePane(paneId, fifoPath);
     if (started) {
+      this.pipePaneRetryAt.delete(paneId);
+      this.pipePaneFailureCount.delete(paneId);
       const session = this.sessions.get(paneId);
       if (session) session.pipePaneActive = true;
     } else {
-      // pipe-pane failed — clean up
+      // Capped exponential backoff so a permanently-failing pane (e.g. tmux
+      // pane gone but poll() hasn't reaped the session yet) doesn't spam
+      // stderr at 1 Hz from the checkPaneContent re-arm path.
+      const failureCount = (this.pipePaneFailureCount.get(paneId) ?? 0) + 1;
+      this.pipePaneFailureCount.set(paneId, failureCount);
+      const cappedExponent = Math.min(6, failureCount - 1);
+      this.pipePaneRetryAt.set(paneId, Date.now() + 2 ** cappedExponent * 1000);
+      if (failureCount === 1) {
+        console.error(`[panopticon] pipe-pane start failed for pane ${paneId}`);
+      }
       this.teardownPipePane(paneId);
     }
   }
@@ -550,6 +567,13 @@ export class SessionManager {
   private checkPaneContent(): void {
     for (const [paneId, session] of this.sessions) {
       try {
+        if (!session.pipePaneActive && !this.pipePanes.has(paneId)) {
+          const retryAt = this.pipePaneRetryAt.get(paneId);
+          if (retryAt === undefined || Date.now() >= retryAt) {
+            this.setupPipePane(paneId);
+          }
+        }
+
         const content = this.deps.capturePaneContent(session.pane_id);
         if (content === null) continue;
 

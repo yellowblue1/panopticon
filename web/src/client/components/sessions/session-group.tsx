@@ -28,11 +28,10 @@ export function SessionGroup({
           groupRole="orchestrator"
         />
       ) : (
-        <tr className="orphan-group-header">
-          {/* colSpan matches the 5 table columns: Project, Branch, Status, Summary, Actions */}
+        <tr className="lost-lead-group-header">
           <td colSpan={5}>
             <span className="project-name">{group.children[0]?.project_name}</span>
-            <span className="orphan-label">orchestrator not running</span>
+            <span className="lost-lead-label">lead pane exited</span>
           </td>
         </tr>
       )}
@@ -44,7 +43,7 @@ export function SessionGroup({
           lastSeenAt={lastSeenMap.get(child.pane_id) ?? 0}
           hasPlan={plans?.[child.pane_id] ?? false}
           onMarkAsRead={onMarkAsRead}
-          groupRole="worktree-child"
+          groupRole="team-child"
         />
       ))}
     </>
