@@ -34,7 +34,7 @@
     "type-coverage": "type-coverage --at-least 99"
   },
   "dependencies": {
-    "@google/genai": "^1.52.0"
+    "@google/genai": "^2.6.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
