@@ -33,8 +33,10 @@ jobs:
       - name: Run type check
         run: bun run typecheck
 
-      - name: Run security audit (informational)
-        continue-on-error: true
+      - name: Run web type check
+        run: bunx tsc --noEmit -p web/tsconfig.json
+
+      - name: Run security audit
         run: bun audit
 
   unit-test:
@@ -50,6 +52,9 @@ jobs:
 
       - name: Run unit tests
         run: bun run test:unit
+
+      - name: Run web unit tests
+        run: bun run --cwd web test
 
   dependency-check:
     name: Dependency Architecture Check

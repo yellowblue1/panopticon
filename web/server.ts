@@ -1,8 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { StreamableHTTPTransport } from "@hono/mcp";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { serveStatic } from "hono/bun";
 import { z } from "zod";
 import { generatePaneSummary } from "../src/intelligence/application/summarize";
@@ -73,6 +71,7 @@ import {
 } from "../src/terminal/infrastructure/tmux-commands";
 import { BuiltinCommandProvider } from "./builtin-command-fetcher";
 import { discoverDialectCommands } from "./command-discovery";
+import { createMcpHandler } from "./mcp-handler";
 import { handlePaneContentSseConnect } from "./pane-content-sse";
 import { type AppType, createApp, type SseClient } from "./server-app";
 
@@ -289,13 +288,6 @@ const mcpFilePushDeps: McpFilePushDeps = {
   broadcastFilePush: broadcastSseEvent,
 };
 
-const mcpServer = new McpServer({
-  name: "panopticon",
-  version: "0.1.0",
-});
-
-const mcpTransport = new StreamableHTTPTransport({ sessionIdGenerator: undefined });
-
 // Hono lowercases all request header keys (WHATWG Headers).
 const PANE_ID_HEADER_NAME_LC = PANE_ID_HEADER_NAME.toLowerCase();
 
@@ -322,70 +314,75 @@ function missingPaneIdResponse() {
   };
 }
 
-mcpServer.tool(
-  "push_file",
-  "Push a file to the Panopticon browser dashboard for display or download",
-  {
-    file_path: z.string().describe("Absolute path to the file to push"),
-    filename: z.string().optional().describe("Display name for the file (defaults to basename)"),
-  },
-  async ({ file_path, filename }, extra) => {
-    const paneId = resolvePaneId(extra.requestInfo?.headers);
-    if (!paneId) return missingPaneIdResponse();
+const handleMcpRequest = createMcpHandler((mcpServer) => {
+  mcpServer.tool(
+    "push_file",
+    "Push a file to the Panopticon browser dashboard for display or download",
+    {
+      file_path: z.string().describe("Absolute path to the file to push"),
+      filename: z.string().optional().describe("Display name for the file (defaults to basename)"),
+    },
+    async ({ file_path, filename }, extra) => {
+      const paneId = resolvePaneId(extra.requestInfo?.headers);
+      if (!paneId) return missingPaneIdResponse();
 
-    const result = handleFilePush(
-      { filePath: file_path, sessionId: paneId, filename },
-      mcpFilePushDeps,
-    );
+      const result = handleFilePush(
+        { filePath: file_path, sessionId: paneId, filename },
+        mcpFilePushDeps,
+      );
 
-    if (!result.success) {
+      if (!result.success) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${result.error}` }],
+          isError: true,
+        };
+      }
+
       return {
-        content: [{ type: "text" as const, text: `Error: ${result.error}` }],
-        isError: true,
+        content: [
+          {
+            type: "text" as const,
+            text: `Pushed ${result.filename} (${result.mimeType}, ${result.size} bytes) to dashboard`,
+          },
+        ],
       };
-    }
+    },
+  );
 
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Pushed ${result.filename} (${result.mimeType}, ${result.size} bytes) to dashboard`,
-        },
-      ],
-    };
-  },
-);
+  mcpServer.tool(
+    "push_url",
+    "Push a URL to the Panopticon browser dashboard so the user can open it with a single click",
+    {
+      url: z.string().describe("The URL to push (http or https)"),
+      label: z
+        .string()
+        .optional()
+        .describe("Display label for the URL (defaults to the URL itself)"),
+    },
+    async ({ url, label }, extra) => {
+      const paneId = resolvePaneId(extra.requestInfo?.headers);
+      if (!paneId) return missingPaneIdResponse();
 
-mcpServer.tool(
-  "push_url",
-  "Push a URL to the Panopticon browser dashboard so the user can open it with a single click",
-  {
-    url: z.string().describe("The URL to push (http or https)"),
-    label: z.string().optional().describe("Display label for the URL (defaults to the URL itself)"),
-  },
-  async ({ url, label }, extra) => {
-    const paneId = resolvePaneId(extra.requestInfo?.headers);
-    if (!paneId) return missingPaneIdResponse();
+      const result = handleUrlPush({ url, label, sessionId: paneId }, mcpUrlPushDeps);
 
-    const result = handleUrlPush({ url, label, sessionId: paneId }, mcpUrlPushDeps);
+      if (!result.success) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${result.error}` }],
+          isError: true,
+        };
+      }
 
-    if (!result.success) {
       return {
-        content: [{ type: "text" as const, text: `Error: ${result.error}` }],
-        isError: true,
+        content: [
+          {
+            type: "text" as const,
+            text: `Pushed URL to dashboard: ${result.url}`,
+          },
+        ],
       };
-    }
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Pushed URL to dashboard: ${result.url}`,
-        },
-      ],
-    };
-  },
-);
+    },
+  );
+});
 
 // Broadcast when session state changes
 sessionManager.onChange(() => {
@@ -642,17 +639,7 @@ const app = createApp(
       return { scanPaths: updated.scanPaths, useGhq: updated.useGhq };
     },
     browsePath: (path) => browsePathFn(path, launcherDeps),
-    handleMcpRequest: MCP_ENABLED
-      ? async (c) => {
-          if (!mcpServer.isConnected()) {
-            await mcpServer.connect(mcpTransport);
-          }
-          return (
-            (await mcpTransport.handleRequest(c)) ??
-            new Response("No response from MCP server", { status: 500 })
-          );
-        }
-      : undefined,
+    handleMcpRequest: MCP_ENABLED ? (c) => handleMcpRequest(c.req.raw) : undefined,
     discoverSlashCommands: (dialect) => {
       const cwds: string[] = [];
       for (const session of sessionManager.getSessions()) {
@@ -758,7 +745,7 @@ async function main() {
   if (MCP_ENABLED) {
     try {
       const claudeJsonPath = join(homedir(), ".claude.json");
-      const registered = registerMcpConfig(server.port ?? PORT, server.hostname, {
+      const registered = registerMcpConfig(server.port ?? PORT, server.hostname ?? HOST, {
         readFile: (p) => {
           try {
             return readFileSync(p, "utf-8");
