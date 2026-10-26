@@ -43,6 +43,11 @@ component is compromised or coerced:
   `/api/*` rely on the loopback bind plus Origin-based CORS, which DNS
   rebinding can defeat; do not run panopticon on a machine where untrusted
   users can drive the local browser to an attacker-controlled page.
+- MCP requests use the SDK's Web Standards transport with a 64 KiB request
+  body limit, its 100-message JSON-RPC batch limit, and a 16-element tool
+  argument limit. Tools receive file paths and URLs, not uploaded file contents.
+  Each request has a separate server and transport; responses use JSON and
+  standalone SSE connections are disabled.
 - Tmux pane content sent to Gemini for summaries is wrapped in
   `<terminal_output>` XML tags with an explicit framing instruction that
   tells the model to treat the contents as opaque data, not as instructions.
@@ -57,4 +62,5 @@ The repository applies the following baseline protections:
 - All third-party GitHub Actions are pinned to commit SHAs with version markers in `.github/workflows/ci.yml`.
 - CI workflows declare least-privilege `permissions: { contents: read }` at the workflow level.
 - Dependabot raises weekly PRs for both the `bun` and `github-actions` ecosystems (see `.github/dependabot.yml`).
+- CI runs `bun audit` as a required check, including development dependencies.
 - A lockfile-drift CI job catches `package.json` / `bun.lock` metadata mismatches before they reach `main` (introduced in #166).

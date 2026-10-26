@@ -9,18 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LauncherRouteImport } from './routes/launcher'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LauncherRouteImport } from './routes/launcher'
 import { Route as SessionsPaneIdRouteImport } from './routes/sessions/$paneId'
 
-const LauncherRoute = LauncherRouteImport.update({
-  id: '/launcher',
-  path: '/launcher',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LauncherRoute = LauncherRouteImport.update({
+  id: '/launcher',
+  path: '/launcher',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsPaneIdRoute = SessionsPaneIdRouteImport.update({
@@ -61,18 +61,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/launcher': {
-      id: '/launcher'
-      path: '/launcher'
-      fullPath: '/launcher'
-      preLoaderRoute: typeof LauncherRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/launcher': {
+      id: '/launcher'
+      path: '/launcher'
+      fullPath: '/launcher'
+      preLoaderRoute: typeof LauncherRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sessions/$paneId': {
